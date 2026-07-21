@@ -16,6 +16,7 @@ import ArchimateOccurrenceControls from '../components/ArchimateOccurrenceContro
 import ViewpointSelect from '../components/ViewpointSelect.vue'
 import { findViewpointBySlug } from '../components/ViewpointSelect.helpers'
 import { isArchimateDiagramType } from '../lib/archimateOccurrences'
+import { loadViewpointSummaries } from '../lib/viewpointSummary'
 
 const svc = inject(modelServiceKey)!
 const route = useRoute()
@@ -30,8 +31,7 @@ const viewpointSlug = ref<string | null>(null)
 let _lastSuggestedName = ''
 
 const loadViewpoints = async () => {
-  const guidance = await Effect.runPromise(svc.getAuthoringGuidance({})).catch(() => null)
-  viewpoints.value = guidance?.viewpoints ? [...guidance.viewpoints] : []
+  viewpoints.value = await loadViewpointSummaries(svc.listViewpointDefinitions())
 }
 
 const mergeDiagramEntities = (patch: Record<string, unknown>) => {

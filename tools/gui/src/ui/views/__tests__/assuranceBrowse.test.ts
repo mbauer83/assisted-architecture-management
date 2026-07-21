@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest'
 import type { RouteRecordRaw } from 'vue-router'
 import {
   parseLensResponse,
-  browseLinkForNode,
+  standaloneNodeLink,
 } from '../../components/AssuranceLens.helpers'
 
 // ── 1. parseLensResponse ──────────────────────────────────────────────────────
@@ -67,17 +67,17 @@ describe('parseLensResponse', () => {
   })
 })
 
-// ── 2. browseLinkForNode ──────────────────────────────────────────────────────
+// ── 2. standaloneNodeLink ─────────────────────────────────────────────────────
 
-describe('browseLinkForNode', () => {
-  it('produces a /assurance/browse link with node_id param', () => {
-    const link = browseLinkForNode('n:hazard:H1')
-    expect(link).toBe('/assurance/browse?node_id=n%3Ahazard%3AH1')
+describe('standaloneNodeLink', () => {
+  it('deep-links to the standalone node page, escaping special chars', () => {
+    const link = standaloneNodeLink('n:hazard:H1')
+    expect(link).toBe('/assurance/node/n%3Ahazard%3AH1')
   })
 
   it('handles simple node ids without special chars', () => {
-    const link = browseLinkForNode('abc123')
-    expect(link).toBe('/assurance/browse?node_id=abc123')
+    const link = standaloneNodeLink('abc123')
+    expect(link).toBe('/assurance/node/abc123')
   })
 })
 

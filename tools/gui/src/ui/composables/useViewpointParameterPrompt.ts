@@ -1,7 +1,13 @@
 import { computed, ref } from 'vue'
 import type { Ref } from 'vue'
 import type { ViewpointDefinitionEnvelope } from '../../domain'
-import { needsParameterPrompt, parameterSignatureOf, parametersToWireValues } from '../lib/viewpointExecutionParameters'
+import {
+  isBlankDraftValue,
+  needsParameterPrompt,
+  type ParameterDraft,
+  parameterSignatureOf,
+  parametersToWireValues,
+} from '../lib/viewpointExecutionParameters'
 
 export interface ResolvedViewpointExecution {
   readonly slug: string
@@ -27,14 +33,14 @@ export function useViewpointParameterPrompt(
     pendingSlug.value === null ? [] : parameterSignatureOf(definitions.value.find((d) => d.slug === pendingSlug.value)),
   )
 
-  const run = async (slug: string, preset?: Record<string, string>): Promise<void> => {
+  const run = async (slug: string, preset?: ParameterDraft): Promise<void> => {
     const signature = parameterSignatureOf(definitions.value.find((d) => d.slug === slug))
     if (needsParameterPrompt(signature)) {
       // A URL-provided preset that covers every required parameter executes directly —
       // reloading a shared link must reproduce the result, not re-open the dialog.
       const covered = signature
         .filter((parameter) => parameter.required)
-        .every((parameter) => (preset?.[parameter.name] ?? '') !== '')
+        .every((parameter) => !isBlankDraftValue(preset?.[parameter.name]))
       if (preset !== undefined && covered) {
         await onResolved({ slug, parameters: parametersToWireValues(signature, preset) })
         return
@@ -45,7 +51,7 @@ export function useViewpointParameterPrompt(
     await onResolved({ slug, parameters: {} })
   }
 
-  const submit = async (draft: Record<string, string>): Promise<void> => {
+  const submit = async (draft: ParameterDraft): Promise<void> => {
     const slug = pendingSlug.value
     if (slug === null) return
     const signature = parameters.value

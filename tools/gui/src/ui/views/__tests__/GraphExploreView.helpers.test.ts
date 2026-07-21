@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  fitViewBox, wrapLabel,
-  groupKeyFor, nodeVisualFor, edgeVisualFor, projectionByItemId, edgeStyleKey, buildConnectionStyleIndex,
-  buildConnectionSummaryIndex, DERIVED_EDGE_DASH,
-  nodeShapePoints, explorationRedirectFor, anchorDistancesFromResult, effectiveExplorationLayout, distanceColor, distanceLegend,
-  contrastTextColor,
+  groupKeyFor, nodeVisualFor, edgeVisualFor, projectionByItemId, edgeStyleKey, buildConnectionStyleIndex, buildConnectionSummaryIndex, DERIVED_EDGE_DASH, explorationRedirectFor, anchorDistancesFromResult, effectiveExplorationLayout, distanceColor, distanceLegend,
 } from '../GraphExploreView.helpers'
 import { tokenColor, tokenShape, tokenIconLetter, tokenEdgeEmphasis, resolveStyleColor } from '../../lib/viewpointStyleTokens'
 import type { ViewpointDefinitionEnvelope } from '../../../domain'
@@ -38,15 +34,21 @@ describe('groupKeyFor', () => {
 })
 
 describe('nodeVisualFor', () => {
-  it('falls back to the domain color and default shape/icon when unstyled', () => {
-    expect(nodeVisualFor(undefined, '#abcabc')).toEqual({ color: '#abcabc', shape: 'circle', iconLetter: null })
+  it('falls back to the domain color and default shape/icon when unstyled; no glyph without a type', () => {
+    expect(nodeVisualFor(undefined, '#abcabc')).toEqual({
+      color: '#abcabc', shape: 'circle', iconLetter: null, glyph: null,
+    })
   })
 
   it('resolves node_color/node_shape/node_icon from the style map', () => {
     const visual = nodeVisualFor({ node_color: 'critical', node_shape: 'critical', node_icon: 'critical' }, '#abcabc')
     expect(visual).toEqual({
-      color: tokenColor('critical'), shape: tokenShape('critical'), iconLetter: tokenIconLetter('critical'),
+      color: tokenColor('critical'), shape: tokenShape('critical'), iconLetter: tokenIconLetter('critical'), glyph: null,
     })
+  })
+
+  it('resolves the ArchiMate glyph from the artifact type', () => {
+    expect(nodeVisualFor(undefined, '#abcabc', 'stakeholder').glyph).toBeTruthy()
   })
 })
 
@@ -200,19 +202,6 @@ describe('effectiveExplorationLayout', () => {
   })
 })
 
-describe('contrastTextColor', () => {
-  it('uses white text on dark fills and dark ink on light fills', () => {
-    expect(contrastTextColor('#dc2626')).toBe('#ffffff')
-    expect(contrastTextColor('#4f6d83')).toBe('#ffffff')
-    expect(contrastTextColor('#fbbf24')).toBe('#252327')
-    expect(contrastTextColor('#ffffff')).toBe('#252327')
-  })
-
-  it('defaults to dark ink for non-hex input', () => {
-    expect(contrastTextColor('neutral')).toBe('#252327')
-  })
-})
-
 describe('distanceColor', () => {
   it('maps depth 0 to the near endpoint and max depth to the far endpoint', () => {
     expect(distanceColor(0, 4)).toBe(tokenColor('heat-near'))
@@ -245,57 +234,5 @@ describe('distanceLegend', () => {
 
   it('is empty for no observed distances', () => {
     expect(distanceLegend([])).toEqual([])
-  })
-})
-
-describe('nodeShapePoints', () => {
-  it('produces a distinct point count per shape', () => {
-    expect(nodeShapePoints('triangle', 24).split(' ')).toHaveLength(3)
-    expect(nodeShapePoints('diamond', 24).split(' ')).toHaveLength(4)
-    expect(nodeShapePoints('square', 24).split(' ')).toHaveLength(4)
-    expect(nodeShapePoints('circle', 24).split(' ')).toHaveLength(24)
-  })
-
-  it('gives diamond and square the same vertex count but a different orientation', () => {
-    expect(nodeShapePoints('diamond', 24)).not.toBe(nodeShapePoints('square', 24))
-  })
-})
-
-describe('fitViewBox', () => {
-  it('bounds every node with padding, aspect-corrected to the container', () => {
-    const box = fitViewBox([{ x: 0, y: 0 }, { x: 1000, y: 100 }], 800, 600, 50)
-    expect(box.x).toBe(-50)
-    expect(box.w).toBe(1100)
-    // Content is wider than the container ratio → height is corrected up to match.
-    expect(box.h).toBeCloseTo(1100 / (800 / 600))
-    // Every node stays inside the box.
-    expect(box.y).toBeLessThan(0)
-    expect(box.y + box.h).toBeGreaterThan(100)
-  })
-
-  it('falls back to the container rect when there is nothing to fit', () => {
-    expect(fitViewBox([], 800, 600)).toEqual({ x: 0, y: 0, w: 800, h: 600 })
-  })
-})
-
-describe('wrapLabel', () => {
-  it('keeps short labels on one line', () => {
-    expect(wrapLabel('Query Engine')).toEqual(['Query Engine'])
-  })
-
-  it('wraps at word boundaries up to two lines', () => {
-    expect(wrapLabel('Canonical Per-Repo Artifact Index', 14, 2)).toEqual(['Canonical', 'Per-Repo…'])
-  })
-
-  it('ellipsizes when content remains beyond the last line', () => {
-    const lines = wrapLabel('Architecture Management Platform Backend Service', 14, 2)
-    expect(lines).toHaveLength(2)
-    expect(lines[1].endsWith('…')).toBe(true)
-  })
-
-  it('hard-truncates a single overlong word', () => {
-    const lines = wrapLabel('supercalifragilisticexpialidocious', 14, 2)
-    expect(lines[0].length).toBeLessThanOrEqual(14)
-    expect(lines[0].endsWith('…')).toBe(true)
   })
 })

@@ -7,6 +7,7 @@
  */
 
 import type { AggregateKind, DerivedAttributeNode, QueryBindingNode, QueryParameterNode } from './viewpointBindings'
+import type { TracePatternNode } from './viewpointTracePattern'
 
 let uidCounter = 0
 export const nextNodeId = (): string => `n${++uidCounter}`
@@ -143,6 +144,7 @@ export interface ExecutableQueryNode {
   bindings: QueryBindingNode[]
   parameters: QueryParameterNode[]
   derived: DerivedAttributeNode[]
+  tracePatterns: TracePatternNode[]
 }
 
 export const QUERY_SCHEMA_VERSION = 1
@@ -155,4 +157,5 @@ export const mkQuery = (): ExecutableQueryNode => ({
   bindings: [],
   parameters: [],
   derived: [],
+  tracePatterns: [],
 })

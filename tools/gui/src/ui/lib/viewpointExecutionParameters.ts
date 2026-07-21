@@ -11,6 +11,16 @@ import type { ViewpointDefinitionEnvelope } from '../../domain'
 
 const asRecord = (raw: unknown): Record<string, unknown> => raw as Record<string, unknown>
 
+/** A draft value: a scalar's string, or a set-valued parameter's ordered members. */
+export type ParameterDraftValue = string | readonly string[]
+export type ParameterDraft = Record<string, ParameterDraftValue>
+
+/** Blank scalar OR empty set — the "no value supplied" state, kept distinct from a
+ * supplied-empty string so an unsupplied optional parameter is omitted from the wire body
+ * (the backend's "missing" vs "supplied" distinction). */
+export const isBlankDraftValue = (value: ParameterDraftValue | undefined): boolean =>
+  value === undefined || (typeof value === 'string' ? value.trim() === '' : value.length === 0)
+
 /** A definition's declared parameters, parsed from its stored `query.parameters` — empty
  * for a scope-only or unparameterized definition. */
 export const parameterSignatureOf = (envelope: ViewpointDefinitionEnvelope | undefined): readonly QueryParameterNode[] => {
@@ -23,19 +33,43 @@ export const parameterSignatureOf = (envelope: ViewpointDefinitionEnvelope | und
 /** A prompt is needed exactly when at least one required parameter has no default —
  * an all-optional or all-defaulted signature executes immediately, same as today. */
 export const needsParameterPrompt = (signature: readonly QueryParameterNode[]): boolean =>
-  signature.some((p) => p.required && p.default === '')
+  signature.some((p) => p.required && isBlankDraftValue(defaultDraftValue(p)))
 
-/** Typed string-input drafts, one per declared parameter, seeded from each parameter's
- * own default (or empty) — the prompt dialog's own local form state shape. */
-export const initialParameterDraft = (signature: readonly QueryParameterNode[]): Record<string, string> =>
-  Object.fromEntries(signature.map((p) => [p.name, p.default]))
+/** A parameter's default as a draft value — a set parameter's is its member array (copied so
+ * the draft never aliases the declaration), a scalar's is its default string. */
+const defaultDraftValue = (parameter: QueryParameterNode): ParameterDraftValue =>
+  parameter.cardinality === 'many'
+    ? [...(typeof parameter.default === 'string' ? [] : parameter.default)]
+    : (typeof parameter.default === 'string' ? parameter.default : '')
+
+/** Typed drafts, one per declared parameter, seeded from each parameter's own default —
+ * the prompt/toolbar's own local form state. */
+export const initialParameterDraft = (signature: readonly QueryParameterNode[]): ParameterDraft =>
+  Object.fromEntries(signature.map((p) => [p.name, defaultDraftValue(p)]))
+
+/** Seed a draft from already-bound WIRE values (the canonical values an execution ran with),
+ * falling back to each parameter's default for any the caller did not supply — used by the
+ * always-on toolbar so it opens reflecting the current result, and a reloaded shared URL
+ * reproduces it. A set parameter's members are copied to strings; a scalar is stringified. */
+export const draftFromWireValues = (
+  signature: readonly QueryParameterNode[],
+  values: Readonly<Record<string, unknown>>,
+): ParameterDraft => {
+  const draft = initialParameterDraft(signature)
+  for (const parameter of signature) {
+    if (!(parameter.name in values)) continue
+    const value = values[parameter.name]
+    draft[parameter.name] = Array.isArray(value) ? value.map(String) : String(value)
+  }
+  return draft
+}
 
 /** A required parameter still missing a value in the current draft — drives the submit
  * button's disabled state and which fields to flag. */
 export const missingRequiredParameters = (
   signature: readonly QueryParameterNode[],
-  draft: Readonly<Record<string, string>>,
-): readonly QueryParameterNode[] => signature.filter((p) => p.required && !(draft[p.name] ?? '').trim())
+  draft: Readonly<ParameterDraft>,
+): readonly QueryParameterNode[] => signature.filter((p) => p.required && isBlankDraftValue(draft[p.name]))
 
 /** Coerces one typed string draft value to the wire shape `execute`'s `parameters` body
  * expects — `entity-id`/`string`/`slug` pass through as strings (an artifact id is a
@@ -60,16 +94,19 @@ export const coerceParameterValue = (valueType: ParameterValueType, raw: string)
 
 /** The full wire-shaped `parameters` body from a draft — omits a parameter entirely when
  * its draft value is blank (an unsupplied optional parameter, not an explicit empty
- * string), matching the backend's "missing" vs. "supplied-empty" distinction. */
+ * string), matching the backend's "missing" vs. "supplied-empty" distinction. A set-valued
+ * parameter sends its member array verbatim (the backend canonicalizes order + dedup). */
 export const parametersToWireValues = (
   signature: readonly QueryParameterNode[],
-  draft: Readonly<Record<string, string>>,
+  draft: Readonly<ParameterDraft>,
 ): Record<string, unknown> => {
   const result: Record<string, unknown> = {}
   for (const parameter of signature) {
-    const raw = draft[parameter.name] ?? ''
-    if (raw.trim() === '') continue
-    result[parameter.name] = coerceParameterValue(parameter.valueType, raw)
+    const value = draft[parameter.name]
+    if (isBlankDraftValue(value)) continue
+    result[parameter.name] = typeof value === 'string'
+      ? coerceParameterValue(parameter.valueType, value)
+      : [...value]
   }
   return result
 }

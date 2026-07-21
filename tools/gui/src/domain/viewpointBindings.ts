@@ -39,17 +39,30 @@ export const mkQueryBinding = (): QueryBindingNode => ({
   cardinality: 'set', project: null, aggregate: null, tupleOf: [], includeInResult: false,
 })
 
+/** `one` = a scalar value; `many` = an ordered set. Orthogonal to `valueType` (the element
+ * kind), mirroring the backend: a closed set of strings and an open set of slugs differ only
+ * by `allowedValues`. */
+export type ParameterCardinality = 'one' | 'many'
+
 export interface QueryParameterNode {
   readonly id: string
   name: string
   valueType: ParameterValueType
   required: boolean
-  default: string
+  /** A scalar default is a string; a set default is its member list. Empty string / empty
+   * array both mean "no default". */
+  default: string | readonly string[]
   description: string
+  cardinality: ParameterCardinality
+  /** Non-empty = a CLOSED vocabulary (members enforced); empty = OPEN (any value accepted,
+   * an unmatched one yielding an empty result rather than an error). `many` only. */
+  allowedValues: readonly string[]
+  minItems: number
 }
 
 export const mkQueryParameter = (): QueryParameterNode => ({
   id: nextNodeId(), name: '', valueType: 'string', required: true, default: '', description: '',
+  cardinality: 'one', allowedValues: [], minItems: 1,
 })
 
 export type DerivedOfHead = 'none' | 'connection' | 'endpoint' | 'relationship-hops'
@@ -57,6 +70,11 @@ export type DerivedOfHead = 'none' | 'connection' | 'endpoint' | 'relationship-h
 export interface DerivedAttributeNode {
   readonly id: string
   name: string
+  /** 'graph' attributes are computed from the model graph; 'security-signal'
+   * attributes are batch-fetched metrics — the graph fields below are
+   * meaningless for them and never serialized. */
+  source: 'graph' | 'security-signal'
+  metric: string | null
   direction: IncidentDirection
   traversal: DerivedTraversal
   includePotential: boolean
@@ -69,7 +87,8 @@ export interface DerivedAttributeNode {
 }
 
 export const mkDerivedAttribute = (): DerivedAttributeNode => ({
-  id: nextNodeId(), name: '', direction: 'either', traversal: 'direct', includePotential: false, maxHops: null,
+  id: nextNodeId(), name: '', source: 'graph', metric: null,
+  direction: 'either', traversal: 'direct', includePotential: false, maxHops: null,
   connectionCriteria: null, endpointCriteria: null, reduce: 'count', ofHead: 'none', ofAttribute: null,
 })
 

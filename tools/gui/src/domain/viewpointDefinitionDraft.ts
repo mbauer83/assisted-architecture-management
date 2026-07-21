@@ -88,6 +88,7 @@ export const isEmptyQuery = (query: ExecutableQueryNode | null): boolean =>
     && query.parameters.length === 0
     && query.bindings.length === 0
     && query.derived.length === 0
+    && query.tracePatterns.length === 0
     && query.includeConnected.length === 0
     && query.connections.enabled
     && query.connections.criteria.children.length === 0

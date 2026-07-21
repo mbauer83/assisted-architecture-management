@@ -9,9 +9,9 @@ import {
 } from '../AssuranceSupplyChainWizard.helpers'
 
 describe('SUPPLY_STEPS', () => {
-  it('runs Scope → Import SBOM → Components → Vulnerabilities → AI-BOM', () => {
+  it('runs Scope → Import SBOM → Components → Vulnerabilities → Posture & VEX → AI-BOM', () => {
     expect(SUPPLY_STEPS.map((s) => s.key)).toEqual([
-      'scope', 'import', 'components', 'vulnerabilities', 'aibom',
+      'scope', 'import', 'components', 'vulnerabilities', 'posture', 'aibom',
     ])
   })
 

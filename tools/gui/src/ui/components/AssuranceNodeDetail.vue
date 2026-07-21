@@ -2,11 +2,16 @@
 import { ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import ModelThisPanel from './ModelThisPanel.vue'
+import AssuranceEdgeList from './AssuranceEdgeList.vue'
+import type { AssuranceEdge } from './AssuranceNodeDetail.helpers'
 import { isUnboundControlNode } from './ModelThisPanel.helpers'
 import { tlpColor } from './tlp'
 
 const props = defineProps<{ nodeId: string | null }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{
+  close: []
+  loadState: [state: 'ok' | 'not-found' | 'locked' | 'error']
+}>()
 
 interface ArchRef {
   arch_artifact_id: string
@@ -14,13 +19,7 @@ interface ArchRef {
   notes?: string
 }
 
-interface Edge {
-  edge_id?: string
-  source_id: string
-  target_id: string
-  conn_type: string
-  label?: string
-}
+type Edge = AssuranceEdge
 
 interface NodeDetail {
   node_id: string
@@ -54,12 +53,15 @@ async function load(nodeId: string | null) {
   error.value = null
   try {
     const resp = await fetch(`/api/assurance/nodes/${encodeURIComponent(nodeId)}`)
-    if (resp.status === 423) { error.value = 'Store locked'; return }
-    if (resp.status === 404) { error.value = 'Node not found'; return }
-    if (!resp.ok) { error.value = `HTTP ${resp.status}`; return }
+    if (resp.status === 423) { error.value = 'Store locked'; emit('loadState', 'locked'); return }
+    // Absent and above-ceiling are indistinguishable by design (same 404).
+    if (resp.status === 404) { error.value = 'Node not found'; emit('loadState', 'not-found'); return }
+    if (!resp.ok) { error.value = `HTTP ${resp.status}`; emit('loadState', 'error'); return }
     data.value = await resp.json() as NodeResponse
+    emit('loadState', 'ok')
   } catch (e) {
     error.value = String(e)
+    emit('loadState', 'error')
   } finally {
     loading.value = false
   }
@@ -70,12 +72,35 @@ watch(() => props.nodeId, load, { immediate: true })
 function archEntityPath(ref: ArchRef): string {
   return `/entity?id=${encodeURIComponent(ref.arch_artifact_id)}`
 }
+
+const deletingEdgeId = ref<string | null>(null)
+
+async function deleteEdge(edge: Edge) {
+  if (!edge.edge_id || deletingEdgeId.value) return
+  deletingEdgeId.value = edge.edge_id
+  try {
+    const resp = await fetch(`/api/assurance/edges/${encodeURIComponent(edge.edge_id)}`, { method: 'DELETE' })
+    if (resp.ok) await load(props.nodeId)
+    else error.value = `Delete failed: HTTP ${resp.status}`
+  } catch (e) {
+    error.value = String(e)
+  } finally {
+    deletingEdgeId.value = null
+  }
+}
 </script>
 
 <template>
   <div class="node-detail">
     <div class="detail-hdr">
       <span class="detail-title">Node detail</span>
+      <RouterLink
+        v-if="data"
+        :to="{ path: '/assurance/graph', query: { node_id: data.node.node_id } }"
+        class="explore-link"
+      >
+        Explore graph
+      </RouterLink>
       <button
         class="close-btn"
         type="button"
@@ -208,45 +233,20 @@ function archEntityPath(ref: ArchRef): string {
       </div>
 
       <!-- Edges -->
-      <div
-        v-if="data.outgoing_edges.length > 0"
-        class="detail-section"
-      >
-        <div class="section-label">
-          Outgoing ({{ data.outgoing_edges.length }})
-        </div>
-        <ul class="edge-list">
-          <li
-            v-for="edge in data.outgoing_edges"
-            :key="edge.edge_id ?? edge.target_id"
-            class="edge-item"
-          >
-            <span class="edge-type">{{ edge.conn_type }}</span>
-            <span class="edge-arrow">→</span>
-            <span class="edge-target">{{ edge.target_id }}</span>
-          </li>
-        </ul>
-      </div>
-
-      <div
-        v-if="data.incoming_edges.length > 0"
-        class="detail-section"
-      >
-        <div class="section-label">
-          Incoming ({{ data.incoming_edges.length }})
-        </div>
-        <ul class="edge-list">
-          <li
-            v-for="edge in data.incoming_edges"
-            :key="edge.edge_id ?? edge.source_id"
-            class="edge-item"
-          >
-            <span class="edge-source">{{ edge.source_id }}</span>
-            <span class="edge-arrow">→</span>
-            <span class="edge-type">{{ edge.conn_type }}</span>
-          </li>
-        </ul>
-      </div>
+      <AssuranceEdgeList
+        label="Outgoing"
+        :edges="data.outgoing_edges"
+        direction="outgoing"
+        :deleting="deletingEdgeId !== null"
+        @delete="deleteEdge"
+      />
+      <AssuranceEdgeList
+        label="Incoming"
+        :edges="data.incoming_edges"
+        direction="incoming"
+        :deleting="deletingEdgeId !== null"
+        @delete="deleteEdge"
+      />
     </template>
   </div>
 </template>
@@ -270,6 +270,8 @@ function archEntityPath(ref: ArchRef): string {
   z-index: 1;
 }
 .detail-title { font-weight: 600; font-size: 14px; }
+.explore-link { margin-left: auto; font-size: 12px; color: #2563eb; text-decoration: none; }
+.explore-link:hover { text-decoration: underline; }
 .close-btn {
   background: none;
   border: none;
@@ -329,7 +331,7 @@ function archEntityPath(ref: ArchRef): string {
   color: #6b7280;
   margin-bottom: 8px;
 }
-.ref-list, .edge-list {
+.ref-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -356,27 +358,4 @@ function archEntityPath(ref: ArchRef): string {
 .ref-icon { font-size: 10px; }
 .ref-id { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
 .ref-rel { font-size: 11px; color: #9ca3af; }
-.edge-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-family: monospace;
-  color: #374151;
-}
-.edge-type {
-  font-size: 11px;
-  font-weight: 500;
-  background: #f1f5f9;
-  padding: 1px 5px;
-  border-radius: 3px;
-  color: #475569;
-}
-.edge-arrow { color: #9ca3af; }
-.edge-target, .edge-source {
-  max-width: 130px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 </style>

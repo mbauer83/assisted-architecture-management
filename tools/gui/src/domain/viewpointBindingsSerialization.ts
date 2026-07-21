@@ -79,8 +79,17 @@ const cardinalityFromResultType = (resultType: string): QueryBindingNode['cardin
 
 export const parameterToMapping = (parameter: QueryParameterNode): Record<string, unknown> => {
   const result: Record<string, unknown> = { name: parameter.name, type: parameter.valueType }
+  if (parameter.cardinality === 'many') {
+    result.cardinality = 'many'
+    if (parameter.allowedValues.length > 0) result.allowed_values = [...parameter.allowedValues]
+    result.min_items = parameter.minItems
+  }
   if (!parameter.required) result.required = false
-  if (parameter.default !== '') result.default = parseDefault(parameter.default, parameter.valueType)
+  if (typeof parameter.default === 'string') {
+    if (parameter.default !== '') result.default = parseDefault(parameter.default, parameter.valueType)
+  } else if (parameter.default.length > 0) {
+    result.default = [...parameter.default]
+  }
   if (parameter.description) result.description = parameter.description
   return result
 }
@@ -98,8 +107,15 @@ export const parameterFromMapping = (raw: unknown): QueryParameterNode => {
   node.name = stringOr(rec.name, '')
   node.valueType = (rec.type as ParameterValueType) ?? 'string'
   node.required = Boolean(rec.required ?? true)
-  node.default = stringOr(rec.default, '')
   node.description = stringOr(rec.description, '')
+  node.cardinality = rec.cardinality === 'many' ? 'many' : 'one'
+  if (node.cardinality === 'many') {
+    node.allowedValues = Array.isArray(rec.allowed_values) ? rec.allowed_values.map(String) : []
+    node.minItems = typeof rec.min_items === 'number' ? rec.min_items : 1
+    node.default = Array.isArray(rec.default) ? rec.default.map(String) : []
+  } else {
+    node.default = stringOr(rec.default, '')
+  }
   return node
 }
 
@@ -107,6 +123,11 @@ export const parameterFromMapping = (raw: unknown): QueryParameterNode => {
 
 export const derivedAttributeToMapping = (attribute: DerivedAttributeNode): Record<string, unknown> => {
   const result: Record<string, unknown> = { name: attribute.name }
+  if (attribute.source === 'security-signal') {
+    result.source = 'security-signal'
+    result.metric = attribute.metric
+    return result
+  }
   if (attribute.direction !== 'either') result.direction = attribute.direction
   if (attribute.traversal !== 'direct') result.traversal = attribute.traversal
   if (attribute.includePotential) result.include_potential = true
@@ -123,6 +144,11 @@ export const derivedAttributeFromMapping = (raw: unknown): DerivedAttributeNode 
   const rec = asRecord(raw)
   const node = mkDerivedAttribute()
   node.name = stringOr(rec.name, '')
+  if (rec.source === 'security-signal') {
+    node.source = 'security-signal'
+    node.metric = stringOrNull(rec.metric)
+    return node
+  }
   node.direction = (rec.direction as IncidentDirection) ?? 'either'
   node.traversal = rec.traversal === 'derived' ? 'derived' : 'direct'
   node.includePotential = Boolean(rec.include_potential ?? false)

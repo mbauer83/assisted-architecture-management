@@ -8,6 +8,7 @@ import { entityEditFormKey, useEntityEditForm } from '../composables/useEntityEd
 import ConnectionsPanel from '../components/ConnectionsPanel.vue'
 import ArtifactReferenceInput from '../components/ArtifactReferenceInput.vue'
 import AssuranceLens from '../components/AssuranceLens.vue'
+import DerivedSecurityAttributesPanel from '../components/DerivedSecurityAttributesPanel.vue'
 import EntityDetailHeader from '../components/EntityDetailHeader.vue'
 import EntityEditFormCard from '../components/EntityEditFormCard.vue'
 import EntityDeletePanel from '../components/EntityDeletePanel.vue'
@@ -177,6 +178,12 @@ const executeDelete = () => { void router.push(backTo.value) }
 
       <!-- Assurance lens: shows assurance findings that concern this entity (hidden when locked) -->
       <AssuranceLens
+        v-if="entityId"
+        :artifact-id="entityId"
+      />
+
+      <!-- Derived security attributes (read-only; absent when locked/unanchored) -->
+      <DerivedSecurityAttributesPanel
         v-if="entityId"
         :artifact-id="entityId"
       />

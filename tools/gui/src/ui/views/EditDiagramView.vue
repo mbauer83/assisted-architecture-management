@@ -20,6 +20,7 @@ import { usePanZoom } from '../composables/usePanZoom'
 import { useDiagramEditSelection } from '../composables/useDiagramEditSelection'
 import { useDiagramEditSvgOverlay } from '../composables/useDiagramEditSvgOverlay'
 import { sanitizeDiagramSvg } from '../lib/svgSanitize'
+import { loadViewpointSummaries } from '../lib/viewpointSummary'
 
 const svc = inject(modelServiceKey)!
 const addToast = inject(toastKey)!
@@ -46,8 +47,7 @@ const viewpointProjection = ref<ViewpointProjection | null>(null)
 const hideInsteadOfGhost = ref(false)
 
 const loadViewpoints = async () => {
-  const guidance = await Effect.runPromise(svc.getAuthoringGuidance({})).catch(() => null)
-  viewpoints.value = guidance?.viewpoints ? [...guidance.viewpoints] : []
+  viewpoints.value = await loadViewpointSummaries(svc.listViewpointDefinitions())
 }
 
 const loadProjection = async () => {

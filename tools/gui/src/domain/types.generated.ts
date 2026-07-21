@@ -27,6 +27,7 @@ export const ENTITY_TYPE_NAMES = [
   "driver",
   "equipment",
   "event",
+  "evidence",
   "facility",
   "function",
   "global-artifact-reference",
@@ -72,7 +73,7 @@ export const ENTITY_TYPE_NAMES = [
 export type EntityTypeName = typeof ENTITY_TYPE_NAMES[number]
 
 export const CONNECTION_TYPE_NAMES = [
-  "accountable-to",
+  "accountable-for",
   "activity-data-association",
   "activity-decision",
   "activity-message-flow",
@@ -91,10 +92,8 @@ export const CONNECTION_TYPE_NAMES = [
   "archimate-specialization",
   "archimate-triggering",
   "assesses",
-  "binds-to",
   "by-controller",
   "c4-uses",
-  "cites",
   "complies-with",
   "concerns",
   "derives",
@@ -116,8 +115,7 @@ export const CONNECTION_TYPE_NAMES = [
   "issues",
   "leads-to",
   "refines",
-  "responsible-of",
-  "satisfied-by",
+  "responsible-for",
   "satisfy",
   "seq-from",
   "seq-to",
@@ -140,7 +138,6 @@ export const CONNECTION_TYPE_NAMES = [
   "usecase-extend",
   "usecase-generalization",
   "usecase-include",
-  "violates",
 ] as const
 export type ConnectionTypeName = typeof CONNECTION_TYPE_NAMES[number]
 

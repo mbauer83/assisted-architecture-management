@@ -122,6 +122,7 @@ const STATIC_ROUTES = [
   '/promote',
   '/assurance',
   '/assurance/browse',
+  '/assurance/graph',
   '/assurance/analyses',
   '/assurance/stpa',
   '/assurance/grc',
@@ -142,6 +143,28 @@ for (const route of STATIC_ROUTES) {
     await expectHealthyMain(page, problems)
   })
 }
+
+test('assurance node deep link: unknown id renders the indistinguishable not-found page', async ({ page }) => {
+  // The 404 echo is expected here (unknown OR above-ceiling — by design the same);
+  // suppress exactly that one console line and keep every other problem fatal.
+  const problems: Problem[] = []
+  page.on('pageerror', (err) => problems.push({ kind: 'pageerror', detail: String(err) }))
+  page.on('console', (msg) => {
+    if (msg.type() !== 'error') return
+    if (isExpectedLockedAssuranceEcho(msg)) return
+    if (/Failed to load resource.*status of 404/.test(msg.text()) && msg.location().url.includes('/api/assurance/nodes/')) return
+    problems.push({ kind: 'console.error', detail: msg.text() })
+  })
+  await page.goto('/assurance/node/HAZ%40does-not-exist', { waitUntil: 'load' })
+  await page.waitForTimeout(1500)
+  const main = page.locator('#app > main')
+  await expect(main).toBeVisible()
+  const text = (await main.innerText()).trim()
+  // Locked store (CI default) shows the locked banner; unlocked shows not-found —
+  // both are healthy, explicit states for a deep link that cannot resolve.
+  expect(/does not exist|locked/i.test(text), `unexpected page text: ${text}`).toBe(true)
+  expect(problems, `runtime problems:\n${problems.map((p) => `  [${p.kind}] ${p.detail}`).join('\n')}`).toEqual([])
+})
 
 test('entity detail renders (exercises /api/ontology connection editor)', async ({ page }) => {
   const { problems } = watch(page)

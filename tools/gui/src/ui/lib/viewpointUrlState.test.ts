@@ -9,7 +9,7 @@ const result = (generation: number | null): ViewpointExecutionResult => ({
   index_generation: generation, entity_ids: [], connection_ids: [], entities: [], connections: [],
   total_entity_count: 0, returned_entity_count: 0, total_connection_count: 0, returned_connection_count: 0,
   truncated: false, entity_limit: 500, matrix_axes: null, warnings: [], duration_ms: 1, query_summary: '',
-  anchor_ids: [], target_population: null, aggregation: null,
+  anchor_ids: [], target_population: null, aggregation: null, bound_parameters: {}, trace_table: null,
 })
 
 describe('executionQuery / parametersFromQuery', () => {
@@ -21,6 +21,19 @@ describe('executionQuery / parametersFromQuery', () => {
 
   it('carries nothing but the execution state — stale keys never leak in', () => {
     expect(Object.keys(executionQuery('vp', {}))).toEqual(['viewpoint'])
+  })
+
+  it('round-trips a SET parameter as repeated ordered keys, not a joined string', () => {
+    const query = executionQuery('motivation-coverage', { scope: ['goal', 'requirement'] })
+    expect(query['param.scope']).toEqual(['goal', 'requirement'])
+    expect(parametersFromQuery(query as never)).toEqual({ scope: ['goal', 'requirement'] })
+  })
+
+  it('reads a repeated query key back as an array and a single one as a string', () => {
+    expect(parametersFromQuery({ 'param.scope': ['goal', 'outcome'], 'param.gaps_only': 'true' })).toEqual({
+      scope: ['goal', 'outcome'],
+      gaps_only: 'true',
+    })
   })
 })
 

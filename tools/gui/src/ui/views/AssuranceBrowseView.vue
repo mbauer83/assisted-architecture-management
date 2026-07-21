@@ -46,9 +46,7 @@ const filterBinding = ref('')
 
 // Selected node for detail / edit panels
 const selectedNodeId = ref<string | null>(null)
-const selectedNode = computed(() =>
-  nodes.value.find(n => n.node_id === selectedNodeId.value) ?? null
-)
+const selectedNode = computed(() => nodes.value.find(n => n.node_id === selectedNodeId.value) ?? null)
 
 // Panel mode: 'detail' | 'create' | 'edit' | 'add-edge'
 const panelMode = ref<'detail' | 'create' | 'edit' | 'add-edge'>('detail')
@@ -503,7 +501,7 @@ watch(analysisId, () => { void loadNodes() })
 
         <!-- ADD EDGE -->
         <div
-          v-else-if="panelMode === 'add-edge' && selectedNodeId"
+          v-else-if="panelMode === 'add-edge' && selectedNode"
           class="panel-section"
         >
           <div class="panel-header">
@@ -521,7 +519,8 @@ watch(analysisId, () => { void loadNodes() })
           </div>
           <div class="panel-body">
             <AssuranceEdgePicker
-              :source-id="selectedNodeId"
+              :source-id="selectedNode.node_id"
+              :source-type="selectedNode.node_type"
               :loading="formLoading"
               @submit="handleAddEdge"
               @cancel="backToDetail"

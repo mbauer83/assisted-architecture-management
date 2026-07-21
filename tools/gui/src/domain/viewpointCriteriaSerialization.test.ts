@@ -10,7 +10,7 @@ import {
   queryFromMapping,
   queryToMapping,
 } from './viewpointCriteriaSerialization'
-import { mkQueryBinding, mkQueryParameter } from './viewpointBindings'
+import { mkDerivedAttribute, mkQueryBinding, mkQueryParameter } from './viewpointBindings'
 
 describe('condition value refs', () => {
   it('serializes a literal value as a plain scalar', () => {
@@ -183,6 +183,28 @@ describe('query bindings/parameters/derived', () => {
     expect(queryToMapping(mkQuery())).not.toHaveProperty('derived')
   })
 
+  it('round-trips a security-signal derived attribute without inventing graph keys', () => {
+    const query = mkQuery()
+    const attribute = mkDerivedAttribute()
+    attribute.name = 'open_vulns'
+    attribute.source = 'security-signal'
+    attribute.metric = 'distinct_open_vulnerabilities'
+    query.derived = [attribute]
+    const mapped = queryToMapping(query)
+    expect(mapped.derived).toEqual([{
+      name: 'open_vulns', source: 'security-signal', metric: 'distinct_open_vulnerabilities',
+    }])
+    const parsed = queryFromMapping(mapped)
+    expect(parsed.derived[0]).toMatchObject({
+      name: 'open_vulns', source: 'security-signal', metric: 'distinct_open_vulnerabilities',
+    })
+    // A graph attribute stays exactly as before — no source key on the wire.
+    const graph = mkDerivedAttribute()
+    graph.name = 'dependents'
+    query.derived = [graph]
+    expect((queryToMapping(query).derived as Record<string, unknown>[])[0]).not.toHaveProperty('source')
+  })
+
   it('round-trips a set-cardinality entity binding through query mapping', () => {
     const query = mkQuery()
     const binding = mkQueryBinding()
@@ -235,7 +257,8 @@ describe('query bindings/parameters/derived', () => {
   it('round-trips a derived attribute with a connection.<attr> source', () => {
     const query = mkQuery()
     const attribute = {
-      id: 'd1', name: 'impact-distance', direction: 'either' as const, traversal: 'derived' as const,
+      id: 'd1', name: 'impact-distance', source: 'graph' as const, metric: null,
+      direction: 'either' as const, traversal: 'derived' as const,
       includePotential: false, maxHops: 3, connectionCriteria: null, endpointCriteria: null,
       reduce: 'min' as const, ofHead: 'relationship-hops' as const, ofAttribute: null,
     }

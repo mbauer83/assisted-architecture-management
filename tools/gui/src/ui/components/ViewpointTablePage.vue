@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, ref } from 'vue'
 import { Effect } from 'effect'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { ViewpointDefinitionEnvelope } from '../../domain'
 import { modelServiceKey } from '../keys'
 import { useViewpointExecution } from '../composables/useViewpointExecution'
 import { useViewpointParameterPrompt } from '../composables/useViewpointParameterPrompt'
 import type { ResolvedViewpointExecution } from '../composables/useViewpointParameterPrompt'
+import { parameterSignatureOf } from '../lib/viewpointExecutionParameters'
+import { executionQuery, parametersFromQuery } from '../lib/viewpointUrlState'
 import ViewpointExecutionDiagnostics from './ViewpointExecutionDiagnostics.vue'
 import ViewpointExecutionError from './ViewpointExecutionError.vue'
+import ViewpointExecutionToolbar from './ViewpointExecutionToolbar.vue'
 import ViewpointParameterPrompt from './ViewpointParameterPrompt.vue'
 import ViewpointTableCell from './ViewpointTableCell.vue'
+import ViewpointTraceTable from './ViewpointTraceTable.vue'
 import { computeExecutionDiagnostics, deriveLegend, deriveScaleGradients } from './ViewpointExecutionDiagnostics.helpers'
 import { executionTitleFor } from '../views/ViewpointsManagementView.helpers'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
@@ -25,13 +29,27 @@ import {
 const props = defineProps<{ slug: string }>()
 
 const svc = inject(modelServiceKey)!
+const route = useRoute()
+const router = useRouter()
 const viewpointDefinitions = ref<readonly ViewpointDefinitionEnvelope[]>([])
 const viewpointExecution = useViewpointExecution(svc)
 const lastResolvedExecution = ref<ResolvedViewpointExecution | null>(null)
-const viewpointPrompt = useViewpointParameterPrompt((resolved) => {
+
+// One path for every execution (prompt, toolbar Apply, or a URL-seeded first run): record
+// what ran, snapshot it into the URL (replace, so the back button isn't polluted) so the
+// link reproduces the exact selection, then execute.
+const runResolved = (resolved: ResolvedViewpointExecution) => {
   lastResolvedExecution.value = resolved
+  void router.replace({ query: executionQuery(resolved.slug, resolved.parameters) })
   return viewpointExecution.execute(resolved)
-}, viewpointDefinitions)
+}
+const viewpointPrompt = useViewpointParameterPrompt(runResolved, viewpointDefinitions)
+
+const viewpointParameterSignature = computed(() =>
+  parameterSignatureOf(viewpointDefinitions.value.find((d) => d.slug === props.slug)))
+const toolbarBoundValues = computed(() => lastResolvedExecution.value?.parameters ?? {})
+const applyParameters = (parameters: Record<string, unknown>) =>
+  runResolved({ slug: props.slug, parameters })
 
 const selectedViewpointPresentation = computed(() => {
   const envelope = viewpointDefinitions.value.find((d) => d.slug === props.slug)
@@ -81,7 +99,7 @@ const exportCsv = () => {
 
 const loadViewpointTable = async () => {
   viewpointDefinitions.value = await Effect.runPromise(svc.listViewpointDefinitions()).catch(() => [])
-  await viewpointPrompt.run(props.slug)
+  await viewpointPrompt.run(props.slug, parametersFromQuery(route.query))
 }
 
 const rerunViewpointTable = () => { void loadViewpointTable() }
@@ -103,6 +121,12 @@ onMounted(() => { void loadViewpointTable() })
       </RouterLink>
     </div>
 
+    <ViewpointExecutionToolbar
+      v-if="!viewpointPrompt.visible.value && viewpointParameterSignature.length > 0"
+      :parameters="viewpointParameterSignature"
+      :bound-values="toolbarBoundValues"
+      @apply="applyParameters"
+    />
     <ViewpointExecutionDiagnostics
       v-if="!viewpointPrompt.visible.value && !viewpointExecution.errorMessage.value"
       :diagnostics="viewpointDiagnostics"
@@ -205,6 +229,7 @@ onMounted(() => { void loadViewpointTable() })
         </template>
       </tbody>
     </table>
+    <ViewpointTraceTable :table="viewpointExecution.result.value?.trace_table ?? null" />
   </div>
 </template>
 

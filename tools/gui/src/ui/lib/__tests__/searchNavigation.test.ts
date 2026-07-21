@@ -23,6 +23,7 @@ const router = createRouter({
     { path: '/diagram', component: stub },
     { path: '/documents/:id', component: stub },
     { path: '/assurance/browse', component: stub },
+    { path: '/assurance/node/:id', component: stub },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: stub },
   ],
 })
@@ -37,9 +38,9 @@ describe('searchHitRoute', () => {
     expect(searchHitRoute({ record_type: 'diagram', artifact_id: 'D1' })).toEqual({ path: '/diagram', query: { id: 'D1' } })
   })
 
-  it('routes assurance nodes to the browse view', () => {
+  it('routes assurance nodes to the standalone node page', () => {
     expect(searchHitRoute({ record_type: 'assurance-node', artifact_id: 'N1' }))
-      .toEqual({ path: '/assurance/browse', query: { node_id: 'N1' } })
+      .toEqual('/assurance/node/N1')
   })
 
   it.each(['connection', 'assurance-edge', 'mystery'])('returns null for non-navigable %s', (rt) => {

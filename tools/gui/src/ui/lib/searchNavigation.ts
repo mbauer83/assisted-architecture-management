@@ -24,7 +24,8 @@ export function searchHitRoute(hit: NavigableHit): RouteLocationRaw | null {
     case 'document':
       return `/documents/${hit.artifact_id}`
     case 'assurance-node':
-      return { path: '/assurance/browse', query: { node_id: hit.artifact_id } }
+      // Standalone page: a search hit is a direct answer, not a browsing session.
+      return `/assurance/node/${encodeURIComponent(hit.artifact_id)}`
     default:
       return null
   }

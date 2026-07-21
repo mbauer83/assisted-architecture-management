@@ -28,6 +28,7 @@ import TestRunMatchedEntities from './TestRunMatchedEntities.vue'
 import QueryBindingsPanel from './QueryBindingsPanel.vue'
 import QueryParametersPanel from './QueryParametersPanel.vue'
 import QueryDerivedAttributesPanel from './QueryDerivedAttributesPanel.vue'
+import ViewpointTracePatternEditor from './ViewpointTracePatternEditor.vue'
 
 const props = defineProps<{
   draft: ViewpointDefinitionDraft
@@ -154,6 +155,12 @@ const testRun = async () => {
       :binding-names="bindingNames"
       :parameter-names="parameterNames"
       @update:model-value="emitQueryUpdate({ derived: $event })"
+    />
+
+    <ViewpointTracePatternEditor
+      :model-value="draft.query.tracePatterns"
+      :catalog="catalog"
+      @update:model-value="emitQueryUpdate({ tracePatterns: $event })"
     />
 
     <NeighborInclusionEditor

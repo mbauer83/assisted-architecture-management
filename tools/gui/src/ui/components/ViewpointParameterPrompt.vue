@@ -7,24 +7,21 @@
  */
 import { ref, watch } from 'vue'
 import type { QueryParameterNode } from '../../domain/viewpointBindings'
-import type { EntityDisplayInfo } from '../../domain'
-import { initialParameterDraft, missingRequiredParameters } from '../lib/viewpointExecutionParameters'
-import EntityPickerInput from './EntityPickerInput.vue'
+import {
+  initialParameterDraft,
+  missingRequiredParameters,
+  type ParameterDraft,
+  type ParameterDraftValue,
+} from '../lib/viewpointExecutionParameters'
+import ViewpointParameterControl from './ViewpointParameterControl.vue'
 
 const props = defineProps<{ parameters: readonly QueryParameterNode[] }>()
-const emit = defineEmits<{ submit: [draft: Record<string, string>]; cancel: [] }>()
+const emit = defineEmits<{ submit: [draft: ParameterDraft]; cancel: [] }>()
 
-const draft = ref<Record<string, string>>(initialParameterDraft(props.parameters))
-// Confirmation echoes the picked entity's display name (the id stays secondary) — a raw
-// artifact id alone makes users second-guess whether they picked the right anchor.
-const pickedNames = ref<Record<string, string>>({})
-watch(() => props.parameters, (parameters) => { draft.value = initialParameterDraft(parameters); pickedNames.value = {} })
+const draft = ref<ParameterDraft>(initialParameterDraft(props.parameters))
+watch(() => props.parameters, (parameters) => { draft.value = initialParameterDraft(parameters) })
 
-const setValue = (name: string, value: string) => { draft.value = { ...draft.value, [name]: value } }
-const setEntityValue = (name: string, entity: EntityDisplayInfo) => {
-  pickedNames.value = { ...pickedNames.value, [name]: entity.name }
-  setValue(name, entity.artifact_id)
-}
+const setValue = (name: string, value: ParameterDraftValue) => { draft.value = { ...draft.value, [name]: value } }
 const missing = () => missingRequiredParameters(props.parameters, draft.value)
 const onSubmit = () => { if (missing().length === 0) emit('submit', draft.value) }
 </script>
@@ -52,49 +49,11 @@ const onSubmit = () => { if (missing().length === 0) emit('submit', draft.value)
           {{ parameter.description }}
         </p>
 
-        <EntityPickerInput
-          v-if="parameter.valueType === 'entity-id'"
-          :placeholder="`select an entity for ${parameter.name}`"
-          close-on-select
-          @select="(entity: EntityDisplayInfo) => setEntityValue(parameter.name, entity)"
+        <ViewpointParameterControl
+          :parameter="parameter"
+          :value="draft[parameter.name] ?? ''"
+          @update="(value) => setValue(parameter.name, value)"
         />
-        <input
-          v-else-if="parameter.valueType === 'boolean'"
-          :id="`vp-param-${parameter.name}`"
-          type="checkbox"
-          :checked="draft[parameter.name] === 'true'"
-          @change="setValue(parameter.name, ($event.target as HTMLInputElement).checked ? 'true' : 'false')"
-        >
-        <input
-          v-else-if="parameter.valueType === 'date'"
-          :id="`vp-param-${parameter.name}`"
-          type="date"
-          :value="draft[parameter.name]"
-          @input="setValue(parameter.name, ($event.target as HTMLInputElement).value)"
-        >
-        <input
-          v-else-if="parameter.valueType === 'integer' || parameter.valueType === 'number'"
-          :id="`vp-param-${parameter.name}`"
-          type="number"
-          :step="parameter.valueType === 'integer' ? '1' : 'any'"
-          :value="draft[parameter.name]"
-          @input="setValue(parameter.name, ($event.target as HTMLInputElement).value)"
-        >
-        <input
-          v-else
-          :id="`vp-param-${parameter.name}`"
-          type="text"
-          :value="draft[parameter.name]"
-          @input="setValue(parameter.name, ($event.target as HTMLInputElement).value)"
-        >
-        <span
-          v-if="parameter.valueType === 'entity-id' && draft[parameter.name]"
-          class="selected-hint"
-        >selected: <b>{{ pickedNames[parameter.name] ?? draft[parameter.name] }}</b>
-          <span
-            v-if="pickedNames[parameter.name]"
-            class="selected-id"
-          >({{ draft[parameter.name] }})</span></span>
       </div>
 
       <p

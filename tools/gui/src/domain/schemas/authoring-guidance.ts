@@ -1,5 +1,4 @@
 import { Schema } from 'effect'
-import { ViewpointSummarySchema } from './viewpoints'
 
 export const PermittedConnectionsByPeerSchema = Schema.Struct({
   outgoing: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
@@ -20,6 +19,12 @@ export const SpecializationGuidanceSchema = Schema.Struct({
 })
 export type SpecializationGuidance = typeof SpecializationGuidanceSchema.Type
 
+export const GuidanceContextLayerSchema = Schema.Struct({
+  level: Schema.String,
+  node: Schema.String,
+  text: Schema.String,
+})
+
 export const EntityTypeGuidanceSchema = Schema.Struct({
   name: Schema.String,
   prefix: Schema.String,
@@ -29,6 +34,8 @@ export const EntityTypeGuidanceSchema = Schema.Struct({
   never_create_when: Schema.String,
   permitted_connections: PermittedConnectionsByPeerSchema,
   specializations: Schema.optional(Schema.Array(SpecializationGuidanceSchema)),
+  // v2 layered guidance: composed ancestry context, broadest first. Absent when none.
+  context: Schema.optional(Schema.Array(GuidanceContextLayerSchema)),
 })
 export type EntityTypeGuidance = typeof EntityTypeGuidanceSchema.Type
 
@@ -60,6 +67,5 @@ export const AuthoringGuidanceSchema = Schema.Struct({
   unknown: Schema.optional(Schema.Array(Schema.String)),
   guidance_status: Schema.optional(Schema.Literal("empty")),
   guidance_hint: Schema.optional(Schema.String),
-  viewpoints: Schema.optional(Schema.Array(ViewpointSummarySchema)),
 })
 export type AuthoringGuidance = typeof AuthoringGuidanceSchema.Type

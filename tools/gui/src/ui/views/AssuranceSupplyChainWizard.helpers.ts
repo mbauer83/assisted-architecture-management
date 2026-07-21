@@ -15,6 +15,7 @@ export const SUPPLY_STEPS: SupplyStep[] = [
   { key: 'import', label: 'Import SBOM', needsAnchor: true },
   { key: 'components', label: 'Components', needsAnchor: true },
   { key: 'vulnerabilities', label: 'Vulnerabilities', needsAnchor: true },
+  { key: 'posture', label: 'Posture & VEX', needsAnchor: true },
   { key: 'aibom', label: 'AI-BOM', needsAnchor: false },
 ]
 

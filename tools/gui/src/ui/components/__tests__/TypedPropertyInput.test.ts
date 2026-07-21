@@ -191,3 +191,25 @@ describe('default pre-population (mirrors EntityCreateView watch logic)', () => 
     expect(populated[1].value).toBe('')
   })
 })
+
+describe('TypedPropertyInput — D2 default attribute shapes', () => {
+  it('validates a business-object Sensitivity enum against its members', () => {
+    const d: EntityAttributeDescriptor = {
+      type: 'string',
+      enum: ['Public', 'Internal', 'Confidential', 'Strictly Confidential'],
+    }
+    expect(makeValidationError(ref('Confidential'), d, false).value).toBeNull()
+    expect(makeValidationError(ref('Secret'), d, false).value).toContain('Must be one of')
+  })
+
+  it('treats a uri-format string (Source Repository) as informative — any value accepted', () => {
+    const d: EntityAttributeDescriptor = { type: 'string' }
+    expect(makeValidationError(ref('not-a-url'), d, false).value).toBeNull()
+    expect(makeValidationError(ref('https://example.com/repo.git'), d, false).value).toBeNull()
+  })
+
+  it('applies no scalar validation to an array attribute (Contained Information → list editor)', () => {
+    const d: EntityAttributeDescriptor = { type: 'array' }
+    expect(makeValidationError(ref('["sbom", "advisories"]'), d, false).value).toBeNull()
+  })
+})

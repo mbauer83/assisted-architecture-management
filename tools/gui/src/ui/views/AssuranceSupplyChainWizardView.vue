@@ -15,6 +15,8 @@ import {
   type BomComponent,
   type VulnRecord,
 } from './AssuranceSupplyChainWizard.helpers'
+import SecurityPostureDashboard from '../components/SecurityPostureDashboard.vue'
+import SupplyVulnerabilityTable from '../components/SupplyVulnerabilityTable.vue'
 
 const stepKey = ref<string>('scope')
 const currentStep = computed<SupplyStep>(
@@ -273,39 +275,10 @@ async function loadVulns() {
       >
         No components for this scope yet. Import an SBOM first.
       </p>
-      <table
+      <SupplyVulnerabilityTable
         v-else
-        class="grid"
-      >
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Version</th>
-            <th>Type</th>
-            <th>purl</th>
-            <th>Match</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="(c, idx) in components"
-            :key="c.component_id ?? idx"
-          >
-            <td>{{ c.name }}</td>
-            <td>{{ c.version }}</td>
-            <td>{{ c.component_type }}</td>
-            <td class="mono">
-              {{ c.purl }}
-            </td>
-            <td>
-              <span
-                class="badge"
-                :class="c.match_type === 'anchor' ? 'badge--ok' : 'badge--none'"
-              >{{ c.match_type }}</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        :vulns="vulns"
+      />
     </section>
 
     <!-- Vulnerabilities -->
@@ -403,6 +376,14 @@ async function loadVulns() {
           </tr>
         </tbody>
       </table>
+    </section>
+
+    <!-- Posture & VEX -->
+    <section
+      v-else-if="currentStep.key === 'posture'"
+      class="step-body"
+    >
+      <SecurityPostureDashboard :anchor-entity-id="anchorId" />
     </section>
 
     <!-- AI-BOM -->

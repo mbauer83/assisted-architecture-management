@@ -1,5 +1,9 @@
 import { Schema } from 'effect'
 
+import { TraceTableSchema } from './viewpointTrace'
+
+export type { PatternResult, TraceObligation, TraceRow, TraceTable } from './viewpointTrace'
+
 // ── Viewpoints (GUI selector/overlay) ─────────────────────────────────────────
 
 export const ViewpointApplicationSchema = Schema.Struct({
@@ -209,6 +213,11 @@ export const ViewpointExecutionResultSchema = Schema.Struct({
   anchor_ids: Schema.optionalWith(Schema.Array(Schema.String), { default: () => [] }),
   target_population: Schema.optionalWith(Schema.NullOr(TargetPopulationSummarySchema), { default: () => null }),
   aggregation: Schema.optionalWith(Schema.NullOr(AggregationSummarySchema), { default: () => null }),
+  /** The canonical values this execution ran with — what a shared URL must reproduce. */
+  bound_parameters: Schema.optionalWith(Schema.Record({ key: Schema.String, value: Schema.Unknown }), {
+    default: () => ({}),
+  }),
+  trace_table: Schema.optionalWith(Schema.NullOr(TraceTableSchema), { default: () => null }),
 })
 export type ViewpointExecutionResult = typeof ViewpointExecutionResultSchema.Type
 
@@ -222,6 +231,19 @@ export interface ViewpointExecutionRequest {
 /** GUI-only ad-hoc ArchiMate-notation rendering (the ad-hoc `diagram` representation) —
  * unstyled; `node_color`/`edge_color`/`edge_emphasis` overlays are applied client-side
  * onto the returned SVG. */
+export const SignalBannerSchema = Schema.Struct({
+  classification: Schema.NullOr(Schema.String),
+  available: Schema.Boolean,
+  note: Schema.NullOr(Schema.String),
+  basis_runs: Schema.Array(Schema.Struct({
+    anchor_entity_id: Schema.String,
+    run_id: Schema.String,
+    activated_at: Schema.String,
+  })),
+  generated_at: Schema.String,
+})
+export type SignalBanner = typeof SignalBannerSchema.Type
+
 export const ViewpointDiagramResultSchema = Schema.Struct({
   svg: Schema.NullOr(Schema.String),
   warnings: Schema.Array(Schema.String),
@@ -229,6 +251,9 @@ export const ViewpointDiagramResultSchema = Schema.Struct({
   // resolve SVG elements back to artifact ids for click-to-select, the same way a real
   // persisted diagram's viewer already does from its own diagram_entities.
   entity_aliases: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
+  // Present ONLY for definitions declaring a security-signal source: computed
+  // classification + basis runs + generation timestamp (the D11 ephemeral render).
+  signal_banner: Schema.optional(Schema.NullOr(SignalBannerSchema)),
 })
 export type ViewpointDiagramResult = typeof ViewpointDiagramResultSchema.Type
 

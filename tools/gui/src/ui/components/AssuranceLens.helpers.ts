@@ -38,6 +38,6 @@ export function parseLensResponse(raw: RawLensResponse): LensResult {
 }
 
 /** Build the assurance browse link for a given node. */
-export function browseLinkForNode(nodeId: string): string {
-  return `/assurance/browse?node_id=${encodeURIComponent(nodeId)}`
+export function standaloneNodeLink(nodeId: string): string {
+  return `/assurance/node/${encodeURIComponent(nodeId)}`
 }

@@ -10,6 +10,8 @@ import type {
 } from '../../domain'
 import type { StyleValue } from '../../domain/schemas/viewpoints'
 import { resolveStyleColor, styleTokenString, tokenShape, tokenIconLetter, tokenEdgeEmphasis } from '../lib/viewpointStyleTokens'
+import { archimateGlyphMarkup } from '../lib/glyphKey'
+import type { EdgeVisual, NodeVisual } from '../components/GraphCanvas.helpers'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import { executionRouteFor } from './ViewpointsManagementView.helpers'
 
@@ -79,38 +81,20 @@ export const groupKeyFor = (entity: Pick<EntityItemSummary, 'type' | 'group' | '
   return entity.type
 }
 
-export interface NodeVisual {
-  readonly color: string
-  readonly shape: 'circle' | 'diamond' | 'triangle' | 'square'
-  readonly iconLetter: string | null
-}
-
 /** `node_color`/`node_shape`/`node_icon` resolved from the projection's per-entity style
  * map, falling back to the existing domain-color convention when the viewpoint carries
  * no styling for a given capability. `node_color` alone can be a scale-mode
  * `{position, tokens}` value (interpolated); shape/icon always read a discrete token. */
-export const nodeVisualFor = (style: Readonly<Record<string, StyleValue>> | undefined, fallbackColor: string): NodeVisual => ({
+export const nodeVisualFor = (
+  style: Readonly<Record<string, StyleValue>> | undefined,
+  fallbackColor: string,
+  artifactType?: string,
+): NodeVisual => ({
   color: style?.node_color !== undefined ? resolveStyleColor(style.node_color) : fallbackColor,
   shape: style?.node_shape !== undefined ? tokenShape(styleTokenString(style.node_shape)) : 'circle',
   iconLetter: style?.node_icon !== undefined ? tokenIconLetter(styleTokenString(style.node_icon)) : null,
+  glyph: archimateGlyphMarkup(artifactType),
 })
-
-const SHAPE_SIDES: Record<NodeVisual['shape'], number> = { circle: 24, diamond: 4, square: 4, triangle: 3 }
-const SHAPE_ROTATION: Record<NodeVisual['shape'], number> = { circle: 0, diamond: 0, square: Math.PI / 4, triangle: -Math.PI / 2 }
-
-/** Renders every `node_shape` as a regular polygon (a 24-gon reads as a circle) so the
- * fixed-notation exploration surface can show real shape variety with one SVG element
- * type — no per-shape template branching. */
-export const nodeShapePoints = (shape: NodeVisual['shape'], radius: number): string => {
-  const sides = SHAPE_SIDES[shape]
-  const rotation = SHAPE_ROTATION[shape]
-  const points: string[] = []
-  for (let i = 0; i < sides; i++) {
-    const angle = rotation + (i / sides) * Math.PI * 2
-    points.push(`${(Math.cos(angle) * radius).toFixed(2)},${(Math.sin(angle) * radius).toFixed(2)}`)
-  }
-  return points.join(' ')
-}
 
 /** Anchor-relative modeled distances as the execution reported them
  * (`anchor_modeled_distance`: 0 = anchor, 1 = direct modeled edge, N = minimum derived
@@ -171,23 +155,6 @@ export const distanceLegend = (depths: readonly number[]): readonly DistanceLege
   }))
 }
 
-/** Legible text color for glyphs drawn on top of a node fill: dark ink on light fills,
- * white on dark fills, decided by perceived (YIQ) brightness. Non-hex input (never
- * produced by the fill pipeline) defaults to dark ink. */
-export const contrastTextColor = (fillColor: string): string => {
-  const match = /^#([0-9a-f]{6})$/i.exec(fillColor)
-  if (!match) return '#252327'
-  const [r, g, b] = [0, 2, 4].map((offset) => parseInt(match[1].slice(offset, offset + 2), 16))
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000
-  return brightness >= 145 ? '#252327' : '#ffffff'
-}
-
-export interface EdgeVisual {
-  readonly stroke: string | null
-  readonly strokeWidth: number | null
-  readonly dashArray: string | undefined
-}
-
 /** Provenance dash patterns: derived edges are visually distinct from modeled ones by
  * construction, and certain vs potential derivations differ in dash density. The edge
  * legend labels exactly these patterns. */
@@ -228,105 +195,4 @@ export const SPACING_PRESETS = [
 export const DOMAIN_COLORS: Record<string, string> = {
   motivation: '#d8c1e4', strategy: '#efbd5d', business: '#f4de7f',
   common: '#e8e5d3', application: '#b6d7e1', technology: '#c3e1b4',
-}
-
-export interface ViewBoxRect { x: number; y: number; w: number; h: number }
-
-/** ViewBox that fits every node with padding, aspect-corrected to the container — the
- * one-click answer to results rendered off-viewport. Falls back to the container rect
- * when there is nothing to fit. */
-export const fitViewBox = (
-  nodes: readonly { x: number; y: number }[],
-  containerWidth: number,
-  containerHeight: number,
-  padding = 80,
-): ViewBoxRect => {
-  if (nodes.length === 0 || containerWidth <= 0 || containerHeight <= 0) {
-    return { x: 0, y: 0, w: Math.max(containerWidth, 1), h: Math.max(containerHeight, 1) }
-  }
-  const xs = nodes.map((n) => n.x)
-  const ys = nodes.map((n) => n.y)
-  const minX = Math.min(...xs) - padding
-  const maxX = Math.max(...xs) + padding
-  const minY = Math.min(...ys) - padding
-  const maxY = Math.max(...ys) + padding
-  const width = maxX - minX
-  const height = maxY - minY
-  const containerRatio = containerWidth / containerHeight
-  const contentRatio = width / height
-  if (contentRatio > containerRatio) {
-    const correctedHeight = width / containerRatio
-    return { x: minX, y: minY - (correctedHeight - height) / 2, w: width, h: correctedHeight }
-  }
-  const correctedWidth = height * containerRatio
-  return { x: minX - (correctedWidth - width) / 2, y: minY, w: correctedWidth, h: height }
-}
-
-/** Word-aware label wrapping for SVG tspans: up to `maxLines` lines of `maxChars`,
- * with an ellipsis when content remains — mid-word truncation was producing misreadings
- * that reached real review artifacts. The full name always travels in the node tooltip. */
-export const wrapLabel = (label: string, maxChars = 14, maxLines = 2): string[] => {
-  const words = label.split(/\s+/).filter((word) => word.length > 0)
-  const wrapped: string[] = []
-  let current = ''
-  for (const word of words) {
-    const candidate = current === '' ? word : `${current} ${word}`
-    if (candidate.length <= maxChars) {
-      current = candidate
-      continue
-    }
-    if (current !== '') wrapped.push(current)
-    current = word
-  }
-  if (current !== '') wrapped.push(current)
-  const lines = wrapped.slice(0, maxLines).map(
-    (line) => (line.length > maxChars ? `${line.slice(0, maxChars - 1)}…` : line),
-  )
-  if (wrapped.length > maxLines && !lines[maxLines - 1].endsWith('…')) {
-    const last = lines[maxLines - 1]
-    lines[maxLines - 1] = last.length >= maxChars ? `${last.slice(0, maxChars - 1)}…` : `${last}…`
-  }
-  return lines.length > 0 ? lines : ['']
-}
-
-interface PositionedNode {
-  readonly id: string
-  readonly x: number
-  readonly y: number
-}
-
-/** SVG path for an edge: orthogonal elbows in cluster layout, a straight segment
- * otherwise. Empty string when either endpoint is missing from the node set. */
-export const edgePathFor = (
-  nodes: readonly PositionedNode[],
-  edge: { readonly source: string; readonly target: string },
-  clusterLayout: boolean,
-): string => {
-  const src = nodes.find((n) => n.id === edge.source)
-  const tgt = nodes.find((n) => n.id === edge.target)
-  if (!src || !tgt) return ''
-  if (clusterLayout) {
-    const midY = (src.y + tgt.y) / 2
-    return `M ${src.x} ${src.y} V ${midY} H ${tgt.x} V ${tgt.y}`
-  }
-  return `M ${src.x} ${src.y} L ${tgt.x} ${tgt.y}`
-}
-
-/** SVG coords for a multiplicity label at `frac` (0=source, 1=target) along an edge,
- * offset 8px perpendicular-ish above the line for legibility. */
-export const edgeCardPosFor = (
-  nodes: readonly PositionedNode[],
-  edge: { readonly source: string; readonly target: string },
-  frac: number,
-): { x: number; y: number } => {
-  const src = nodes.find((n) => n.id === edge.source)
-  const tgt = nodes.find((n) => n.id === edge.target)
-  if (!src || !tgt) return { x: 0, y: 0 }
-  const dx = tgt.x - src.x
-  const dy = tgt.y - src.y
-  const len = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
-  return {
-    x: src.x + dx * frac - (dy / len) * 8,
-    y: src.y + dy * frac + (dx / len) * 8,
-  }
 }

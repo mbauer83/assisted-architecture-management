@@ -50,6 +50,8 @@ export const router = createRouter({
     // Assurance (enabled-gated, separate from model nav)
     { path: '/assurance', component: () => import('../views/AssuranceView.vue') },
     { path: '/assurance/browse', component: () => import('../views/AssuranceBrowseView.vue') },
+    { path: '/assurance/graph', component: () => import('../views/AssuranceGraphExploreView.vue') },
+    { path: '/assurance/node/:id', component: () => import('../views/AssuranceNodeView.vue') },
     { path: '/assurance/stpa', component: () => import('../views/AssuranceStpaWizardView.vue') },
     { path: '/assurance/grc', component: () => import('../views/AssuranceGrcWizardView.vue') },
     { path: '/assurance/cast', component: () => import('../views/AssuranceCastWizardView.vue') },

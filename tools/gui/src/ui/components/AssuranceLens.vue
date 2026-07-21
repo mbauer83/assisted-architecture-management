@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { parseLensResponse, browseLinkForNode } from './AssuranceLens.helpers'
+import { parseLensResponse, standaloneNodeLink } from './AssuranceLens.helpers'
 import type { LensResult, RawLensResponse } from './AssuranceLens.helpers'
 import { tlpColor } from './tlp'
 import WithheldNotice from './WithheldNotice.vue'
@@ -43,7 +43,7 @@ watch(() => props.artifactId, (id) => { void load(id) })
           class="lens-item"
         >
           <RouterLink
-            :to="browseLinkForNode(node.node_id)"
+            :to="standaloneNodeLink(node.node_id)"
             class="lens-link"
           >
             <span class="lens-badge">{{ node.node_type }}</span>

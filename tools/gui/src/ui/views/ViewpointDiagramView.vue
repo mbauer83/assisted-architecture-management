@@ -26,6 +26,8 @@ import ViewpointParameterPrompt from '../components/ViewpointParameterPrompt.vue
 import { computeExecutionDiagnostics, deriveLegend, deriveScaleGradients } from '../components/ViewpointExecutionDiagnostics.helpers'
 import { presentationFromMapping } from '../../domain/viewpointPresentationSerialization'
 import { resolveElementMap } from '../lib/diagramViewerExtensions'
+import type { SignalBanner } from '../../domain/schemas/viewpoints'
+import SignalRenderBanner from '../components/SignalRenderBanner.vue'
 import { sanitizeDiagramSvg } from '../lib/svgSanitize'
 import {
   anchorBadges, applyEdgeHighlightOverlay, applyNodeColorOverlay, centerAnchorsAfterFit,
@@ -42,6 +44,7 @@ const slug = computed(() => (route.query.viewpoint as string | undefined) ?? '')
 const definitions = ref<readonly ViewpointDefinitionEnvelope[]>([])
 const execution = useViewpointExecution(svc)
 const svgMarkup = ref<string | null>(null)
+const signalBanner = ref<SignalBanner | null>(null)
 const diagramWarnings = ref<readonly string[]>([])
 const diagramLoading = ref(false)
 const diagramError = ref<string | null>(null)
@@ -135,6 +138,7 @@ const runExecution = async (resolved: ResolvedViewpointExecution) => {
     svgMarkup.value = exit.value.svg
     diagramWarnings.value = exit.value.warnings
     entityAliases.value = exit.value.entity_aliases ?? {}
+    signalBanner.value = exit.value.signal_banner ?? null
   } else {
     diagramError.value = String(exit.cause)
   }
@@ -142,6 +146,28 @@ const runExecution = async (resolved: ResolvedViewpointExecution) => {
   await centerAnchorsAfterFit(applyOverlay(), containerRef.value, panZoom.fitDiagramToViewport, panBy)
 }
 const prompt = useViewpointParameterPrompt(runExecution, definitions)
+
+const exportStampedRender = async () => {
+  // D11: styled output leaves the browser ONLY through the stamped export —
+  // the server burns the computed classification banner into the bytes.
+  const svgEl = svgContainer.value?.querySelector('svg')
+  if (!svgEl || !slug.value) return
+  const response = await fetch('/api/viewpoints/export-render', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug: slug.value, svg: svgEl.outerHTML }),
+  })
+  if (!response.ok) {
+    diagramError.value = `export failed (HTTP ${response.status})`
+    return
+  }
+  const blob = await response.blob()
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `${slug.value}.svg`
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
 
 const load = async () => {
   definitions.value = await Effect.runPromise(svc.listViewpointDefinitions()).catch(() => [])
@@ -172,6 +198,12 @@ onMounted(() => { if (slug.value) void load() })
       :scale-gradients="scaleGradients"
       :query-summary="execution.result.value?.query_summary ?? ''"
       @rerun="rerun"
+    />
+
+    <SignalRenderBanner
+      v-if="signalBanner"
+      :banner="signalBanner"
+      @export="exportStampedRender"
     />
 
     <div

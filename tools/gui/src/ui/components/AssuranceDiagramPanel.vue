@@ -306,7 +306,7 @@ onUnmounted(() => interactionController?.abort())
           <RouterLink
             v-if="selectedNodeId"
             class="edit-node-link"
-            :to="{ path: '/assurance/browse', query: { node_id: selectedNodeId } }"
+            :to="`/assurance/node/${encodeURIComponent(selectedNodeId)}`"
           >
             Edit in Assurance Browse →
           </RouterLink>
@@ -328,10 +328,10 @@ onUnmounted(() => interactionController?.abort())
               {{ selectedEdge.label || selectedEdge.name }}
             </p>
             <div class="edge-actions">
-              <RouterLink :to="{ path: '/assurance/browse', query: { node_id: selectedEdge.source_id } }">
+              <RouterLink :to="`/assurance/node/${encodeURIComponent(selectedEdge.source_id)}`">
                 Edit source
               </RouterLink>
-              <RouterLink :to="{ path: '/assurance/browse', query: { node_id: selectedEdge.target_id } }">
+              <RouterLink :to="`/assurance/node/${encodeURIComponent(selectedEdge.target_id)}`">
                 Edit target
               </RouterLink>
             </div>

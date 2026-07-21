@@ -7,6 +7,7 @@ export interface GraphNode {
   id: string
   label: string
   type: string // artifact_type prefix e.g. "GOL", "APP"
+  artifactType?: string // full artifact type e.g. "goal" (resolved from the entity fetch)
   domain?: string
   x: number
   y: number

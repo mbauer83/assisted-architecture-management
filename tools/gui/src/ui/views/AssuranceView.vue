@@ -135,6 +135,12 @@ onMounted(async () => {
             Browse assurance nodes →
           </RouterLink>
           <RouterLink
+            to="/assurance/graph"
+            class="assurance-link"
+          >
+            Graph explorer →
+          </RouterLink>
+          <RouterLink
             to="/assurance/diagrams"
             class="assurance-link"
           >

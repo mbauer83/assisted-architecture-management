@@ -1,6 +1,6 @@
 import { computed, ref, type Ref } from 'vue'
 import type { GraphNode } from './useForceGraph'
-import { fitViewBox, type ViewBoxRect } from '../views/GraphExploreView.helpers'
+import { fitViewBox, type ViewBoxRect } from '../components/GraphCanvas.helpers'
 
 /**
  * SVG pan/zoom/drag interaction for the graph explorer: wheel zoom around the cursor,

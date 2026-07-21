@@ -1,14 +1,25 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+/**
+ * Ontology-driven edge authoring: connection types come exclusively from
+ * GET /api/assurance/edge-catalog filtered to the legal set for the concrete
+ * node-type pair; targets come from the exposure-filtered server-side search.
+ * Supports both directions (this node as source or as target).
+ */
+import { ref, computed, onMounted } from 'vue'
+import {
+  edgeSubmission, emptyLegalSetMessage, legalTypesForSelection,
+  type EdgeCatalog, type EdgeDirection,
+} from './AssuranceEdgePicker.helpers'
 
-interface NodeSummary {
-  node_id: string
-  node_type: string
+interface SearchHit {
+  artifact_id: string
+  artifact_type: string
   name: string
 }
 
 const props = defineProps<{
   sourceId: string
+  sourceType: string
   loading?: boolean
 }>()
 
@@ -17,25 +28,48 @@ const emit = defineEmits<{
   cancel: []
 }>()
 
-const CONN_TYPES = [
-  'issues', 'acts-on', 'feedback', 'concerns', 'by-controller', 'violates',
-  'leads-to', 'explains', 'derives', 'refines', 'satisfied-by', 'accountable-to',
-  'responsible-of', 'evidenced-by', 'assesses', 'treated-by', 'complies-with',
-  'cites', 'binds-to', 'investigates',
-]
-
+const catalog = ref<EdgeCatalog | null>(null)
+const catalogError = ref<string | null>(null)
+const direction = ref<EdgeDirection>('outgoing')
 const connType = ref('')
 const targetQuery = ref('')
-const targetId = ref('')
-const searchResults = ref<NodeSummary[]>([])
+const target = ref<SearchHit | null>(null)
+const searchResults = ref<SearchHit[]>([])
 const searching = ref(false)
 const searchError = ref<string | null>(null)
 
+onMounted(async () => {
+  try {
+    const resp = await fetch('/api/assurance/edge-catalog')
+    if (!resp.ok) {
+      catalogError.value = `Edge catalog unavailable (HTTP ${resp.status})`
+      return
+    }
+    catalog.value = await resp.json() as EdgeCatalog
+  } catch (e) {
+    catalogError.value = String(e)
+  }
+})
+
+const legalTypes = computed(() => {
+  if (!catalog.value || !target.value) return []
+  return legalTypesForSelection(
+    catalog.value, direction.value, props.sourceType, target.value.artifact_type,
+  )
+})
+
+const noLegalTypes = computed(() =>
+  catalog.value !== null && target.value !== null && legalTypes.value.length === 0)
+
+const emptyMessage = computed(() => target.value === null
+  ? ''
+  : emptyLegalSetMessage(direction.value, props.sourceType, target.value.artifact_type))
+
 const canSubmit = computed(() =>
   connType.value !== ''
-  && targetId.value !== ''
-  && !props.loading
-)
+  && target.value !== null
+  && legalTypes.value.includes(connType.value)
+  && !props.loading)
 
 async function searchNodes() {
   const q = targetQuery.value.trim()
@@ -46,20 +80,13 @@ async function searchNodes() {
   searching.value = true
   searchError.value = null
   try {
-    const resp = await fetch(`/api/assurance/nodes?status=`)
+    const resp = await fetch(`/api/assurance/search?q=${encodeURIComponent(q)}&limit=15`)
     if (!resp.ok) {
-      searchError.value = `Search failed (HTTP ${resp.status})`
+      searchError.value = resp.status === 423 ? 'Store is locked.' : `Search failed (HTTP ${resp.status})`
       return
     }
-    const body = await resp.json() as { nodes: NodeSummary[] }
-    const lq = q.toLowerCase()
-    searchResults.value = (body.nodes ?? [])
-      .filter(n =>
-        n.name.toLowerCase().includes(lq)
-        || n.node_type.toLowerCase().includes(lq)
-        || n.node_id.toLowerCase().includes(lq)
-      )
-      .slice(0, 15)
+    const body = await resp.json() as { hits: SearchHit[] }
+    searchResults.value = body.hits ?? []
   } catch (e) {
     searchError.value = String(e)
   } finally {
@@ -67,19 +94,23 @@ async function searchNodes() {
   }
 }
 
-function selectTarget(node: NodeSummary) {
-  targetId.value = node.node_id
-  targetQuery.value = `${node.name} (${node.node_type})`
+function selectTarget(hit: SearchHit) {
+  target.value = hit
+  targetQuery.value = `${hit.name} (${hit.artifact_type})`
   searchResults.value = []
+  if (!legalTypes.value.includes(connType.value)) connType.value = ''
+}
+
+function setDirection(value: EdgeDirection) {
+  direction.value = value
+  if (!legalTypes.value.includes(connType.value)) connType.value = ''
 }
 
 function handleSubmit() {
-  if (!canSubmit.value) return
-  emit('submit', {
-    source_id: props.sourceId,
-    target_id: targetId.value,
-    conn_type: connType.value,
-  })
+  if (!canSubmit.value || !target.value) return
+  emit('submit', edgeSubmission(
+    direction.value, props.sourceId, target.value.artifact_id, connType.value,
+  ))
 }
 </script>
 
@@ -88,34 +119,43 @@ function handleSubmit() {
     class="edge-picker"
     @submit.prevent="handleSubmit"
   >
-    <div class="form-row">
-      <label class="form-label">Connection type <span class="required">*</span></label>
-      <select
-        v-model="connType"
-        class="form-control"
-        required
-      >
-        <option value="">
-          — select —
-        </option>
-        <option
-          v-for="t in CONN_TYPES"
-          :key="t"
-          :value="t"
-        >
-          {{ t }}
-        </option>
-      </select>
+    <div
+      v-if="catalogError"
+      class="catalog-error"
+    >
+      {{ catalogError }}
     </div>
 
     <div class="form-row">
-      <label class="form-label">Target node <span class="required">*</span></label>
+      <label class="form-label">Direction</label>
+      <div class="direction-toggle">
+        <button
+          type="button"
+          class="direction-btn"
+          :class="{ 'direction-btn--active': direction === 'outgoing' }"
+          @click="setDirection('outgoing')"
+        >
+          Outgoing (this node →)
+        </button>
+        <button
+          type="button"
+          class="direction-btn"
+          :class="{ 'direction-btn--active': direction === 'incoming' }"
+          @click="setDirection('incoming')"
+        >
+          Incoming (→ this node)
+        </button>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label class="form-label">{{ direction === 'outgoing' ? 'Target node' : 'Source node' }} <span class="required">*</span></label>
       <div class="search-box">
         <input
           v-model="targetQuery"
           type="text"
           class="form-control"
-          placeholder="Search by name, type, or ID…"
+          placeholder="Search by name…"
           @input="searchNodes"
         >
         <div
@@ -135,23 +175,56 @@ function handleSubmit() {
           class="search-results"
         >
           <li
-            v-for="n in searchResults"
-            :key="n.node_id"
+            v-for="hit in searchResults"
+            :key="hit.artifact_id"
             class="search-result-item"
-            @click="selectTarget(n)"
+            @click="selectTarget(hit)"
           >
-            <span class="result-badge">{{ n.node_type }}</span>
-            <span class="result-name">{{ n.name }}</span>
-            <span class="result-id">{{ n.node_id }}</span>
+            <span class="result-badge">{{ hit.artifact_type }}</span>
+            <span class="result-name">{{ hit.name }}</span>
+            <span class="result-id">{{ hit.artifact_id }}</span>
           </li>
         </ul>
       </div>
       <div
-        v-if="targetId"
+        v-if="target"
         class="target-selected"
       >
-        Selected: <code>{{ targetId }}</code>
+        Selected: <code>{{ target.artifact_id }}</code>
       </div>
+    </div>
+
+    <div class="form-row">
+      <label class="form-label">Connection type <span class="required">*</span></label>
+      <div
+        v-if="!target"
+        class="search-hint"
+      >
+        Select a node first — only ontology-legal types for the concrete pair are offered.
+      </div>
+      <div
+        v-else-if="noLegalTypes"
+        class="empty-legal-set"
+      >
+        {{ emptyMessage }}
+      </div>
+      <select
+        v-else
+        v-model="connType"
+        class="form-control"
+        required
+      >
+        <option value="">
+          — select —
+        </option>
+        <option
+          v-for="t in legalTypes"
+          :key="t"
+          :value="t"
+        >
+          {{ t }}
+        </option>
+      </select>
     </div>
 
     <div class="form-actions">
@@ -178,6 +251,25 @@ function handleSubmit() {
 .form-row { display: flex; flex-direction: column; gap: 4px; }
 .form-label { font-size: 12px; font-weight: 600; color: #374151; }
 .required { color: #dc2626; }
+.catalog-error, .empty-legal-set {
+  font-size: 12px;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.direction-toggle { display: flex; gap: 6px; }
+.direction-btn {
+  padding: 4px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  font-size: 12px;
+  cursor: pointer;
+  color: #374151;
+}
+.direction-btn--active { background: #2563eb; color: white; border-color: #2563eb; }
 .form-control {
   font-size: 13px;
   padding: 6px 10px;

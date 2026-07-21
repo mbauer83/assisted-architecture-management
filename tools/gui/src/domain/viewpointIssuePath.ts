@@ -18,6 +18,7 @@ import type { CriteriaNode, ConnectionSelectionNode, ExecutableQueryNode, GroupN
 import type { PresentationNode, StyleRuleNode } from './viewpointPresentation'
 import type { ViewpointDefinitionDraft } from './viewpointDefinitionDraft'
 import type { DerivedAttributeNode, QueryBindingNode, QueryParameterNode } from './viewpointBindings'
+import type { TracePatternNode } from './viewpointTracePattern'
 
 type Cursor =
   | ViewpointDefinitionDraft
@@ -30,12 +31,14 @@ type Cursor =
   | QueryBindingNode
   | QueryParameterNode
   | DerivedAttributeNode
+  | TracePatternNode
   | readonly CriteriaNode[]
   | readonly NeighborInclusionNode[]
   | readonly StyleRuleNode[]
   | readonly QueryBindingNode[]
   | readonly QueryParameterNode[]
   | readonly DerivedAttributeNode[]
+  | readonly TracePatternNode[]
   | GroupNode
   | undefined
 
@@ -66,6 +69,7 @@ const step = (cursor: Cursor, segment: string): Cursor => {
     if (segment === 'bindings') return cursor.bindings
     if (segment === 'parameters') return cursor.parameters
     if (segment === 'derived') return cursor.derived
+    if (segment === 'trace_patterns') return cursor.tracePatterns
     return undefined
   }
   if (isConnectionSelection(cursor)) {

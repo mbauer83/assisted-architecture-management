@@ -39,6 +39,7 @@ import {
   parameterFromMapping,
   parameterToMapping,
 } from './viewpointBindingsSerialization'
+import { tracePatternFromMapping, tracePatternToMapping } from './viewpointTracePatternSerialization'
 
 /** See `viewpointDefinitionSerialization.ts`'s `stringOr` for why this exists: `String()`
  * on an `unknown` narrowed by `!= null` trips `@typescript-eslint/no-base-to-string`. */
@@ -220,6 +221,7 @@ export const queryToMapping = (
   }
   if (query.parameters.length > 0) result.parameters = query.parameters.map(parameterToMapping)
   if (query.derived.length > 0) result.derived = query.derived.map(derivedAttributeToMapping)
+  if (query.tracePatterns.length > 0) result.trace_patterns = query.tracePatterns.map(tracePatternToMapping)
   return result
 }
 
@@ -235,5 +237,6 @@ export const queryFromMapping = (raw: unknown): ExecutableQueryNode => {
   query.bindings = Array.isArray(rec.bindings) ? rec.bindings.map(bindingFromMapping) : []
   query.parameters = Array.isArray(rec.parameters) ? rec.parameters.map(parameterFromMapping) : []
   query.derived = Array.isArray(rec.derived) ? rec.derived.map(derivedAttributeFromMapping) : []
+  query.tracePatterns = Array.isArray(rec.trace_patterns) ? rec.trace_patterns.map(tracePatternFromMapping) : []
   return query
 }

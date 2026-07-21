@@ -18,16 +18,23 @@ export const VERIFIED_KEYS = ['vpv', 'vpd', 'gen'] as const
 export const executionQuery = (slug: string, parameters: Record<string, unknown>): LocationQueryRaw => {
   const query: LocationQueryRaw = { viewpoint: slug }
   for (const [name, value] of Object.entries(parameters)) {
-    query[`${PARAM_PREFIX}${name}`] = String(value)
+    // A set value becomes repeated ordered keys (`scope=goal&scope=requirement`), the
+    // canonical wire form the backend already parses — never a joined string that a reader
+    // can't split back apart.
+    query[`${PARAM_PREFIX}${name}`] = Array.isArray(value) ? value.map(String) : String(value)
   }
   return query
 }
 
-export const parametersFromQuery = (query: LocationQuery): Record<string, string> => {
-  const values: Record<string, string> = {}
+export const parametersFromQuery = (query: LocationQuery): Record<string, string | string[]> => {
+  const values: Record<string, string | string[]> = {}
   for (const [key, value] of Object.entries(query)) {
-    if (key.startsWith(PARAM_PREFIX) && typeof value === 'string') {
-      values[key.slice(PARAM_PREFIX.length)] = value
+    if (!key.startsWith(PARAM_PREFIX)) continue
+    const name = key.slice(PARAM_PREFIX.length)
+    if (Array.isArray(value)) {
+      values[name] = value.filter((v): v is string => typeof v === 'string')
+    } else if (typeof value === 'string') {
+      values[name] = value
     }
   }
   return values
