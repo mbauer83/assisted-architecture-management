@@ -1,9 +1,9 @@
-"""Security refresh-run lifecycle: state machine, idempotent-replay decisions,
+"""Security signal-snapshot lifecycle: state machine, idempotent-replay decisions,
 and the canonical bundle digest.
 
-A refresh run is the atomic unit of security-signal ingestion: one anchor, one
+A signal snapshot is the atomic unit of security-signal ingestion: one anchor, one
 staged population of components/aliases/vulnerabilities/findings, one atomic
-activation. Metrics only ever read the single active run per anchor.
+activation. Metrics only ever read the single active snapshot per anchor.
 
 Lifecycle: ``staging → complete → active → superseded`` plus the terminal
 ``staging → failed``. Status never doubles as a timestamp — activation and
@@ -24,7 +24,9 @@ import json
 from dataclasses import dataclass
 from typing import Literal, Mapping, Sequence
 
-RunStatus = Literal["staging", "complete", "active", "superseded", "failed"]
+from src.domain.artifact_id import is_entity_id, stable_id
+
+SnapshotStatus = Literal["staging", "complete", "active", "superseded", "failed"]
 
 _ALLOWED_TRANSITIONS: frozenset[tuple[str, str]] = frozenset({
     ("staging", "complete"),
@@ -42,80 +44,138 @@ def is_allowed_transition(current: str, target: str) -> bool:
 
 def transition_error(current: str, target: str) -> str:
     return (
-        f"Illegal refresh-run transition {current!r} → {target!r}; allowed: "
+        f"Illegal signal-snapshot transition {current!r} → {target!r}; allowed: "
         + ", ".join(sorted(f"{a}→{b}" for a, b in _ALLOWED_TRANSITIONS))
     )
+
+
+# ── Anchor identity ────────────────────────────────────────────────────────────
+
+
+def anchor_key(anchor_entity_id: str) -> str:
+    """The key a snapshot is stored and looked up under: the STABLE (slug-free)
+    artifact id.
+
+    Callers legitimately hold either form — the GUI navigates by the full
+    ``PREFIX@epoch.random.slug`` id, while scripts and MCP callers often use the
+    short one — and the store matches anchors by exact string equality. Without
+    normalization a snapshot ingested under one form is invisible to a reader
+    using the other, which surfaces as "no active snapshot" rather than as an
+    error. The slug is also rename-volatile, so keying on the full id would
+    orphan every snapshot the moment an entity is renamed.
+
+    Anything that is not a well-formed artifact id is returned unchanged: test
+    and synthetic anchors must not be silently truncated at their last dot.
+    """
+    candidate = anchor_entity_id.strip()
+    if not is_entity_id(candidate):
+        return candidate
+    return stable_id(candidate)
 
 
 # ── Idempotent replay ──────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
-class StoredRunKey:
-    """What the store knows about an existing run under the replay key."""
+class StoredSnapshotKey:
+    """What the store knows about an existing snapshot under the replay key."""
 
-    run_id: str
+    snapshot_id: str
     status: str
     request_payload_digest: str
 
 
 @dataclass(frozen=True)
-class CreateNewRun:
-    """No run exists under the key — begin a new staging run."""
+class CreateNewSnapshot:
+    """No snapshot exists under the key — begin a new staging snapshot."""
 
 
 @dataclass(frozen=True)
 class ReplayInProgress:
-    """Same key + digest, run not yet terminal/active: retry later; no mutation."""
+    """Same key + digest, snapshot not yet terminal/active: retry later; no mutation."""
 
-    run_id: str
+    snapshot_id: str
 
 
 @dataclass(frozen=True)
 class ReplayStoredSuccess:
-    """Same key + digest, run reached active (or was later superseded):
+    """Same key + digest, snapshot reached active (or was later superseded):
     return the original success; no mutation, no new audit."""
 
-    run_id: str
+    snapshot_id: str
 
 
 @dataclass(frozen=True)
 class ReplayStoredFailure:
-    """Same key + digest, run failed (terminal): return the stored failure and
+    """Same key + digest, snapshot failed (terminal): return the stored failure and
     instruct the caller to use a new request_id; no mutation, no new audit."""
 
-    run_id: str
+    snapshot_id: str
 
 
 @dataclass(frozen=True)
 class IdempotencyConflict:
     """Same key, DIFFERENT digest: typed conflict; no signal or audit write."""
 
-    run_id: str
+    snapshot_id: str
     stored_digest: str
     submitted_digest: str
 
 
 ReplayDecision = (
-    CreateNewRun | ReplayInProgress | ReplayStoredSuccess | ReplayStoredFailure | IdempotencyConflict
+    CreateNewSnapshot | ReplayInProgress | ReplayStoredSuccess | ReplayStoredFailure | IdempotencyConflict
 )
 
 
-def replay_decision(existing: StoredRunKey | None, submitted_digest: str) -> ReplayDecision:
+def replay_decision(existing: StoredSnapshotKey | None, submitted_digest: str) -> ReplayDecision:
     """The normative replay table for one (anchor, request_id) key."""
     if existing is None:
-        return CreateNewRun()
+        return CreateNewSnapshot()
     if existing.request_payload_digest != submitted_digest:
         return IdempotencyConflict(
-            run_id=existing.run_id,
+            snapshot_id=existing.snapshot_id,
             stored_digest=existing.request_payload_digest,
             submitted_digest=submitted_digest,
         )
     if existing.status in ("staging", "complete"):
-        return ReplayInProgress(run_id=existing.run_id)
+        return ReplayInProgress(snapshot_id=existing.snapshot_id)
     if existing.status in ("active", "superseded"):
-        return ReplayStoredSuccess(run_id=existing.run_id)
-    return ReplayStoredFailure(run_id=existing.run_id)
+        return ReplayStoredSuccess(snapshot_id=existing.snapshot_id)
+    return ReplayStoredFailure(snapshot_id=existing.snapshot_id)
+
+
+# ── What a population actually persisted ──────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class SnapshotPopulation:
+    """The outcome of populating one snapshot: what was submitted, and what the
+    store actually holds afterwards.
+
+    The two differ by design. Row identity is ``(snapshot, component, canonical
+    vulnerability)``, so two submitted findings whose alias sets resolve to the
+    same canonical vulnerability for the same component collapse into one row —
+    one component plus one canonical vulnerability is exactly one finding. That
+    collapse is correct; reporting only the submitted count is not, because the
+    caller then reads back a smaller number than the ingest claimed. Both counts
+    travel together so the collapse stays visible instead of being swallowed.
+    """
+
+    canonical_by_external_id: Mapping[str, str]
+    submitted_component_count: int
+    persisted_component_count: int
+    submitted_finding_count: int
+    persisted_finding_count: int
+
+    @property
+    def collapsed_finding_count(self) -> int:
+        """Submitted findings that merged into an existing row via alias resolution."""
+        return self.submitted_finding_count - self.persisted_finding_count
+
+    @property
+    def collapsed_component_count(self) -> int:
+        """Submitted components that merged into an existing row by source id."""
+        return self.submitted_component_count - self.persisted_component_count
 
 
 # ── Canonical bundle digest ────────────────────────────────────────────────────
@@ -136,7 +196,7 @@ def _canonical(value: object) -> object:
 def canonical_bundle_digest(semantic_fields: Mapping[str, object]) -> str:
     """SHA-256 over the canonical form of every semantic bundle field
     (components, findings, aliases, applicability evaluations, diagnostics,
-    generator/source metadata, anchor) — generated fields (run id, timestamps)
+    generator/source metadata, anchor) — generated fields (snapshot id, timestamps)
     must not be passed in."""
     canonical = _canonical(semantic_fields)
     encoded = json.dumps(canonical, sort_keys=True, ensure_ascii=True, separators=(",", ":"))

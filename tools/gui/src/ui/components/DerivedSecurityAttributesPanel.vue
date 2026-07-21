@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Read-only derived security attributes for one entity (C-S4): values from the
- * ACTIVE refresh run via the same metrics use case the MCP tool serializes.
+ * ACTIVE signal snapshot via the same metrics use case the MCP tool serializes.
  * ABSENT unless signals are available and an active run anchors this entity —
  * locked store, unconfigured deployment, or anchor-less entity all collapse to
  * nothing. Deliberately contains no form element: the payload is disjoint from

@@ -1,7 +1,7 @@
 """Shared context for assurance MCP tools.
 
 Provides port-typed ConfidentialAssuranceStore, AssuranceArchive, and the
-refresh-run / VEX signal stores via the store factory (workspace-keyed singleton).
+signal-snapshot / VEX signal stores via the store factory (workspace-keyed singleton).
 Adapters are selected by `storage.assurance` config; default: SQLCipher store
 + co-located confidential signals.
 
@@ -87,9 +87,9 @@ class AssuranceContext:
         return self._bundle().archive
 
     @property
-    def refresh_run_store(self):  # type: ignore[no-untyped-def] — port-typed at use sites
-        """Refresh-run reads/mutations; None outside the SQLCipher store."""
-        return self._bundle().refresh_run_store
+    def snapshot_store(self):  # type: ignore[no-untyped-def] — port-typed at use sites
+        """Signal-snapshot reads/mutations; None outside the SQLCipher store."""
+        return self._bundle().snapshot_store
 
     @property
     def vex_store(self):  # type: ignore[no-untyped-def] — port-typed at use sites

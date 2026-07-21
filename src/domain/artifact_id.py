@@ -34,6 +34,16 @@ def stable_id(s: str) -> str:
     return s.rsplit(".", 1)[0]
 
 
+def is_entity_id(s: str) -> bool:
+    """True when *s* is a well-formed entity artifact ID (short or full form).
+
+    The non-raising companion to ``parse_entity_id``, for callers that must treat
+    a non-ID string as data rather than as an error — normalizing an arbitrary
+    string with ``stable_id`` would silently truncate it at its last dot.
+    """
+    return _ENTITY_ID_RE.match(s) is not None
+
+
 def slug_of(s: str) -> str | None:
     """Return the slug segment of an artifact ID, or None if absent."""
     if s.count(".") < 2:

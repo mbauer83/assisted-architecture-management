@@ -52,7 +52,7 @@ def signal_banner_for(
     slug: str | None, catalogs: RuntimeCatalogs, entity_ids: list[str],
 ) -> dict[str, object] | None:
     """D11 banner for signal-declaring definitions: computed classification
-    (max of visible contributors), per-anchor basis runs, and the generation
+    (max of visible contributors), per-anchor basis snapshots, and the generation
     timestamp. None for plain viewpoints — the response stays cacheable."""
     definition = catalogs.viewpoints.get(slug) if slug else None
     if definition is None or not declares_signal_source(definition):
@@ -62,10 +62,11 @@ def signal_banner_for(
         "classification": batch.classification if batch.available else None,
         "available": batch.available,
         "note": batch.note,
-        "basis_runs": [
-            {"anchor_entity_id": run.anchor_entity_id, "run_id": run.run_id,
-             "activated_at": run.activated_at}
-            for run in batch.basis_runs
+        "basis_snapshots": [
+            {"anchor_entity_id": snapshot.anchor_entity_id,
+             "snapshot_id": snapshot.snapshot_id,
+             "activated_at": snapshot.activated_at}
+            for snapshot in batch.basis_snapshots
         ],
         "generated_at": utc_now_iso(),
     }
@@ -124,9 +125,9 @@ def _banner_text(slug: str, banner: dict[str, object] | None) -> str:
     if banner is None:
         return f"{slug} — generated {utc_now_iso()}"
     classification = banner.get("classification") or "signals unavailable"
-    raw_runs = banner.get("basis_runs")
-    runs: list[dict[str, str]] = raw_runs if isinstance(raw_runs, list) else []
-    run_part = ", ".join(
-        f"{run['anchor_entity_id']}: {run['run_id']}" for run in runs
-    ) or "no active run"
-    return f"{classification} — basis {run_part} — generated {banner.get('generated_at')}"
+    raw_snapshots = banner.get("basis_snapshots")
+    snapshots: list[dict[str, str]] = raw_snapshots if isinstance(raw_snapshots, list) else []
+    basis_part = ", ".join(
+        f"{s['anchor_entity_id']}: {s['snapshot_id']}" for s in snapshots
+    ) or "no active snapshot"
+    return f"{classification} — basis {basis_part} — generated {banner.get('generated_at')}"

@@ -235,9 +235,9 @@ export const SignalBannerSchema = Schema.Struct({
   classification: Schema.NullOr(Schema.String),
   available: Schema.Boolean,
   note: Schema.NullOr(Schema.String),
-  basis_runs: Schema.Array(Schema.Struct({
+  basis_snapshots: Schema.Array(Schema.Struct({
     anchor_entity_id: Schema.String,
-    run_id: Schema.String,
+    snapshot_id: Schema.String,
     activated_at: Schema.String,
   })),
   generated_at: Schema.String,
@@ -252,7 +252,7 @@ export const ViewpointDiagramResultSchema = Schema.Struct({
   // persisted diagram's viewer already does from its own diagram_entities.
   entity_aliases: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
   // Present ONLY for definitions declaring a security-signal source: computed
-  // classification + basis runs + generation timestamp (the D11 ephemeral render).
+  // classification + basis snapshots + generation timestamp (the D11 ephemeral render).
   signal_banner: Schema.optional(Schema.NullOr(SignalBannerSchema)),
 })
 export type ViewpointDiagramResult = typeof ViewpointDiagramResultSchema.Type

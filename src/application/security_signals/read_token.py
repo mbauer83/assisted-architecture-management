@@ -1,9 +1,9 @@
-"""SignalSnapshotToken (§6.0(f)) — pin one consistent signal snapshot across a
+"""SignalReadToken (§6.0(f)) — pin one consistent signal snapshot across a
 batch of reads.
 
 The token covers: the availability revision (bumped by lock/unlock/
 reconfigure — exposed through an inward-facing port, never the connection
-manager itself), the active run identity for the anchor, the exposure ceiling,
+manager itself), the active snapshot identity for the anchor, the exposure ceiling,
 and the VEX revision state for the anchor. Batch reads happen under one token
 and the caller revalidates before returning; ANY revision change makes the
 result ``unavailable/retry`` — never partial values mixing two snapshots.
@@ -23,8 +23,8 @@ class AvailabilityState(Protocol):
     def availability_revision(self) -> int: ...
 
 
-class SnapshotRunReads(Protocol):
-    def get_active_run(self, anchor_entity_id: str) -> Mapping[str, Any] | None: ...
+class SnapshotReads(Protocol):
+    def get_active_snapshot(self, anchor_entity_id: str) -> Mapping[str, Any] | None: ...
 
 
 class SnapshotVexReads(Protocol):
@@ -32,11 +32,11 @@ class SnapshotVexReads(Protocol):
 
 
 @dataclass(frozen=True)
-class SignalSnapshotToken:
+class SignalReadToken:
     anchor_entity_id: str
     availability_revision: int
-    active_run_id: str | None
-    active_run_activated_at: str | None
+    active_snapshot_id: str | None
+    active_snapshot_activated_at: str | None
     exposure_ceiling: str
     vex_revision_count: int
 
@@ -45,35 +45,35 @@ def take_snapshot(
     anchor_entity_id: str,
     *,
     availability: AvailabilityState,
-    run_store: SnapshotRunReads,
+    snapshot_store: SnapshotReads,
     vex_store: SnapshotVexReads,
     exposure_ceiling: str,
-) -> SignalSnapshotToken:
-    run = run_store.get_active_run(anchor_entity_id)
-    return SignalSnapshotToken(
+) -> SignalReadToken:
+    snapshot = snapshot_store.get_active_snapshot(anchor_entity_id)
+    return SignalReadToken(
         anchor_entity_id=anchor_entity_id,
         availability_revision=availability.availability_revision(),
-        active_run_id=None if run is None else str(run["run_id"]),
-        active_run_activated_at=None if run is None else str(run.get("activated_at") or ""),
+        active_snapshot_id=None if snapshot is None else str(snapshot["snapshot_id"]),
+        active_snapshot_activated_at=None if snapshot is None else str(snapshot.get("activated_at") or ""),
         exposure_ceiling=exposure_ceiling,
         vex_revision_count=len(vex_store.list_anchor_assessments(anchor_entity_id)),
     )
 
 
 def snapshot_still_valid(
-    token: SignalSnapshotToken,
+    token: SignalReadToken,
     *,
     availability: AvailabilityState,
-    run_store: SnapshotRunReads,
+    snapshot_store: SnapshotReads,
     vex_store: SnapshotVexReads,
     exposure_ceiling: str,
 ) -> bool:
     """Revalidation: recompute the token and require exact equality — a changed
-    run, ceiling, VEX state, or availability generation invalidates the batch."""
+    snapshot, ceiling, VEX state, or availability generation invalidates the batch."""
     return token == take_snapshot(
         token.anchor_entity_id,
         availability=availability,
-        run_store=run_store,
+        snapshot_store=snapshot_store,
         vex_store=vex_store,
         exposure_ceiling=exposure_ceiling,
     )
@@ -82,22 +82,22 @@ def evaluate_pinned(
     anchor_entity_id: str,
     *,
     availability: AvailabilityState,
-    run_store: Any,
+    snapshot_store: Any,
     vex_store: Any,
     exposure_ceiling: str,
     evaluate: Any,
-) -> tuple[Any | None, SignalSnapshotToken]:
+) -> tuple[Any | None, SignalReadToken]:
     """Run ``evaluate()`` under one snapshot token and revalidate before
     returning. Returns (result, token) — result is None when any covered
     revision changed mid-evaluation; the caller reports unavailable/retry,
     never partial values."""
     token = take_snapshot(
-        anchor_entity_id, availability=availability, run_store=run_store,
+        anchor_entity_id, availability=availability, snapshot_store=snapshot_store,
         vex_store=vex_store, exposure_ceiling=exposure_ceiling,
     )
     result = evaluate()
     if not snapshot_still_valid(
-        token, availability=availability, run_store=run_store,
+        token, availability=availability, snapshot_store=snapshot_store,
         vex_store=vex_store, exposure_ceiling=exposure_ceiling,
     ):
         return None, token

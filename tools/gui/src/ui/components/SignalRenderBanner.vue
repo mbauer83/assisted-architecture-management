@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * D11 banner for signal-styled ephemeral renders: computed classification,
- * basis runs, generation timestamp — or the unavailable note with default
+ * basis snapshots, generation timestamp — or the unavailable note with default
  * styling. The export button routes through the stamped-export endpoint (the
  * only sanctioned way styled output leaves the browser).
  */
@@ -20,11 +20,11 @@ const emit = defineEmits<{ export: [] }>()
       <strong>{{ banner.classification ?? 'no classified contributions' }}</strong>
       — signal-styled, ephemeral render (basis:
       <span
-        v-for="run in banner.basis_runs"
-        :key="run.anchor_entity_id"
+        v-for="snapshot in banner.basis_snapshots"
+        :key="snapshot.anchor_entity_id"
         class="signal-basis"
-      >{{ run.run_id }}</span>
-      <span v-if="banner.basis_runs.length === 0">no active run</span>
+      >{{ snapshot.snapshot_id }}</span>
+      <span v-if="banner.basis_snapshots.length === 0">no active snapshot</span>
       · generated {{ banner.generated_at }})
     </template>
     <template v-else>

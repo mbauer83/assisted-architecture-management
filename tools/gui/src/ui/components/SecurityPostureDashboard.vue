@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Security posture for one architecture anchor: the §-vocabulary metric grid
- * from the ACTIVE refresh run (unit-explicit, exposure-filtered) plus the
+ * from the ACTIVE signal snapshot (unit-explicit, exposure-filtered) plus the
  * audited VEX assessment form. Numbers come from the same use case the MCP
  * metrics tool serializes; recording a VEX assessment re-fetches so the
  * analyst watches counts change.
@@ -80,7 +80,7 @@ async function submitVex() {
 <template>
   <div class="posture">
     <p class="posture-hint">
-      Security posture from the ACTIVE refresh run for this anchor — the same
+      Security posture from the ACTIVE signal snapshot for this anchor — the same
       numbers the MCP metrics tool reports. Suppressing VEX dispositions
       (not_affected / fixed) require a justification.
     </p>
@@ -109,7 +109,7 @@ async function submitVex() {
             v-if="metrics.computed_classification"
             class="classification-chip"
           >{{ metrics.computed_classification }}</span>
-          <span class="basis">basis run <code>{{ metrics.basis_run_id }}</code>
+          <span class="basis">basis snapshot <code>{{ metrics.basis_snapshot_id }}</code>
             · activated {{ metrics.basis_activated_at }}</span>
         </div>
         <dl class="metric-grid">

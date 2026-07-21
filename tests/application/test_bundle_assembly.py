@@ -4,7 +4,7 @@ with applicability/severity/aliases, not-applicable exclusion counted."""
 
 from __future__ import annotations
 
-from src.application.security_refresh.bundle_assembly import (
+from src.application.security_signals.bundle_assembly import (
     AcquisitionInputs,
     attach_findings,
     prepare_components,

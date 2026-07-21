@@ -4,7 +4,7 @@ graph normalized — for CycloneDX and SPDX."""
 
 from __future__ import annotations
 
-from src.domain.security_refresh_run import classify_directness
+from src.domain.security_signal_snapshot import classify_directness
 from src.infrastructure.assurance._sbom_parser import parse_bom
 
 CDX = {

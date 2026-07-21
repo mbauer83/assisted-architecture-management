@@ -7,10 +7,10 @@
 
 export interface SecurityMetricsPayload {
   availability: 'available' | 'unavailable'
-  content_state?: 'complete' | 'visibility_limited' | 'no_active_run' | 'no_findings'
+  content_state?: 'complete' | 'visibility_limited' | 'no_active_snapshot' | 'no_findings'
   reason?: string
   visibility_limited?: boolean
-  basis_run_id?: string | null
+  basis_snapshot_id?: string | null
   basis_activated_at?: string | null
   computed_classification?: string | null
   component_count?: number
@@ -30,8 +30,9 @@ export const stateMessage = (payload: SecurityMetricsPayload): string | null => 
     return payload.reason ?? 'signals unavailable — retry'
   }
   switch (payload.content_state) {
-    case 'no_active_run':
-      return 'No security refresh run has been activated for this anchor yet — run the refresh script to produce one.'
+    case 'no_active_snapshot':
+      return 'No security signal snapshot has been activated for this anchor yet'
+        + ' — run the ingest script to produce one.'
     case 'no_findings':
       return null // the zeroes are real
     case 'visibility_limited':
@@ -42,7 +43,7 @@ export const stateMessage = (payload: SecurityMetricsPayload): string | null => 
 }
 
 export const showsMetrics = (payload: SecurityMetricsPayload): boolean =>
-  payload.availability === 'available' && payload.content_state !== 'no_active_run'
+  payload.availability === 'available' && payload.content_state !== 'no_active_snapshot'
 
 const SUPPRESSING = new Set(['not_affected', 'fixed'])
 export const VEX_DISPOSITIONS = ['affected', 'not_affected', 'fixed', 'under_investigation'] as const

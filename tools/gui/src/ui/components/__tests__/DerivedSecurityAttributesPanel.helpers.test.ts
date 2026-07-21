@@ -10,7 +10,7 @@ import type { SecurityMetricsPayload } from '../SecurityPostureDashboard.helpers
 const withRun: SecurityMetricsPayload = {
   availability: 'available',
   content_state: 'complete',
-  basis_run_id: 'RUN@1',
+  basis_snapshot_id: 'SNAP@1',
   basis_activated_at: '2026-07-20T00:00:00Z',
   computed_classification: 'TLP:AMBER',
   distinct_open_vulnerabilities: 3,
@@ -30,8 +30,8 @@ describe('panelVisible', () => {
   it('is absent for every gated state', () => {
     expect(panelVisible(null)).toBe(false)  // fetch failed / locked (423)
     expect(panelVisible({ availability: 'unavailable', reason: 'x' })).toBe(false)
-    expect(panelVisible({ ...withRun, content_state: 'no_active_run', basis_run_id: null })).toBe(false)
-    expect(panelVisible({ ...withRun, basis_run_id: null })).toBe(false)
+    expect(panelVisible({ ...withRun, content_state: 'no_active_snapshot', basis_snapshot_id: null })).toBe(false)
+    expect(panelVisible({ ...withRun, basis_snapshot_id: null })).toBe(false)
   })
 })
 
@@ -42,7 +42,7 @@ describe('displayRows', () => {
     expect(rows['component findings by directness']).toBe('direct: 1, transitive: 3')
     expect(rows['findings by severity band']).toBe('high: 2, medium: 2')
     expect(rows['max CVSS score']).toBe('8.1 (high)')
-    expect(rows.basis).toContain('RUN@1')
+    expect(rows.basis).toContain('SNAP@1')
   })
 
   it('renders honest placeholders when nothing scored', () => {

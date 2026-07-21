@@ -1,7 +1,7 @@
 /**
  * Visibility logic for the entity-details derived security attributes panel:
  * the panel is ABSENT (not an empty shell) unless the metrics read succeeded,
- * signals are available, and an active refresh run exists for this entity as
+ * signals are available, and an active signal snapshot exists for this entity as
  * anchor — locked stores, unconfigured deployments, and anchor-less entities
  * all collapse to absence (F3.14 lens-style gating).
  */
@@ -10,8 +10,8 @@ import type { SecurityMetricsPayload } from './SecurityPostureDashboard.helpers'
 export const panelVisible = (payload: SecurityMetricsPayload | null): boolean => {
   if (payload === null) return false
   if (payload.availability !== 'available') return false
-  if (payload.content_state === 'no_active_run') return false
-  return Boolean(payload.basis_run_id)
+  if (payload.content_state === 'no_active_snapshot') return false
+  return Boolean(payload.basis_snapshot_id)
 }
 
 /** Read-only display rows — a pure projection so the template stays dumb and
@@ -29,6 +29,6 @@ export const displayRows = (payload: SecurityMetricsPayload): { label: string; v
     { label: 'findings by severity band', value: bands },
     { label: 'max CVSS score', value: payload.max_cvss_score != null ? `${payload.max_cvss_score} (${payload.max_severity_band ?? 'n/a'})` : '—' },
     { label: 'components', value: String(payload.component_count ?? 0) },
-    { label: 'basis', value: `${payload.basis_run_id} · ${payload.basis_activated_at}` },
+    { label: 'basis', value: `${payload.basis_snapshot_id} · ${payload.basis_activated_at}` },
   ]
 }

@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from src.application.security_refresh.bundle_assembly import AcquisitionInputs
-from src.application.security_refresh.supplied_acquisition import acquisition_from_records
+from src.application.security_signals.bundle_assembly import AcquisitionInputs
+from src.application.security_signals.supplied_acquisition import acquisition_from_records
 from src.infrastructure.assurance.signal_ingest import assemble_bundle
 
 _BOM: dict[str, Any] = {

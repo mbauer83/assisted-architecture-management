@@ -40,9 +40,9 @@ _ADVISORY: dict[str, Any] = {
 
 
 class _RealContext:
-    def __init__(self, store: Any, run_store: Any) -> None:
+    def __init__(self, store: Any, snapshot_store: Any) -> None:
         self.store = store
-        self.refresh_run_store = run_store
+        self.snapshot_store = snapshot_store
         self.vex_store = None
         self.max_classification = "TLP:RED"
 
@@ -56,7 +56,7 @@ class _RealContext:
 @pytest.fixture()
 def ctx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
     import src.infrastructure.assurance.signal_gate as gate
-    from src.infrastructure.assurance._refresh_run_store import SQLCipherRefreshRunStore
+    from src.infrastructure.assurance._snapshot_store import SQLCipherSnapshotStore
     from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore
     from src.infrastructure.assurance.lifecycle import init_store
 
@@ -68,7 +68,7 @@ def ctx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-unt
     init_store(db_path)
     store = SQLCipherAssuranceStore(db_path)
     store.unlock()
-    yield _RealContext(store, SQLCipherRefreshRunStore(store._thread_conn_or_none))  # noqa: SLF001
+    yield _RealContext(store, SQLCipherSnapshotStore(store._thread_conn_or_none))  # noqa: SLF001
     store.lock()
 
 
@@ -100,8 +100,8 @@ class TestIngestOutcomes:
         assert payload["status"] == "activated"
         assert payload["component_count"] == 2
         assert payload["finding_count"] == 1
-        active = ctx.refresh_run_store.get_active_run("APP@1")
-        assert active["run_id"] == payload["snapshot_id"]
+        active = ctx.snapshot_store.get_active_snapshot("APP@1")
+        assert active["snapshot_id"] == payload["snapshot_id"]
 
     def test_the_snapshot_is_immediately_readable_through_the_list_surface(
         self, ctx: Any,
@@ -168,7 +168,7 @@ class TestIngestGating:
             assert resp.headers.get("Cache-Control") == "no-store"
         finally:
             ctx.store.unlock()
-        assert ctx.refresh_run_store.get_active_run("APP@1") is None
+        assert ctx.snapshot_store.get_active_snapshot("APP@1") is None
 
     def test_non_transactional_configuration_is_403_and_writes_nothing(
         self, ctx: Any, monkeypatch: pytest.MonkeyPatch,
@@ -182,7 +182,7 @@ class TestIngestGating:
 
         assert resp.status_code == 403
         assert resp.json()["reason_code"] == "archive_has_no_atomic_boundary"
-        assert ctx.refresh_run_store.get_active_run("APP@1") is None
+        assert ctx.snapshot_store.get_active_snapshot("APP@1") is None
 
 
 class TestCrossSurfaceParity:

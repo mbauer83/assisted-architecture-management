@@ -1,6 +1,6 @@
 /**
  * Posture dashboard logic: closed availability/content states as honest
- * user messages (no_active_run never renders zeros as "all clear"), and VEX
+ * user messages (no_active_snapshot never renders zeros as "all clear"), and VEX
  * form validation mirroring the server's justification rule.
  */
 import { describe, it, expect } from 'vitest'
@@ -18,9 +18,9 @@ describe('state handling', () => {
     expect(showsMetrics(payload)).toBe(false)
   })
 
-  it('no_active_run explains itself and hides the grid — never fake zeros', () => {
-    const payload: SecurityMetricsPayload = { ...base, content_state: 'no_active_run' }
-    expect(stateMessage(payload)).toContain('refresh')
+  it('no_active_snapshot explains itself and hides the grid — never fake zeros', () => {
+    const payload: SecurityMetricsPayload = { ...base, content_state: 'no_active_snapshot' }
+    expect(stateMessage(payload)).toContain('ingest')
     expect(showsMetrics(payload)).toBe(false)
   })
 

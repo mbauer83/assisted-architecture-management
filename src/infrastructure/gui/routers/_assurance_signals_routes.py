@@ -1,4 +1,4 @@
-"""Security-posture REST surface: metrics over the active refresh run and the
+"""Security-posture REST surface: metrics over the active signal snapshot and the
 audited VEX mutation route. Reads are unlock-gated with no-store semantics and
 exposure-filtered before aggregation; VEX writes pass the signal-mutation
 capability gate (typed denial) and land data + audit in one transaction."""
@@ -13,10 +13,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.application.assurance_exposure import AssuranceExposurePolicy
-from src.application.security_refresh.capability import SignalMutationDenied
-from src.application.security_refresh.metrics import compute_security_metrics
-from src.application.security_refresh.snapshot import AvailabilityState, evaluate_pinned
-from src.application.security_refresh.vex import (
+from src.application.security_signals.capability import SignalMutationDenied
+from src.application.security_signals.metrics import compute_security_metrics
+from src.application.security_signals.read_token import AvailabilityState, evaluate_pinned
+from src.application.security_signals.vex import (
     RecordVexRequest,
     VexInvalid,
     record_vex_assessment,
@@ -43,16 +43,16 @@ def security_metrics(anchor_entity_id: str) -> JSONResponse:
     ctx, pol = _policy()
     if pol.check_locked():
         return _locked_response()
-    run_store = ctx.refresh_run_store
+    snapshot_store = ctx.snapshot_store
     vex_store = ctx.vex_store
-    if run_store is None or vex_store is None:
+    if snapshot_store is None or vex_store is None:
         return _ok({
             "availability": "unavailable",
             "reason": "metrics require the SQLCipher store with co-located signals",
         })
     if not isinstance(ctx.store, AvailabilityState):
         metrics = compute_security_metrics(
-            anchor_entity_id, run_store=run_store, vex_store=vex_store, policy=pol,
+            anchor_entity_id, snapshot_store=snapshot_store, vex_store=vex_store, policy=pol,
         )
         return _ok(asdict(metrics))
     # Snapshot pinning: the whole read batch happens under one token; any
@@ -61,11 +61,11 @@ def security_metrics(anchor_entity_id: str) -> JSONResponse:
     result, _token = evaluate_pinned(
         anchor_entity_id,
         availability=ctx.store,
-        run_store=run_store,
+        snapshot_store=snapshot_store,
         vex_store=vex_store,
         exposure_ceiling=ctx.max_classification,
         evaluate=lambda: compute_security_metrics(
-            anchor_entity_id, run_store=run_store, vex_store=vex_store, policy=pol,
+            anchor_entity_id, snapshot_store=snapshot_store, vex_store=vex_store, policy=pol,
         ),
     )
     if result is None:
@@ -76,15 +76,15 @@ def security_metrics(anchor_entity_id: str) -> JSONResponse:
 @signals_router.get("/api/assurance/security-components")
 def security_components(anchor_entity_id: str) -> JSONResponse:
     """Components of the anchor's active signal snapshot (exposure-filtered)."""
-    from src.application.security_refresh.signals_read import list_active_components  # noqa: PLC0415
+    from src.application.security_signals.signals_read import list_active_components  # noqa: PLC0415
 
     ctx, pol = _policy()
     if pol.check_locked():
         return _locked_response()
-    run_store = ctx.refresh_run_store
-    if run_store is None:
+    snapshot_store = ctx.snapshot_store
+    if snapshot_store is None:
         return _ok({"components": [], "count": 0, "reason": "no co-located signals store"})
-    components, withheld = list_active_components(anchor_entity_id, run_store=run_store, policy=pol)
+    components, withheld = list_active_components(anchor_entity_id, snapshot_store=snapshot_store, policy=pol)
     return _ok({"components": components, "count": len(components), "withheld": withheld})
 
 
@@ -94,31 +94,31 @@ def security_findings(
 ) -> JSONResponse:
     """Vulnerability findings of the anchor's active snapshot, optionally scoped to one
     component by purl or component_id (the component-details view). Exposure-filtered."""
-    from src.application.security_refresh.signals_read import list_active_findings  # noqa: PLC0415
+    from src.application.security_signals.signals_read import list_active_findings  # noqa: PLC0415
 
     ctx, pol = _policy()
     if pol.check_locked():
         return _locked_response()
-    run_store = ctx.refresh_run_store
-    if run_store is None:
+    snapshot_store = ctx.snapshot_store
+    if snapshot_store is None:
         return _ok({"findings": [], "count": 0, "reason": "no co-located signals store"})
     findings, withheld = list_active_findings(
-        anchor_entity_id, run_store=run_store, policy=pol, purl=purl, component_id=component_id)
+        anchor_entity_id, snapshot_store=snapshot_store, policy=pol, purl=purl, component_id=component_id)
     return _ok({"findings": findings, "count": len(findings), "withheld": withheld})
 
 
 @signals_router.get("/api/assurance/security-stats")
 def security_stats() -> JSONResponse:
-    """Signal-snapshot aggregate counts (runs + active-snapshot components/findings)."""
-    from src.application.security_refresh.signals_read import signals_stats  # noqa: PLC0415
+    """Signal-snapshot aggregate counts (snapshots + active-snapshot components/findings)."""
+    from src.application.security_signals.signals_read import signals_stats  # noqa: PLC0415
 
     ctx, pol = _policy()
     if pol.check_locked():
         return _locked_response()
-    run_store = ctx.refresh_run_store
-    if run_store is None:
+    snapshot_store = ctx.snapshot_store
+    if snapshot_store is None:
         return _ok({"reason": "no co-located signals store"})
-    return _ok(dict(signals_stats(run_store=run_store)))
+    return _ok(dict(signals_stats(snapshot_store=snapshot_store)))
 
 
 class IngestSignalsBody(BaseModel):
@@ -154,14 +154,14 @@ def ingest_security_signals(body: IngestSignalsBody) -> JSONResponse:
             },
             headers={"Cache-Control": _NO_STORE},
         )
-    run_store = ctx.refresh_run_store
-    if run_store is None:  # unreachable when the capability allowed the write
+    snapshot_store = ctx.snapshot_store
+    if snapshot_store is None:  # unreachable when the capability allowed the write
         return _locked_response()
     payload = ingest_outcome_payload(ingest_supplied_bom(
         body.anchor_entity_id,
         body.bom,
         records=body.vulnerabilities,
-        run_store=run_store,
+        snapshot_store=snapshot_store,
         request_id=body.request_id,
         source=body.source,
     ))

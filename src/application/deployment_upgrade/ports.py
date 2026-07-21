@@ -120,14 +120,14 @@ def build_operational_registry() -> OperationalStepRegistry:
     from src.application.deployment_upgrade.steps.guidance_cache_format import (  # noqa: PLC0415
         GuidanceCacheFormatStep,
     )
-    from src.application.deployment_upgrade.steps.signals_refresh_run_schema import (  # noqa: PLC0415
+    from src.application.deployment_upgrade.steps.signals_snapshot_schema import (  # noqa: PLC0415
         PublicSqliteSignalsSchemaStep,
-        SignalsRefreshRunSchemaStep,
+        SignalsSnapshotSchemaStep,
     )
 
     registry = OperationalStepRegistry()
     registry.register(AssuranceRelationshipReconciliationStep())
     registry.register(GuidanceCacheFormatStep())
-    registry.register(SignalsRefreshRunSchemaStep())
+    registry.register(SignalsSnapshotSchemaStep())
     registry.register(PublicSqliteSignalsSchemaStep())
     return registry

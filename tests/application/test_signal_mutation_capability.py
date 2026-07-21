@@ -8,7 +8,7 @@ import itertools
 
 import pytest
 
-from src.application.security_refresh.capability import (
+from src.application.security_signals.capability import (
     SignalMutationAllowed,
     SignalMutationDenied,
     signal_mutation_capability,

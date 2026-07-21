@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.application.security_refresh.supplied_acquisition import acquisition_from_records
+from src.application.security_signals.supplied_acquisition import acquisition_from_records
 
 _QUERYABLE = [
     {"component_id": "pkg:pypi/requests@2.31.0", "purl": "pkg:pypi/requests@2.31.0"},

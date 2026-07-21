@@ -1,5 +1,5 @@
 """Security metrics + VEX REST surface over a REAL SQLCipher store: locked
-gating, unavailable-without-colocated-stores, end-to-end refresh→metrics→VEX
+gating, unavailable-without-colocated-stores, end-to-end ingest→metrics→VEX
 suppression→reopen, validation 422, cross-anchor isolation and
 superseded-version no-carry-over (F3.3), and no-store semantics."""
 
@@ -14,7 +14,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from src.application.security_refresh.command import RefreshBundle, refresh_security_signals
+from src.application.security_signals.command import IngestBundle, ingest_security_signals
 
 pytest.importorskip("sqlcipher3", reason="sqlcipher3 not installed")
 
@@ -23,10 +23,10 @@ _counter = itertools.count(1)
 
 
 class _RealContext:
-    def __init__(self, store: Any, run_store: Any, vex_store: Any,
+    def __init__(self, store: Any, snapshot_store: Any, vex_store: Any,
                  ceiling: str = "TLP:RED") -> None:
         self.store = store
-        self.refresh_run_store = run_store
+        self.snapshot_store = snapshot_store
         self.vex_store = vex_store
         self.max_classification = ceiling
 
@@ -37,7 +37,7 @@ class _RealContext:
 @pytest.fixture()
 def ctx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import src.infrastructure.assurance.signal_gate as gate
-    from src.infrastructure.assurance._refresh_run_store import SQLCipherRefreshRunStore
+    from src.infrastructure.assurance._snapshot_store import SQLCipherSnapshotStore
     from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore
     from src.infrastructure.assurance._vex_assessment_store import SQLCipherVexAssessmentStore
     from src.infrastructure.assurance.lifecycle import init_store
@@ -52,7 +52,7 @@ def ctx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     store.unlock()
     yield _RealContext(
         store,
-        SQLCipherRefreshRunStore(store._thread_conn_or_none),  # noqa: SLF001
+        SQLCipherSnapshotStore(store._thread_conn_or_none),  # noqa: SLF001
         SQLCipherVexAssessmentStore(store._thread_conn_or_none),  # noqa: SLF001
     )
     store.lock()
@@ -69,9 +69,9 @@ def _client(ctx: Any) -> TestClient:
     return client
 
 
-def _refresh(ctx: Any, anchor: str, *, vuln: str = "CVE-2024-1", purl: str = "pkg:pypi/a@1") -> str:
-    result = refresh_security_signals(
-        RefreshBundle(
+def _ingest(ctx: Any, anchor: str, *, vuln: str = "CVE-2024-1", purl: str = "pkg:pypi/a@1") -> str:
+    result = ingest_security_signals(
+        IngestBundle(
             anchor_entity_id=anchor,
             request_id=f"req-{next(_counter)}",
             components=({"component_id": "C1", "name": "a", "purl": purl,
@@ -79,10 +79,10 @@ def _refresh(ctx: Any, anchor: str, *, vuln: str = "CVE-2024-1", purl: str = "pk
             findings=({"component_id": "C1", "external_ids": [vuln],
                        "severity_band": "high", "cvss_score": 8.0},),
         ),
-        store=ctx.refresh_run_store,
-        new_run_id=lambda: f"RUN@{next(_counter)}",
+        store=ctx.snapshot_store,
+        new_snapshot_id=lambda: f"SNAP@{next(_counter)}",
     )
-    return result.run_id  # type: ignore[union-attr]
+    return result.snapshot_id  # type: ignore[union-attr]
 
 
 def _vex_body(anchor: str, purl: str = "pkg:pypi/a@1", vuln_canonical: str = "",
@@ -109,22 +109,22 @@ class TestGating:
             ctx.store.unlock()
 
     def test_missing_colocated_stores_yield_unavailable(self, ctx: Any) -> None:
-        ctx.refresh_run_store = None
+        ctx.snapshot_store = None
         resp = _client(ctx).get("/api/assurance/security-metrics?anchor_entity_id=APP@1")
         assert resp.status_code == 200
         assert resp.json()["availability"] == "unavailable"
 
 
 class TestEndToEnd:
-    def test_refresh_then_metrics_then_vex_suppression_then_reopen(self, ctx: Any) -> None:
-        run_id = _refresh(ctx, "APP@1")
+    def test_ingest_then_metrics_then_vex_suppression_then_reopen(self, ctx: Any) -> None:
+        snapshot_id = _ingest(ctx, "APP@1")
         client = _client(ctx)
         before = client.get("/api/assurance/security-metrics?anchor_entity_id=APP@1").json()
-        assert before["basis_run_id"] == run_id
+        assert before["basis_snapshot_id"] == snapshot_id
         assert before["distinct_open_vulnerabilities"] == 1
         assert before["max_cvss_score"] == 8.0
 
-        canonical = ctx.refresh_run_store.list_run_findings(run_id)[0][
+        canonical = ctx.snapshot_store.list_snapshot_findings(snapshot_id)[0][
             "canonical_vulnerability_id"]
         recorded = client.post("/api/assurance/vex", json=_vex_body("APP@1", vuln_canonical=canonical))
         assert recorded.status_code == 200
@@ -141,10 +141,10 @@ class TestEndToEnd:
         assert after["distinct_open_vulnerabilities"] == 1
 
     def test_vex_never_crosses_anchors_or_component_versions(self, ctx: Any) -> None:
-        run_id = _refresh(ctx, "APP@1")
-        _refresh(ctx, "APP@2")
+        snapshot_id = _ingest(ctx, "APP@1")
+        _ingest(ctx, "APP@2")
         client = _client(ctx)
-        canonical = ctx.refresh_run_store.list_run_findings(run_id)[0][
+        canonical = ctx.snapshot_store.list_snapshot_findings(snapshot_id)[0][
             "canonical_vulnerability_id"]
         # Assessment recorded for APP@2 (other anchor) and for a DIFFERENT version.
         client.post("/api/assurance/vex", json=_vex_body("APP@2", vuln_canonical=canonical))
@@ -188,13 +188,13 @@ class TestCrossSurfaceConsistency:
         from dataclasses import asdict
 
         from src.application.assurance_exposure import AssuranceExposurePolicy
-        from src.application.security_refresh.metrics import compute_security_metrics
+        from src.application.security_signals.metrics import compute_security_metrics
 
-        _refresh(ctx, "APP@1")
+        _ingest(ctx, "APP@1")
         rest = _client(ctx).get(
             "/api/assurance/security-metrics?anchor_entity_id=APP@1").json()
         direct = asdict(compute_security_metrics(
-            "APP@1", run_store=ctx.refresh_run_store, vex_store=ctx.vex_store,
+            "APP@1", snapshot_store=ctx.snapshot_store, vex_store=ctx.vex_store,
             policy=AssuranceExposurePolicy(ctx.max_classification, True),
         ))
         assert rest == direct
@@ -205,7 +205,7 @@ class TestSignalListing:
     legacy list_bom_components/list_vulnerabilities endpoints provided, on the new model)."""
 
     def test_components_findings_and_stats_over_the_active_snapshot(self, ctx: Any) -> None:
-        _refresh(ctx, "APP@1", vuln="CVE-2024-9", purl="pkg:pypi/a@1")
+        _ingest(ctx, "APP@1", vuln="CVE-2024-9", purl="pkg:pypi/a@1")
         client = _client(ctx)
 
         comps = client.get("/api/assurance/security-components?anchor_entity_id=APP@1")
@@ -227,9 +227,9 @@ class TestSignalListing:
         assert empty.json()["count"] == 0
 
         stats = client.get("/api/assurance/security-stats").json()
-        assert stats["active_runs"] == 1
-        assert stats["active_run_components"] == 1
-        assert stats["active_run_findings"] == 1
+        assert stats["active_snapshots"] == 1
+        assert stats["active_snapshot_components"] == 1
+        assert stats["active_snapshot_findings"] == 1
 
     def test_locked_listing_returns_423(self, ctx: Any) -> None:
         client = _client(ctx)

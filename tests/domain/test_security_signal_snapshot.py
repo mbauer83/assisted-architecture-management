@@ -1,4 +1,4 @@
-"""Refresh-run domain contract: the transition table, the normative idempotent
+"""Signal-snapshot domain contract: the transition table, the normative idempotent
 replay table (failed is terminal — replay returns, never resumes), canonical
 digest stability under input reordering, and directness classification."""
 
@@ -6,13 +6,13 @@ from __future__ import annotations
 
 import pytest
 
-from src.domain.security_refresh_run import (
-    CreateNewRun,
+from src.domain.security_signal_snapshot import (
+    CreateNewSnapshot,
     IdempotencyConflict,
     ReplayInProgress,
     ReplayStoredFailure,
     ReplayStoredSuccess,
-    StoredRunKey,
+    StoredSnapshotKey,
     canonical_bundle_digest,
     classify_directness,
     is_allowed_transition,
@@ -46,28 +46,28 @@ class TestTransitionTable:
 
 
 class TestReplayTable:
-    def _key(self, status: str, digest: str = "d1") -> StoredRunKey:
-        return StoredRunKey(run_id="RUN@1", status=status, request_payload_digest=digest)
+    def _key(self, status: str, digest: str = "d1") -> StoredSnapshotKey:
+        return StoredSnapshotKey(snapshot_id="SNAP@1", status=status, request_payload_digest=digest)
 
     def test_no_existing_key_creates(self) -> None:
-        assert isinstance(replay_decision(None, "d1"), CreateNewRun)
+        assert isinstance(replay_decision(None, "d1"), CreateNewSnapshot)
 
     def test_same_digest_staging_and_complete_are_in_progress(self) -> None:
-        assert replay_decision(self._key("staging"), "d1") == ReplayInProgress(run_id="RUN@1")
-        assert replay_decision(self._key("complete"), "d1") == ReplayInProgress(run_id="RUN@1")
+        assert replay_decision(self._key("staging"), "d1") == ReplayInProgress(snapshot_id="SNAP@1")
+        assert replay_decision(self._key("complete"), "d1") == ReplayInProgress(snapshot_id="SNAP@1")
 
     def test_same_digest_active_and_superseded_return_stored_success(self) -> None:
-        assert replay_decision(self._key("active"), "d1") == ReplayStoredSuccess(run_id="RUN@1")
-        assert replay_decision(self._key("superseded"), "d1") == ReplayStoredSuccess(run_id="RUN@1")
+        assert replay_decision(self._key("active"), "d1") == ReplayStoredSuccess(snapshot_id="SNAP@1")
+        assert replay_decision(self._key("superseded"), "d1") == ReplayStoredSuccess(snapshot_id="SNAP@1")
 
     def test_same_digest_failed_returns_stored_failure(self) -> None:
-        assert replay_decision(self._key("failed"), "d1") == ReplayStoredFailure(run_id="RUN@1")
+        assert replay_decision(self._key("failed"), "d1") == ReplayStoredFailure(snapshot_id="SNAP@1")
 
     def test_different_digest_is_a_typed_conflict_regardless_of_status(self) -> None:
         for status in ("staging", "complete", "active", "superseded", "failed"):
             decision = replay_decision(self._key(status), "d2")
             assert decision == IdempotencyConflict(
-                run_id="RUN@1", stored_digest="d1", submitted_digest="d2",
+                snapshot_id="SNAP@1", stored_digest="d1", submitted_digest="d2",
             )
 
 

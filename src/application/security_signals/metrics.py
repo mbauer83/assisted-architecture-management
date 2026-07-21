@@ -1,4 +1,4 @@
-"""Security posture metrics — one pure use case over (active run snapshot,
+"""Security posture metrics — one pure use case over (active snapshot snapshot,
 visible VEX revisions, exposure policy).
 
 Filter-before-aggregate: the exposure policy is applied to components,
@@ -22,18 +22,18 @@ from typing import Any, Literal, Mapping, Protocol, Sequence
 from src.application.assurance_exposure import AssuranceExposurePolicy
 from src.domain.vex_assessment import SUPPRESSING_DISPOSITIONS
 
-ContentState = Literal["complete", "visibility_limited", "no_active_run", "no_findings"]
+ContentState = Literal["complete", "visibility_limited", "no_active_snapshot", "no_findings"]
 
 _TLP_ORDER = ("TLP:WHITE", "TLP:GREEN", "TLP:AMBER", "TLP:RED")
 _BAND_ORDER = ("none", "low", "medium", "high", "critical")
 
 
 class MetricsRunReads(Protocol):
-    def get_active_run(self, anchor_entity_id: str) -> Mapping[str, Any] | None: ...
+    def get_active_snapshot(self, anchor_entity_id: str) -> Mapping[str, Any] | None: ...
 
-    def list_run_components(self, run_id: str) -> list[dict[str, Any]]: ...
+    def list_snapshot_components(self, snapshot_id: str) -> list[dict[str, Any]]: ...
 
-    def list_run_findings(self, run_id: str) -> list[dict[str, Any]]: ...
+    def list_snapshot_findings(self, snapshot_id: str) -> list[dict[str, Any]]: ...
 
 
 class MetricsVexReads(Protocol):
@@ -45,7 +45,7 @@ class SecurityMetrics:
     availability: Literal["available", "unavailable"]
     content_state: ContentState
     visibility_limited: bool
-    basis_run_id: str | None
+    basis_snapshot_id: str | None
     basis_activated_at: str | None
     computed_classification: str | None
     component_count: int
@@ -82,30 +82,30 @@ def _current_visible_vex(visible_revisions: Sequence[Mapping[str, Any]]) -> dict
 def compute_security_metrics(
     anchor_entity_id: str,
     *,
-    run_store: MetricsRunReads,
+    snapshot_store: MetricsRunReads,
     vex_store: MetricsVexReads,
     policy: AssuranceExposurePolicy,
 ) -> SecurityMetrics:
     empty: dict[str, int] = {}
-    run = run_store.get_active_run(anchor_entity_id)
-    if run is None:
+    snapshot = snapshot_store.get_active_snapshot(anchor_entity_id)
+    if snapshot is None:
         return SecurityMetrics(
-            availability="available", content_state="no_active_run",
+            availability="available", content_state="no_active_snapshot",
             visibility_limited=False,
-            basis_run_id=None, basis_activated_at=None, computed_classification=None,
+            basis_snapshot_id=None, basis_activated_at=None, computed_classification=None,
             component_count=0, finding_total=0, open_component_findings=empty,
             distinct_open_vulnerabilities=0, severity_band_counts=empty,
             max_cvss_score=None, max_severity_band=None,
             applicability_unknown_count=0, unknown_severity_finding_count=0,
             suppressed_finding_count=0,
         )
-    run_id = str(run["run_id"])
+    snapshot_id = str(snapshot["snapshot_id"])
 
     # Filter BEFORE any aggregation.
     visible_components, hidden_components = policy.filter_security_records(
-        run_store.list_run_components(run_id))
+        snapshot_store.list_snapshot_components(snapshot_id))
     visible_findings, hidden_findings = policy.filter_security_records(
-        run_store.list_run_findings(run_id))
+        snapshot_store.list_snapshot_findings(snapshot_id))
     visible_vex, _hidden_vex = policy.filter_security_records(
         vex_store.list_anchor_assessments(anchor_entity_id))
 
@@ -153,7 +153,7 @@ def compute_security_metrics(
     applicability_unknown = sum(
         1 for f in open_findings if str(f.get("applicability") or "") == "unknown"
     )
-    classification = _max_tlp([run, *visible_components, *visible_findings])
+    classification = _max_tlp([snapshot, *visible_components, *visible_findings])
 
     # The flag means content was ACTUALLY withheld from THIS response — not merely
     # that the session ceiling sits below the top level. A read that returns everything
@@ -170,8 +170,8 @@ def compute_security_metrics(
         availability="available",
         content_state=content_state,
         visibility_limited=anything_hidden,
-        basis_run_id=run_id,
-        basis_activated_at=str(run.get("activated_at") or ""),
+        basis_snapshot_id=snapshot_id,
+        basis_activated_at=str(snapshot.get("activated_at") or ""),
         computed_classification=classification,
         component_count=len(visible_components),
         finding_total=len(visible_findings),

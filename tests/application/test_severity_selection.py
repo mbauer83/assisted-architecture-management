@@ -4,7 +4,7 @@ follow the CVSS qualitative scale."""
 
 from __future__ import annotations
 
-from src.application.security_refresh.severity import score_to_band, select_severity
+from src.application.security_signals.severity import score_to_band, select_severity
 
 V31_MEDIUM = "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:L/A:N"          # 5.4
 V30_CRITICAL = "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"       # 10.0

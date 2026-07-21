@@ -5,7 +5,7 @@ signal-mutation transport (REST, MCP) consults before touching a connector."""
 
 from __future__ import annotations
 
-from src.application.security_refresh.capability import (
+from src.application.security_signals.capability import (
     SignalMutationCapability,
     signal_mutation_capability,
 )

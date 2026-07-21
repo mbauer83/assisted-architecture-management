@@ -1,14 +1,14 @@
 """Security-signal read-only MCP tools.
 
 Tools registered on arch-assurance-read:
-  assurance_list_bom_components  — components of the anchor's ACTIVE refresh run
-  assurance_list_vulnerabilities — vulnerability findings of the active run
-  assurance_security_stats       — refresh-run aggregate counts
-  assurance_security_metrics     — posture metrics from the active refresh run + VEX
+  assurance_list_bom_components  — components of the anchor's ACTIVE signal snapshot
+  assurance_list_vulnerabilities — vulnerability findings of the active snapshot
+  assurance_security_stats       — signal-snapshot aggregate counts
+  assurance_security_metrics     — posture metrics from the active signal snapshot + VEX
   assurance_scan_ai_candidates   — heuristic AI-BOM candidate scan
   assurance_aibom_export         — emit CycloneDX 1.6 ML-BOM from provided components JSON
 
-All read the refresh-run model. Confidential-backend reads are gated behind store-unlock
+All read the signal-snapshot model. Confidential-backend reads are gated behind store-unlock
 and filtered by the max_classification TLP ceiling before return.
 """
 
@@ -30,27 +30,27 @@ def register_security_read_tools(server: FastMCP) -> None:
     @server.tool(
         name="assurance_list_bom_components",
         description=(
-            "List the software components of the ACTIVE security refresh run for an "
+            "List the software components of the ACTIVE security signal snapshot for an "
             "architecture anchor (the current SBOM). Exposure-filtered by the TLP ceiling. "
             "Requires the assurance store to be unlocked."
         ),
     )
     def assurance_list_bom_components(anchor_entity_id: str) -> dict[str, object]:
-        from src.application.security_refresh.signals_read import list_active_components  # noqa: PLC0415
+        from src.application.security_signals.signals_read import list_active_components  # noqa: PLC0415
 
         if not ctx.is_available():
             return ctx.locked_response()
-        run_store = ctx.refresh_run_store
-        if run_store is None:
+        snapshot_store = ctx.snapshot_store
+        if snapshot_store is None:
             return {"components": [], "count": 0, "reason": "no co-located signals store"}
         components, withheld = list_active_components(
-            anchor_entity_id, run_store=run_store, policy=_policy())
+            anchor_entity_id, snapshot_store=snapshot_store, policy=_policy())
         return {"components": components, "count": len(components), "withheld": withheld}
 
     @server.tool(
         name="assurance_list_vulnerabilities",
         description=(
-            "List vulnerability findings of the ACTIVE refresh run for an architecture "
+            "List vulnerability findings of the ACTIVE signal snapshot for an architecture "
             "anchor, each carrying its component name/purl/directness, severity band, CVSS "
             "score, and applicability. Optionally scope to one component by purl or "
             "component_id (the component-details view). Exposure-filtered; a finding is "
@@ -60,45 +60,45 @@ def register_security_read_tools(server: FastMCP) -> None:
     def assurance_list_vulnerabilities(
         anchor_entity_id: str, purl: str | None = None, component_id: str | None = None,
     ) -> dict[str, object]:
-        from src.application.security_refresh.signals_read import list_active_findings  # noqa: PLC0415
+        from src.application.security_signals.signals_read import list_active_findings  # noqa: PLC0415
 
         if not ctx.is_available():
             return ctx.locked_response()
-        run_store = ctx.refresh_run_store
-        if run_store is None:
+        snapshot_store = ctx.snapshot_store
+        if snapshot_store is None:
             return {"findings": [], "count": 0, "reason": "no co-located signals store"}
         findings, withheld = list_active_findings(
-            anchor_entity_id, run_store=run_store, policy=_policy(), purl=purl, component_id=component_id)
+            anchor_entity_id, snapshot_store=snapshot_store, policy=_policy(), purl=purl, component_id=component_id)
         return {"findings": findings, "count": len(findings), "withheld": withheld}
 
     @server.tool(
         name="assurance_security_stats",
         description=(
-            "Refresh-run aggregate counts: total_runs, active_runs, anchors_with_active_run, "
-            "and the component/finding totals across the active runs. Requires the assurance "
+            "Snapshot aggregate counts: total_snapshots, active_snapshots, anchors_with_active_snapshot, "
+            "and the component/finding totals across the active snapshots. Requires the assurance "
             "store to be unlocked."
         ),
     )
     def assurance_security_stats() -> dict[str, object]:
-        from src.application.security_refresh.signals_read import signals_stats  # noqa: PLC0415
+        from src.application.security_signals.signals_read import signals_stats  # noqa: PLC0415
 
         if not ctx.is_available():
             return ctx.locked_response()
-        run_store = ctx.refresh_run_store
-        if run_store is None:
+        snapshot_store = ctx.snapshot_store
+        if snapshot_store is None:
             return {"reason": "no co-located signals store"}
-        return dict(signals_stats(run_store=run_store))
+        return dict(signals_stats(snapshot_store=snapshot_store))
 
     @server.tool(
         name="assurance_security_metrics",
         description=(
             "Security posture metrics for one architecture anchor, computed from the "
-            "single ACTIVE refresh run plus visible VEX assessments, exposure-filtered "
+            "single ACTIVE signal snapshot plus visible VEX assessments, exposure-filtered "
             "before any aggregation. Unit-explicit: finding_total and per-directness "
             "open_component_findings count component findings; "
             "distinct_open_vulnerabilities counts canonical vulnerability identities. "
-            "Includes basis run id/timestamp, computed classification, and closed "
-            "availability/content states (no_active_run / no_findings / "
+            "Includes basis snapshot id/timestamp, computed classification, and closed "
+            "availability/content states (no_active_snapshot / no_findings / "
             "visibility_limited / complete)."
         ),
     )
@@ -106,20 +106,20 @@ def register_security_read_tools(server: FastMCP) -> None:
         from dataclasses import asdict  # noqa: PLC0415
 
         from src.application.assurance_exposure import AssuranceExposurePolicy  # noqa: PLC0415
-        from src.application.security_refresh.metrics import compute_security_metrics  # noqa: PLC0415
+        from src.application.security_signals.metrics import compute_security_metrics  # noqa: PLC0415
 
         if not ctx.is_available():
             return ctx.locked_response()
-        run_store = ctx.refresh_run_store
+        snapshot_store = ctx.snapshot_store
         vex_store = ctx.vex_store
-        if run_store is None or vex_store is None:
+        if snapshot_store is None or vex_store is None:
             return {
                 "availability": "unavailable",
                 "reason": "metrics require the SQLCipher store with co-located signals",
             }
         policy = AssuranceExposurePolicy(ctx.max_classification, ctx.is_available())
         return asdict(compute_security_metrics(
-            anchor_entity_id, run_store=run_store, vex_store=vex_store, policy=policy,
+            anchor_entity_id, snapshot_store=snapshot_store, vex_store=vex_store, policy=policy,
         ))
 
     @server.tool(

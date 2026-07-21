@@ -29,11 +29,11 @@ class RepositoryReadAccess(CriteriaReadAccess, Protocol):
     def get_connection(self, artifact_id: str) -> ConnectionRecord | None: ...
 
 @dataclass(frozen=True)
-class SignalBasisRun:
+class SignalBasisSnapshot:
     """Provenance of one anchor's contribution to a batch."""
 
     anchor_entity_id: str
-    run_id: str
+    snapshot_id: str
     activated_at: str
 
 
@@ -42,18 +42,18 @@ class SignalMetricsBatch:
     """One batched fetch of signal-derived attribute values.
 
     ``values`` is keyed by (entity_id, metric_name). ``available=False`` means
-    the whole batch is unusable (locked store, no active run coherence, snapshot
+    the whole batch is unusable (locked store, no active snapshot coherence, snapshot
     change mid-read) — callers fall back to unresolved-reference styling and
     surface ``note`` as the legend explanation; values are never mixed across
     snapshots. ``classification`` is the maximum TLP of the VISIBLE contributing
-    records (computed, never hardcoded) and ``basis_runs`` the per-anchor
+    records (computed, never hardcoded) and ``basis_snapshots`` the per-anchor
     provenance — the banner/export stamp reads both."""
 
     available: bool
     values: Mapping[tuple[str, str], object] = field(default_factory=dict)
     note: str | None = None
     classification: str | None = None
-    basis_runs: tuple[SignalBasisRun, ...] = ()
+    basis_snapshots: tuple[SignalBasisSnapshot, ...] = ()
 
 
 class SignalAttributeCapability(Protocol):

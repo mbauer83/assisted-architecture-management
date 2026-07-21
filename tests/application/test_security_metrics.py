@@ -8,23 +8,23 @@ from __future__ import annotations
 from typing import Any
 
 from src.application.assurance_exposure import AssuranceExposurePolicy
-from src.application.security_refresh.metrics import compute_security_metrics
+from src.application.security_signals.metrics import compute_security_metrics
 
-RUN = {"run_id": "RUN@1", "activated_at": "2026-07-20T00:00:00Z", "tlp": "TLP:AMBER"}
+RUN = {"snapshot_id": "SNAP@1", "activated_at": "2026-07-20T00:00:00Z", "tlp": "TLP:AMBER"}
 
 
-class FakeRunReads:
-    def __init__(self, run: dict[str, Any] | None, components: list[dict[str, Any]],
+class FakeSnapshotReads:
+    def __init__(self, snapshot: dict[str, Any] | None, components: list[dict[str, Any]],
                  findings: list[dict[str, Any]]) -> None:
-        self._run, self._components, self._findings = run, components, findings
+        self._snapshot, self._components, self._findings = snapshot, components, findings
 
-    def get_active_run(self, anchor_entity_id: str) -> dict[str, Any] | None:
-        return self._run
+    def get_active_snapshot(self, anchor_entity_id: str) -> dict[str, Any] | None:
+        return self._snapshot
 
-    def list_run_components(self, run_id: str) -> list[dict[str, Any]]:
+    def list_snapshot_components(self, snapshot_id: str) -> list[dict[str, Any]]:
         return list(self._components)
 
-    def list_run_findings(self, run_id: str) -> list[dict[str, Any]]:
+    def list_snapshot_findings(self, snapshot_id: str) -> list[dict[str, Any]]:
         return list(self._findings)
 
 
@@ -56,20 +56,20 @@ def _vex(purl: str, vuln: str, revision: int, disposition: str,
 
 
 def _metrics(components: list, findings: list, vex: list | None = None,
-             ceiling: str = "TLP:RED", run: dict | None = RUN) -> Any:
+             ceiling: str = "TLP:RED", snapshot: dict | None = RUN) -> Any:
     return compute_security_metrics(
         "APP@1",
-        run_store=FakeRunReads(run, components, findings),
+        snapshot_store=FakeSnapshotReads(snapshot, components, findings),
         vex_store=FakeVexReads(vex),
         policy=AssuranceExposurePolicy(ceiling, True),
     )
 
 
 class TestContentStates:
-    def test_no_active_run(self) -> None:
-        result = _metrics([], [], run=None)
-        assert result.content_state == "no_active_run"
-        assert result.basis_run_id is None
+    def test_no_active_snapshot(self) -> None:
+        result = _metrics([], [], snapshot=None)
+        assert result.content_state == "no_active_snapshot"
+        assert result.basis_snapshot_id is None
 
     def test_no_findings_is_distinct_from_hidden_findings(self) -> None:
         clean = _metrics([_component("a")], [])
@@ -85,7 +85,7 @@ class TestContentStates:
     def test_complete_when_nothing_is_hidden_at_red_ceiling(self) -> None:
         result = _metrics([_component("a")], [_finding("a", "VID@1")])
         assert result.content_state == "complete"
-        assert result.basis_run_id == "RUN@1"
+        assert result.basis_snapshot_id == "SNAP@1"
 
     def test_ceiling_below_top_is_not_visibility_limited_when_nothing_withheld(self) -> None:
         # AMBER data at an AMBER ceiling: everything is returned, so the flag must be
@@ -98,9 +98,9 @@ class TestContentStates:
         assert result.content_state == "complete"
         assert result.visibility_limited is False
 
-    def test_no_active_run_is_not_visibility_limited(self) -> None:
-        result = _metrics([], [], ceiling="TLP:AMBER", run=None)
-        assert result.content_state == "no_active_run"
+    def test_no_active_snapshot_is_not_visibility_limited(self) -> None:
+        result = _metrics([], [], ceiling="TLP:AMBER", snapshot=None)
+        assert result.content_state == "no_active_snapshot"
         assert result.visibility_limited is False
 
 

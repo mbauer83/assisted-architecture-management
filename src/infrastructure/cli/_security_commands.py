@@ -1,7 +1,7 @@
 """Security signal CLI commands for arch-assurance.
 
 Handlers for: export-aibom, scan-ai-candidates. (Signal ingestion is the
-refresh tool's job — see tools/refresh_security_signals.py.)
+ingest tool's job — see tools/ingest_security_signals.py.)
 Extracted to keep arch_assurance.py within the LoC limit.
 """
 

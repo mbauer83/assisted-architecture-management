@@ -35,7 +35,7 @@ def bundle(tmp_path):  # type: ignore[no-untyped-def]
     the cross-thread scenario under test.
     """
     from src.infrastructure.assurance._archive import SQLCipherAssuranceArchive
-    from src.infrastructure.assurance._refresh_run_store import SQLCipherRefreshRunStore
+    from src.infrastructure.assurance._snapshot_store import SQLCipherSnapshotStore
     from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore
     from src.infrastructure.assurance.lifecycle import init_store
 
@@ -43,14 +43,14 @@ def bundle(tmp_path):  # type: ignore[no-untyped-def]
     init_store(db_path)
     store = SQLCipherAssuranceStore(db_path)
     store.unlock()
-    # Mirror the factory wiring: archive + refresh-run store share the store's
+    # Mirror the factory wiring: archive + signal-snapshot store share the store's
     # connection access. Post-fix this is the thread-aware accessor; pre-fix we
     # fall back to the single bound ``_conn`` so the harness reproduces the real
     # cross-thread failure on the unfixed code instead of an AttributeError.
     conn_access = getattr(store, "_thread_conn_or_none", None) or (lambda: store._conn)  # noqa: SLF001
     archive = SQLCipherAssuranceArchive(conn_access)
-    run_store = SQLCipherRefreshRunStore(conn_access)
-    yield store, archive, run_store
+    snapshot_store = SQLCipherSnapshotStore(conn_access)
+    yield store, archive, snapshot_store
     store.lock()
 
 
@@ -76,7 +76,7 @@ def test_read_on_thread_other_than_unlock_thread(bundle) -> None:  # type: ignor
 
 def test_concurrent_reads_from_threadpool(bundle) -> None:  # type: ignore[no-untyped-def]
     """Many concurrent reads across worker threads (the GUI/agent read load)."""
-    store, archive, run_store = bundle
+    store, archive, snapshot_store = bundle
     for i in range(10):
         store.create_node("loss", f"Loss {i}", concern_class="safety")
 
@@ -88,7 +88,7 @@ def test_concurrent_reads_from_threadpool(bundle) -> None:  # type: ignore[no-un
             store.stats()
             store.list_edges()
             archive.list_entries()
-            run_store.list_runs()
+            snapshot_store.list_snapshots()
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{type(exc).__name__}: {exc}")
 

@@ -1762,7 +1762,7 @@ viewpoints:
   name: Security Posture
   description: A tool-specific capability, not part of the ArchiMate standard's example
     viewpoints. Application components colored by the maximum CVSS score of their open
-    vulnerability findings, read from the ACTIVE security refresh run through the
+    vulnerability findings, read from the ACTIVE security-signal snapshot through the
     signal-metrics capability (exposure-filtered, snapshot-pinned). With the assurance
     store locked or signals unconfigured the diagram renders with default styling plus
     an explicit "signals unavailable" note — never with stale or mixed values. Styled

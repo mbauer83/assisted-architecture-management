@@ -6,7 +6,7 @@ Tools registered on arch-assurance-write:
   assurance_reconcile_aibom         — drift report: modeled vs discovered AI-BOM
 
 Ingestion never writes signal rows directly: the tool assembles a typed bundle and
-hands it to the RefreshSecuritySignals command, which owns the run lifecycle
+hands it to the IngestSecuritySignals command, which owns the snapshot lifecycle
 (staging → populate → complete → atomic activation) and the mutation+audit
 transaction boundary. The signal-mutation capability gate is consulted first, so an
 MCP ingest is denied in exactly the configurations a REST or CLI one is.
@@ -49,7 +49,7 @@ def register_security_write_tools(server: FastMCP) -> None:
         request_id: str = "",
         source: str = "",
     ) -> dict[str, object]:
-        from src.application.security_refresh.capability import SignalMutationDenied  # noqa: PLC0415
+        from src.application.security_signals.capability import SignalMutationDenied  # noqa: PLC0415
         from src.infrastructure.assurance.signal_gate import (  # noqa: PLC0415
             current_signal_mutation_capability,
         )
@@ -67,14 +67,14 @@ def register_security_write_tools(server: FastMCP) -> None:
                 "reason_code": capability.reason_code,
                 "message": capability.message,
             }
-        run_store = ctx.refresh_run_store
-        if run_store is None:  # unreachable once the capability allowed the write
+        snapshot_store = ctx.snapshot_store
+        if snapshot_store is None:  # unreachable once the capability allowed the write
             return ctx.locked_response()
         return ingest_outcome_payload(ingest_supplied_bom(
             anchor_entity_id,
             bom,
             records=vulnerabilities or [],
-            run_store=run_store,
+            snapshot_store=snapshot_store,
             request_id=request_id,
             source=source,
         ))

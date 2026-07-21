@@ -17,7 +17,7 @@ from typing import Any, Mapping, Sequence
 
 from packageurl import PackageURL
 
-from src.application.security_refresh.bundle_assembly import AcquisitionInputs
+from src.application.security_signals.bundle_assembly import AcquisitionInputs
 
 PackageIdentity = tuple[str, str, str]  # purl type, namespace, name
 

@@ -17,7 +17,7 @@ _SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>'
 
 class TestSvgStamp:
     def test_banner_is_burned_into_the_document(self) -> None:
-        stamped = stamp_svg_banner(_SVG, "TLP:AMBER — basis APP@1: RUN@x — generated t")
+        stamped = stamp_svg_banner(_SVG, "TLP:AMBER — basis APP@1: SNAP@x — generated t")
         assert "classification-banner" in stamped
         assert "TLP:AMBER" in stamped
         assert stamped.count("<") > _SVG.count("<")  # actually added elements

@@ -1,6 +1,6 @@
 """Signal-mutation capability predicate over the FULL configuration space.
 
-Signal mutations (refresh lifecycle, BOM/vulnerability/anchor imports, VEX)
+Signal mutations (snapshot lifecycle, BOM/vulnerability/anchor imports, VEX)
 require a real transactional boundary between the signal rows and their audit
 records. That exists in exactly one configuration:
 

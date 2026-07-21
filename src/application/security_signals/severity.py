@@ -4,7 +4,7 @@ Multiple severities per vulnerability: select the MAXIMUM valid applicable
 score, preserving the vector, nomenclature (CVSS_V2/V3/V4), and selection
 provenance. Scores are computed locally from upstream-reported vectors via the
 vetted `cvss` library — never synthesized from a band. Invalid vectors count
-as unknown severity; they never crash the refresh and never score 0.0.
+as unknown severity; they never crash the ingest and never score 0.0.
 """
 
 from __future__ import annotations

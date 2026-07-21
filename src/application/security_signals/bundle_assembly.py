@@ -1,4 +1,4 @@
-"""Assemble RefreshBundle inputs from a parsed SBOM plus acquisition results.
+"""Assemble IngestBundle inputs from a parsed SBOM plus acquisition results.
 
 Pure application logic: component identity (bom-ref first), directness from
 the preserved dependency graph, per-finding applicability via the OSV range
@@ -14,9 +14,9 @@ from typing import Any, Mapping, Sequence
 
 from packageurl import PackageURL
 
-from src.application.security_refresh.severity import select_severity
+from src.application.security_signals.severity import select_severity
 from src.domain.osv_ranges import evaluate_applicability
-from src.domain.security_refresh_run import classify_directness
+from src.domain.security_signal_snapshot import classify_directness
 
 
 @dataclass(frozen=True)

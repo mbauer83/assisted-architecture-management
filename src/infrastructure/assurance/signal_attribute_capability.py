@@ -6,7 +6,7 @@ capability serves the rest) — availability is evaluated per CALL, never at
 wiring time, so lock-state changes at runtime behave correctly. Each batch
 pins one snapshot token per anchor and revalidates every token after all
 reads; any change makes the whole batch unavailable — values from different
-snapshots are never mixed. An anchor with no active run contributes NO values
+snapshots are never mixed. An anchor with no active snapshot contributes NO values
 (absent ⇒ default styling), never a fabricated zero."""
 
 from __future__ import annotations
@@ -15,17 +15,17 @@ from collections.abc import Callable, Sequence
 from dataclasses import asdict
 
 from src.application.assurance_exposure import AssuranceExposurePolicy
-from src.application.security_refresh.metrics import compute_security_metrics
-from src.application.security_refresh.snapshot import (
+from src.application.security_signals.metrics import compute_security_metrics
+from src.application.security_signals.read_token import (
     AvailabilityState,
-    SignalSnapshotToken,
+    SignalReadToken,
     snapshot_still_valid,
     take_snapshot,
 )
 from src.application.viewpoints.ports import (
     NullSignalAttributeCapability,
     SignalAttributeCapability,
-    SignalBasisRun,
+    SignalBasisSnapshot,
     SignalMetricsBatch,
 )
 from src.infrastructure.mcp.assurance_mcp.context import AssuranceContext, get_assurance_context
@@ -42,9 +42,9 @@ class AssuranceSignalAttributeCapability:
         policy = AssuranceExposurePolicy(ctx.max_classification, ctx.is_available())
         if policy.check_locked():
             return SignalMetricsBatch(available=False, note="assurance store locked")
-        run_store = ctx.refresh_run_store
+        snapshot_store = ctx.snapshot_store
         vex_store = ctx.vex_store
-        if run_store is None or vex_store is None:
+        if snapshot_store is None or vex_store is None:
             return SignalMetricsBatch(
                 available=False,
                 note="signal metrics require the SQLCipher store with co-located signals",
@@ -53,25 +53,25 @@ class AssuranceSignalAttributeCapability:
         if not isinstance(store, AvailabilityState):
             return SignalMetricsBatch(available=False, note="store exposes no availability state")
 
-        tokens: dict[str, SignalSnapshotToken] = {}
+        tokens: dict[str, SignalReadToken] = {}
         values: dict[tuple[str, str], object] = {}
-        basis_runs: list[SignalBasisRun] = []
+        basis_snapshots: list[SignalBasisSnapshot] = []
         classifications: list[str] = []
         for entity_id in entity_ids:
             token = take_snapshot(
-                entity_id, availability=store, run_store=run_store,
+                entity_id, availability=store, snapshot_store=snapshot_store,
                 vex_store=vex_store, exposure_ceiling=ctx.max_classification,
             )
             tokens[entity_id] = token
-            if token.active_run_id is None:
-                continue  # no active run: absent values, never fabricated zeros
+            if token.active_snapshot_id is None:
+                continue  # no active snapshot: absent values, never fabricated zeros
             metrics = compute_security_metrics(
-                entity_id, run_store=run_store, vex_store=vex_store, policy=policy,
+                entity_id, snapshot_store=snapshot_store, vex_store=vex_store, policy=policy,
             )
-            basis_runs.append(SignalBasisRun(
+            basis_snapshots.append(SignalBasisSnapshot(
                 anchor_entity_id=entity_id,
-                run_id=token.active_run_id,
-                activated_at=token.active_run_activated_at or "",
+                snapshot_id=token.active_snapshot_id,
+                activated_at=token.active_snapshot_activated_at or "",
             ))
             if metrics.computed_classification:
                 classifications.append(metrics.computed_classification)
@@ -82,7 +82,7 @@ class AssuranceSignalAttributeCapability:
                     values[(entity_id, metric_name)] = value
         for entity_id, token in tokens.items():
             if not snapshot_still_valid(
-                token, availability=store, run_store=run_store,
+                token, availability=store, snapshot_store=snapshot_store,
                 vex_store=vex_store, exposure_ceiling=ctx.max_classification,
             ):
                 return SignalMetricsBatch(
@@ -94,7 +94,7 @@ class AssuranceSignalAttributeCapability:
         )
         return SignalMetricsBatch(
             available=True, values=values,
-            classification=classification, basis_runs=tuple(basis_runs),
+            classification=classification, basis_snapshots=tuple(basis_snapshots),
         )
 
 def composed_signal_attribute_capability() -> "SignalAttributeCapability":

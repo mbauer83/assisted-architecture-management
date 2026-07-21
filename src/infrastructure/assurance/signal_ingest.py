@@ -2,11 +2,11 @@
 
 Every ingest surface — the dogfooding script, the REST route, the MCP tool —
 assembles a typed bundle here, submits it through the same serialised write, and
-renders the outcome through the same projection, so run-id policy, the
+renders the outcome through the same projection, so snapshot-id policy, the
 single-writer boundary, and the response shape each have exactly one definition.
 Acquisition is injected (`acquire`): live OSV querying for the script,
-caller-supplied records for the REST/MCP surfaces. No surface touches the run
-lifecycle directly — the RefreshSecuritySignals command owns staging → populate
+caller-supplied records for the REST/MCP surfaces. No surface touches the snapshot
+lifecycle directly — the IngestSecuritySignals command owns staging → populate
 → complete → activate.
 """
 
@@ -17,28 +17,28 @@ import json
 import uuid
 from typing import Any, Callable, Mapping, Sequence
 
-from src.application.security_refresh.bundle_assembly import (
+from src.application.security_signals.bundle_assembly import (
     AcquisitionInputs,
     attach_findings,
     prepare_components,
 )
-from src.application.security_refresh.command import (
-    RefreshActivated,
-    RefreshBundle,
-    RefreshConflict,
-    RefreshFailed,
-    RefreshInvalid,
-    RefreshReplayed,
-    RefreshResult,
-    refresh_security_signals,
+from src.application.security_signals.command import (
+    IngestActivated,
+    IngestBundle,
+    IngestConflict,
+    IngestFailed,
+    IngestInvalid,
+    IngestReplayed,
+    IngestResult,
+    ingest_security_signals,
 )
-from src.application.security_refresh.ports import RefreshRunStore
+from src.application.security_signals.ports import SnapshotStore
 
 Acquire = Callable[[Sequence[Mapping[str, str]]], AcquisitionInputs]
 
 
-def new_run_id() -> str:
-    return f"RUN@{uuid.uuid4().hex[:16]}"
+def new_snapshot_id() -> str:
+    return f"SNAP@{uuid.uuid4().hex[:16]}"
 
 
 def new_request_id() -> str:
@@ -53,7 +53,7 @@ def assemble_bundle(
     request_id: str = "",
     generator_metadata: Mapping[str, object] | None = None,
     source_metadata: Mapping[str, object] | None = None,
-) -> RefreshBundle:
+) -> IngestBundle:
     """Parse a CycloneDX document, classify its components, acquire vulnerability
     data through the injected strategy, and return the complete typed bundle."""
     from src.infrastructure.assurance._sbom_parser import parse_bom  # noqa: PLC0415
@@ -63,7 +63,7 @@ def assemble_bundle(
     meta, parsed = parse_bom(dict(sbom_data))
     assembled = prepare_components(meta, parsed)
     attach_findings(assembled, acquire(assembled.queryable))
-    return RefreshBundle(
+    return IngestBundle(
         anchor_entity_id=anchor_entity_id,
         request_id=request_id or new_request_id(),
         components=tuple(assembled.components),
@@ -77,12 +77,12 @@ def assemble_bundle(
     )
 
 
-def submit_bundle(bundle: RefreshBundle, *, run_store: RefreshRunStore) -> RefreshResult:
+def submit_bundle(bundle: IngestBundle, *, snapshot_store: SnapshotStore) -> IngestResult:
     """Execute one ingest on the serialised assurance writer."""
     from src.infrastructure.assurance.write_serialization import run_write  # noqa: PLC0415
 
-    return run_write(lambda: refresh_security_signals(
-        bundle, store=run_store, new_run_id=new_run_id,
+    return run_write(lambda: ingest_security_signals(
+        bundle, store=snapshot_store, new_snapshot_id=new_snapshot_id,
     ))
 
 
@@ -91,10 +91,10 @@ def ingest_supplied_bom(
     bom: Mapping[str, Any],
     *,
     records: Sequence[Mapping[str, Any]],
-    run_store: RefreshRunStore,
+    snapshot_store: SnapshotStore,
     request_id: str = "",
     source: str = "",
-) -> RefreshResult:
+) -> IngestResult:
     """Ingest a caller-supplied BOM (+ advisories) for one anchor.
 
     The whole act behind both the REST route and the MCP tool: assemble the bundle
@@ -102,7 +102,7 @@ def ingest_supplied_bom(
     signal-mutation capability first — they render a denial differently, but the
     ingest itself is defined once, here.
     """
-    from src.application.security_refresh.supplied_acquisition import (  # noqa: PLC0415
+    from src.application.security_signals.supplied_acquisition import (  # noqa: PLC0415
         acquisition_from_records,
     )
 
@@ -114,7 +114,7 @@ def ingest_supplied_bom(
         generator_metadata={"generator": "supplied-bom"},
         source_metadata={"vulnerability_source": source or "caller-supplied"},
     )
-    return submit_bundle(bundle, run_store=run_store)
+    return submit_bundle(bundle, snapshot_store=snapshot_store)
 
 
 # HTTP status per ingest outcome; the MCP surface reports the same `status`
@@ -128,30 +128,37 @@ INGEST_STATUS_CODES: Mapping[str, int] = {
 }
 
 
-def ingest_outcome_payload(result: RefreshResult) -> dict[str, object]:
+def ingest_outcome_payload(result: IngestResult) -> dict[str, object]:
     """Project the command's typed outcome onto the shared response body."""
     match result:
-        case RefreshActivated(run_id, superseded, components, findings):
+        case IngestActivated() as activated:
+            # `component_count`/`finding_count` are the PERSISTED counts — what a
+            # read of this snapshot returns. The submitted counts and the collapse
+            # delta ride alongside so a caller seeing fewer findings than it sent
+            # can tell alias dedup from data loss.
             return {
                 "status": "activated",
-                "snapshot_id": run_id,
-                "superseded_snapshot_id": superseded,
-                "component_count": components,
-                "finding_count": findings,
+                "snapshot_id": activated.snapshot_id,
+                "superseded_snapshot_id": activated.superseded_snapshot_id,
+                "component_count": activated.persisted_component_count,
+                "finding_count": activated.persisted_finding_count,
+                "submitted_component_count": activated.submitted_component_count,
+                "submitted_finding_count": activated.submitted_finding_count,
+                "collapsed_finding_count": activated.collapsed_finding_count,
             }
-        case RefreshInvalid(errors):
+        case IngestInvalid(errors):
             return {
                 "status": "invalid",
                 "errors": [{"field": e.field, "message": e.message} for e in errors],
             }
-        case RefreshReplayed(run_id, outcome, message):
+        case IngestReplayed(snapshot_id, outcome, message):
             return {
                 "status": "replayed",
-                "snapshot_id": run_id,
+                "snapshot_id": snapshot_id,
                 "stored_outcome": outcome,
                 "message": message,
             }
-        case RefreshConflict(run_id, message):
-            return {"status": "conflict", "snapshot_id": run_id, "message": message}
-        case RefreshFailed(run_id, reason):
-            return {"status": "failed", "snapshot_id": run_id, "reason": reason}
+        case IngestConflict(snapshot_id, message):
+            return {"status": "conflict", "snapshot_id": snapshot_id, "message": message}
+        case IngestFailed(snapshot_id, reason):
+            return {"status": "failed", "snapshot_id": snapshot_id, "reason": reason}

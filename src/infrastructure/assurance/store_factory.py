@@ -48,18 +48,18 @@ class _AssuranceBundle:
         self.archive_backend = archive_backend
         # Run/VEX stores exist only where the transactional boundary does
         # (SQLCipher store; the capability predicate denies mutations elsewhere).
-        self.refresh_run_store = _build_refresh_run_store(store, store_backend)
+        self.snapshot_store = _build_snapshot_store(store, store_backend)
         self.vex_store = _build_vex_store(store, store_backend)
 
 
-def _build_refresh_run_store(store: ConfidentialAssuranceStore, store_backend: str):
+def _build_snapshot_store(store: ConfidentialAssuranceStore, store_backend: str):
     if store_backend != "sqlcipher":
         return None
-    from src.infrastructure.assurance._refresh_run_store import SQLCipherRefreshRunStore
+    from src.infrastructure.assurance._snapshot_store import SQLCipherSnapshotStore
     from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore
 
     assert isinstance(store, SQLCipherAssuranceStore)
-    return SQLCipherRefreshRunStore(store._thread_conn_or_none)  # noqa: SLF001
+    return SQLCipherSnapshotStore(store._thread_conn_or_none)  # noqa: SLF001
 
 
 def _build_vex_store(store: ConfidentialAssuranceStore, store_backend: str):
