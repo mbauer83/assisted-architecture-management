@@ -29,7 +29,8 @@ from src.application.assurance_diagrams import (
     render_control_structure,
     uca_matrix_nodes,
 )
-from src.application.assurance_exposure import AssuranceExposurePolicy
+from src.application.assurance_edge_enrichment import enrich_edges, visible_nodes_by_id
+from src.application.assurance_exposure import AssuranceExposurePolicy, Visible
 from src.application.assurance_queries import coverage_gaps, risk_register
 from src.infrastructure.gui.routers._assurance_http import locked_response as _locked_response
 from src.infrastructure.gui.routers._assurance_http import not_found_response as _not_found_response
@@ -126,19 +127,21 @@ def read_assurance_node(node_id: str) -> JSONResponse:
         return _locked_response()
     node = ctx.store.get_node(node_id)
     outcome = pol.apply_node(node)
-    from src.application.assurance_exposure import Visible  # noqa: PLC0415
     if not isinstance(outcome, Visible):
         return _not_found_response()
-    visible_ids = frozenset(str(n["node_id"]) for n in pol.filter_nodes(ctx.store.list_nodes())[0])
+    visible_nodes, _ = pol.filter_nodes(ctx.store.list_nodes())
+    nodes_by_id = visible_nodes_by_id(visible_nodes)
+    nodes_by_id[node_id] = outcome.value
+    all_visible = frozenset(nodes_by_id)
     edges_out = ctx.store.list_edges(source_id=node_id)
     edges_in = ctx.store.list_edges(target_id=node_id)
-    all_visible = frozenset({node_id}) | visible_ids
     arch_refs = ctx.store.list_arch_refs(assurance_node_id=node_id)
     return _ok({
         "node": outcome.value,
-        "outgoing_edges": pol.filter_edges(edges_out, all_visible),
-        "incoming_edges": pol.filter_edges(edges_in, all_visible),
+        "outgoing_edges": enrich_edges(pol.filter_edges(edges_out, all_visible), nodes_by_id),
+        "incoming_edges": enrich_edges(pol.filter_edges(edges_in, all_visible), nodes_by_id),
         "arch_refs": arch_refs,
+        "visibility_limited": pol.scope().visibility_limited,
     })
 
 
@@ -155,8 +158,8 @@ def list_assurance_edges(
         return _locked_response()
     edges = ctx.store.list_edges(source_id=source_id, target_id=target_id, conn_type=conn_type)
     visible_nodes, _ = pol.filter_nodes(ctx.store.list_nodes())
-    visible_ids = frozenset(str(n["node_id"]) for n in visible_nodes)
-    filtered = pol.filter_edges(edges, visible_ids)
+    nodes_by_id = visible_nodes_by_id(visible_nodes)
+    filtered = enrich_edges(pol.filter_edges(edges, frozenset(nodes_by_id)), nodes_by_id)
     return _ok({"edges": filtered, "count": len(filtered), "visibility_limited": pol.scope().visibility_limited})
 
 
@@ -214,40 +217,6 @@ def assurance_risk_register() -> JSONResponse:
     visible_ids = frozenset(str(n["node_id"]) for n in visible)
     visible_edges = pol.filter_edges(ctx.store.list_edges(), visible_ids)
     return _ok(risk_register(visible, visible_edges))
-
-
-# ── Security signals ──────────────────────────────────────────────────────────
-
-@read_router.get("/api/assurance/bom/components")
-def list_bom_components(
-    anchor_entity_id: str | None = None,
-    purl: str | None = None,
-) -> JSONResponse:
-    ctx, pol = _policy()
-    if not ctx.signals_available():
-        return _locked_response()
-    components = ctx.connector.list_bom_components(anchor_entity_id=anchor_entity_id, purl=purl)
-    visible, withheld = pol.filter_security_records(components)
-    scope = pol.scope()
-    if withheld:
-        logger.info("bom_components: ceiling=%s withheld=%d", scope.ceiling, withheld)
-    return _ok({"components": visible, "count": len(visible), "visibility_limited": scope.visibility_limited})
-
-
-@read_router.get("/api/assurance/vulnerabilities")
-def list_vulnerabilities(
-    purl: str | None = None,
-    severity: str | None = None,
-) -> JSONResponse:
-    ctx, pol = _policy()
-    if not ctx.signals_available():
-        return _locked_response()
-    vulns = ctx.connector.list_vulnerabilities(purl=purl, severity=severity)
-    visible, withheld = pol.filter_security_records(vulns)
-    scope = pol.scope()
-    if withheld:
-        logger.info("vulnerabilities: ceiling=%s withheld=%d", scope.ceiling, withheld)
-    return _ok({"vulnerabilities": visible, "count": len(visible), "visibility_limited": scope.visibility_limited})
 
 
 # ── Derived diagram previews ──────────────────────────────────────────────────

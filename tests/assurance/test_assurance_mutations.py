@@ -84,6 +84,9 @@ class _FakeStore:
             "ref_type": ref_type,
         })
 
+    def list_arch_refs(self, *, assurance_node_id=None, arch_artifact_id=None):
+        return list(self._arch_refs)
+
     def stats(self) -> dict[str, Any]:
         return {"node_count": len(self._nodes)}
 
@@ -117,9 +120,15 @@ def test_delete_node_locked() -> None:
     assert isinstance(result, mut.MutationLocked)
 
 
+def _legal_leads_to(source_type: str, target_type: str) -> frozenset[str]:
+    """Unit-test stand-in for the module matrix lookup: hazard→loss chain types."""
+    return frozenset({"leads-to"})
+
+
 def test_add_edge_locked() -> None:
     result = mut.add_edge(_FakeStore(unlocked=False), _FakeArchive(),
-                          source_id="A", target_id="B", conn_type="leads-to")
+                          source_id="A", target_id="B", conn_type="leads-to",
+                          legal_connection_types=_legal_leads_to)
     assert isinstance(result, mut.MutationLocked)
 
 
@@ -152,7 +161,8 @@ def test_add_edge_source_not_found() -> None:
     store = _FakeStore()
     store.create_node("loss", "L1")
     result = mut.add_edge(store, _FakeArchive(),
-                          source_id="NOD@missing", target_id="NOD@1", conn_type="leads-to")
+                          source_id="NOD@missing", target_id="NOD@1", conn_type="leads-to",
+                          legal_connection_types=_legal_leads_to)
     assert isinstance(result, mut.MutationNotFound)
     assert result.artifact_id == "NOD@missing"
 
@@ -161,7 +171,8 @@ def test_add_edge_target_not_found() -> None:
     store = _FakeStore()
     nid = store.create_node("loss", "L1")
     result = mut.add_edge(store, _FakeArchive(),
-                          source_id=nid, target_id="NOD@missing", conn_type="leads-to")
+                          source_id=nid, target_id="NOD@missing", conn_type="leads-to",
+                          legal_connection_types=_legal_leads_to)
     assert isinstance(result, mut.MutationNotFound)
     assert result.artifact_id == "NOD@missing"
 
@@ -231,7 +242,8 @@ def test_add_edge_success() -> None:
     store, archive = _FakeStore(), _FakeArchive()
     sid = store.create_node("hazard", "H1")
     tid = store.create_node("loss", "L1")
-    result = mut.add_edge(store, archive, source_id=sid, target_id=tid, conn_type="leads-to")
+    result = mut.add_edge(store, archive, source_id=sid, target_id=tid, conn_type="leads-to",
+                          legal_connection_types=_legal_leads_to)
     assert isinstance(result, mut.MutationOk)
     assert "edge_id" in result.payload
     assert result.payload["conn_type"] == "leads-to"

@@ -32,6 +32,7 @@ class _FakeStore:
         self._nodes: dict[str, dict[str, Any]] = {}
         self._edges: list[dict[str, Any]] = []
         self._next = 0
+        self._arch_refs: list[dict[str, Any]] = []
 
     def _nid(self) -> str:
         self._next += 1
@@ -78,6 +79,9 @@ class _FakeStore:
     def register_arch_ref(self, *_args: object, **_kwargs: object) -> None:
         pass
 
+    def list_arch_refs(self, *, assurance_node_id=None, arch_artifact_id=None):
+        return list(self._arch_refs)
+
     def stats(self) -> dict[str, Any]:
         return {}
 
@@ -103,37 +107,10 @@ class _FakeArchive:
         return []
 
 
-class _FakeConnector:
-    def list_bom_components(self, **_kwargs: object) -> list[Any]:
-        return []
-
-    def list_vulnerabilities(self, **_kwargs: object) -> list[Any]:
-        return []
-
-    def get_stats(self) -> dict[str, Any]:
-        return {}
-
-    def import_bom(self, bom_data: dict[str, Any], *, anchor_entity_id: str,
-                   bom_format: str = "cyclonedx", source_file: str = "") -> dict[str, Any]:
-        return {"imported": True}
-
-    def import_vulnerabilities(self, vuln_records: list[Any], *,
-                               source: str = "osv") -> dict[str, Any]:
-        return {"imported": len(vuln_records)}
-
-    def set_anchor(self, component_ref: str, arch_entity_id: str,
-                   *, ref_type: str = "purl") -> None:
-        pass
-
-    def list_anchors(self, **_kwargs: object) -> list[Any]:
-        return []
-
-
 class _FakeContext:
     def __init__(self, store: _FakeStore, ceiling: str = "TLP:RED") -> None:
         self._store = store
         self._archive = _FakeArchive()
-        self._connector = _FakeConnector()
         self.max_classification = ceiling
 
     @property
@@ -144,21 +121,11 @@ class _FakeContext:
     def archive(self) -> _FakeArchive:
         return self._archive
 
-    @property
-    def connector(self) -> _FakeConnector:
-        return self._connector
-
     def is_available(self) -> bool:
-        return self._store.is_unlocked()
-
-    def signals_available(self) -> bool:
         return self._store.is_unlocked()
 
     def locked_response(self) -> dict[str, Any]:
         return {"error": "assurance_store_locked", "message": "locked"}
-
-    def signals_locked_response(self) -> dict[str, Any]:
-        return {"error": "signals_store_locked", "message": "locked"}
 
     def not_found_response(self, node_id: str) -> dict[str, Any]:
         return {"error": "not_found", "node_id": node_id}
@@ -289,6 +256,25 @@ def test_add_edge_success() -> None:
     })
     assert resp.status_code == 200
     assert "edge_id" in resp.json()
+
+
+def test_add_edge_illegal_pair_is_a_422_typed_envelope() -> None:
+    store = _FakeStore()
+    sid = store.create_node("loss", "L1")
+    tid = store.create_node("hazard", "H1")
+    ctx = _FakeContext(store)
+    client = _make_client(ctx)
+    resp = client.post("/api/assurance/edges", json={
+        "source_id": sid, "target_id": tid, "conn_type": "leads-to",
+    })
+    assert resp.status_code == 422
+    body = resp.json()
+    assert body["error"] == "illegal_connection_type"
+    assert body["source_type"] == "loss"
+    assert body["target_type"] == "hazard"
+    assert body["conn_type"] == "leads-to"
+    assert isinstance(body["legal_types"], list)
+    assert store.list_edges() == []  # nothing written
 
 
 def test_add_edge_source_not_found() -> None:

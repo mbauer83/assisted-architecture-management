@@ -48,11 +48,8 @@ agent cannot, for example, mark a safety constraint as `accept`-risk-treated.
 | Completeness & coverage | `assurance_case_completeness` | Read-only | Run argument-completeness checks for an assurance case. |
 | Completeness & coverage | `assurance_draft_gsn` | Read-only | Scaffold a GSN (Goal Structuring Notation) argument structure from the assurance store. |
 | Supply chain / AIBOM | `assurance_aibom_export` | Read-only | Emit a CycloneDX 1.6 ML-BOM/ASBOM JSON document from a list of AI-component dicts. |
-| Supply chain / AIBOM | `assurance_aibom_coverage` | Read-only | AI-BOM coverage/gap report: shows BOM components that have no anchor mapping (not linked to an architecture entity) and anchor mappings for entities that are not yet marked with an ai_role. |
 | Supply chain / AIBOM | `assurance_scan_ai_candidates` | Read-only | Heuristic AI-BOM candidate scan over a list of architecture entity dicts. |
-| Supply chain / AIBOM | `assurance_list_bom_components` | Read-only | List BOM components ingested via assurance_import_bom. |
-| Supply chain / AIBOM | `assurance_list_vulnerabilities` | Read-only | List vulnerability findings ingested via assurance_import_vulnerabilities. |
-| Security signals | `assurance_security_stats` | Read-only | Return counts of security signal data: BOM ingests, BOM components, vulnerability records, and anchor mappings. |
+| Security signals | `assurance_security_metrics` | Read-only | Security posture metrics for one architecture anchor, computed from the single ACTIVE refresh run plus visible VEX assessments, exposure-filtered before any aggregation. |
 | Security signals | `assurance_risk_register` | Read-only | Return a tabular view of all risk entities with their treatment, owner status, linked hazards/loss-scenarios (via assesses), and treating constraints (via treated-by). |
 | Store administration | `assurance_store_status` | Read-only | Return the current status of the confidential assurance store: whether it is configured, locked, or unlocked. |
 | Store administration | `assurance_stats` | Read-only | Return counts of assurance nodes and edges by type. |
@@ -60,6 +57,9 @@ agent cannot, for example, mark a safety constraint as `accept`-risk-treated.
 | Store administration | `assurance_list_nodes` | Read-only | List assurance entities (losses, hazards, UCAs, constraints, etc.). |
 | Store administration | `assurance_read_node` | Read-only | Read a single assurance entity by node_id. |
 | Store administration | `assurance_list_edges` | Read-only | List assurance connections. |
+| Other | `assurance_list_bom_components` | Read-only | List the software components of the ACTIVE security refresh run for an architecture anchor (the current SBOM). |
+| Other | `assurance_list_vulnerabilities` | Read-only | List vulnerability findings of the ACTIVE refresh run for an architecture anchor, each carrying its component name/purl/directness, severity band, CVSS score, and applicability. |
+| Other | `assurance_security_stats` | Read-only | Refresh-run aggregate counts: total_runs, active_runs, anchors_with_active_run, and the component/finding totals across the active runs. |
 <!-- mcp-tools:end assurance-read -->
 
 ## `arch-assurance-write`
@@ -77,10 +77,7 @@ agent cannot, for example, mark a safety constraint as `accept`-risk-treated.
 | STPA / CAST / GRC authoring | `assurance_delete_edge` | Destructive | Delete a single assurance edge by its edge_id. |
 | STPA / CAST / GRC authoring | `assurance_seal_baseline` | Write | Seal a signed baseline of the current assurance analysis state. |
 | Completeness & coverage | `assurance_promotion_preflight` | Write | Pre-check safety/security assurance-constraints before promoting findings to a wider audience tier. |
-| Supply chain / AIBOM | `assurance_import_bom` | Write | Ingest a CycloneDX or SPDX BOM (as a JSON dict) and map its components to architecture entities via existing anchor_mappings. |
-| Supply chain / AIBOM | `assurance_import_vulnerabilities` | Write | Ingest vulnerability records (OSV / NVD / GitHub Advisory / CISA-KEV format). |
 | Supply chain / AIBOM | `assurance_reconcile_aibom` | Write | Diff a modeled AI-BOM (from the architecture model) against a discovered one (from a runtime discovery tool or an imported BOM file). |
-| Supply chain / AIBOM | `assurance_set_anchor` | Write | Map a component reference (typically a Package URL / PURL) to an architecture entity. |
 | Security signals | `assurance_register_arch_ref` | Write | Record an assurance→architecture cross-reference. |
 | Security signals | `assurance_model_this` | Write | Propose an architecture entity to bind an unbound-pending control-structure-node. |
 <!-- mcp-tools:end assurance-write -->

@@ -52,7 +52,7 @@ def coverage_gaps(
             "assurance-constraint", lambda nid: not _has_out(nid, "evidenced-by")
         ),
         "hazards_without_constraints": _ids(
-            "hazard", lambda nid: not _has_in(nid, "violates")
+            "hazard", lambda nid: not _has_in(nid, "leads-to")
         ),
         "obligations_without_constraints": _ids(
             "obligation", lambda nid: not _has_in(nid, "complies-with")
@@ -75,35 +75,6 @@ def coverage_gaps(
     }
 
 
-_UNANCHORED_PAGE_SIZE = 50
-
-
-def aibom_coverage(
-    components: list[dict[str, Any]],
-    anchors: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """AI-BOM coverage/gap report over exposure-filtered BOM components and anchors.
-
-    Accepts pre-fetched, exposure-filtered records (no store access). Surfaces BOM
-    components with no architecture anchor (not linked to an entity) and the set of
-    anchored entity ids, so callers can see where AI-component marking is incomplete.
-    """
-    unanchored = [c for c in components if not c.get("arch_entity_id")]
-    anchor_entity_ids = {str(a["arch_entity_id"]) for a in anchors if a.get("arch_entity_id")}
-    return {
-        "total_bom_components": len(components),
-        "unanchored_components": len(unanchored),
-        "unanchored_truncated": len(unanchored) > _UNANCHORED_PAGE_SIZE,
-        "anchor_mappings": len(anchors),
-        "unanchored": unanchored[:_UNANCHORED_PAGE_SIZE],
-        "anchored_entity_ids": sorted(anchor_entity_ids),
-        "summary": (
-            "All BOM components are linked to an architecture entity." if not unanchored
-            else f"{len(unanchored)} BOM component(s) not linked to an architecture entity."
-        ),
-    }
-
-
 def risk_register(
     nodes: list[dict[str, Any]],
     edges: list[dict[str, Any]],
@@ -116,6 +87,13 @@ def risk_register(
             str(e["target_id"]) for e in edges
             if str(e["source_id"]) == source_id and str(e["conn_type"]) == conn
             and str(e["target_id"]) in nodes_by_id
+        ]
+
+    def _sources_of(target_id: str, conn: str) -> list[str]:
+        return [
+            str(e["source_id"]) for e in edges
+            if str(e["target_id"]) == target_id and str(e["conn_type"]) == conn
+            and str(e["source_id"]) in nodes_by_id
         ]
 
     rows = []
@@ -145,6 +123,6 @@ def risk_register(
             "risk_score": str(attrs.get("risk_score") or ""),
             "assesses": _refs(_targets_of(rid, "assesses")),
             "treated_by": _refs(_targets_of(rid, "treated-by")),
-            "owners": _refs(_targets_of(rid, "accountable-to")),
+            "owners": _refs(_sources_of(rid, "accountable-for")),
         })
     return {"risks": rows, "count": len(rows)}

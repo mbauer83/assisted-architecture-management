@@ -44,11 +44,19 @@ def test_core_connection_types_present() -> None:
     conns = assurance_module.connection_types
     for expected in [
         "issues", "acts-on", "feedback", "concerns", "by-controller",
-        "violates", "leads-to", "explains", "derives",
-        "refines", "accountable-to", "evidenced-by",
-        "assesses", "treated-by", "complies-with", "binds-to",
+        "leads-to", "explains", "derives", "refines",
+        "responsible-for", "accountable-for", "evidenced-by",
+        "assesses", "treated-by", "complies-with", "investigates",
     ]:
         assert expected in conns, f"Expected connection type '{expected}' in assurance module"
+    for retired in ["violates", "satisfied-by", "accountable-to", "responsible-of", "binds-to", "cites"]:
+        assert retired not in conns, f"Retired vocabulary '{retired}' must not be an edge type"
+
+
+def test_reference_type_catalog_is_distinct_from_edge_types() -> None:
+    reference_types = assurance_module.reference_types
+    assert set(reference_types) == {"binds-to", "refines-requirement", "evidenced-by-artifact", "purl"}
+    assert set(reference_types).isdisjoint(set(assurance_module.connection_types))
 
 
 def test_element_classes_declared() -> None:

@@ -40,7 +40,7 @@ def promotion_preflight(
 
         if concern_class in _SAFETY_CLASSES:
             has_owner = any(
-                str(e["source_id"]) == nid and str(e["conn_type"]) == "accountable-to"
+                str(e["target_id"]) == nid and str(e["conn_type"]) == "responsible-for"
                 for e in all_edges
             )
             has_evidence = any(
@@ -53,8 +53,8 @@ def promotion_preflight(
                     "name": str(node.get("name", "")),
                     "issue": "missing_owner",
                     "message": (
-                        f"Safety/security constraint ({concern_class}) has no accountable-to owner. "
-                        "Assign an owner before promoting (§6 pre-check)."
+                        f"Safety/security constraint ({concern_class}) has no responsible controller. "
+                        "Add an incoming responsible-for connection before promoting (§6 pre-check)."
                     ),
                 })
             if not has_evidence:

@@ -33,6 +33,36 @@ def _compute_hash(
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
+def append_audit_row(
+    conn: Any,
+    operation: str,
+    *,
+    node_id: str | None = None,
+    payload: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Append one hash-chained audit row WITHOUT committing — for callers that
+    must land the audit record in the same transaction as the signal mutation
+    it describes (the audited-mutation durability invariant). The plain
+    ``append`` method wraps this with its own commit."""
+    timestamp = _now_iso()
+    payload_json = json.dumps(payload or {})
+    head = conn.execute(
+        "SELECT seq, entry_hash FROM audit_log ORDER BY seq DESC LIMIT 1"
+    ).fetchone()
+    prev_hash = head["entry_hash"] if head else ""
+    seq_row = conn.execute(
+        "SELECT COALESCE(MAX(seq), 0) + 1 AS next_seq FROM audit_log"
+    ).fetchone()
+    seq = int(seq_row["next_seq"])
+    entry_hash = _compute_hash(seq, timestamp, operation, payload_json, prev_hash)
+    conn.execute(
+        "INSERT INTO audit_log (seq, timestamp, operation, node_id, payload_json, prev_hash, entry_hash) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (seq, timestamp, operation, node_id, payload_json, prev_hash, entry_hash),
+    )
+    return {"seq": seq, "timestamp": timestamp, "operation": operation, "entry_hash": entry_hash}
+
+
 class SQLCipherAssuranceArchive:
     """Adapter implementing AssuranceArchive backed by the assurance SQLCipher store.
 
@@ -59,27 +89,9 @@ class SQLCipherAssuranceArchive:
         payload: dict[str, object] | None = None,
     ) -> dict[str, object]:
         conn = self._conn()
-        timestamp = _now_iso()
-        payload_json = json.dumps(payload or {})
-
-        head = conn.execute(
-            "SELECT seq, entry_hash FROM audit_log ORDER BY seq DESC LIMIT 1"
-        ).fetchone()
-        prev_hash = head["entry_hash"] if head else ""
-
-        seq_row = conn.execute(
-            "SELECT COALESCE(MAX(seq), 0) + 1 AS next_seq FROM audit_log"
-        ).fetchone()
-        seq = int(seq_row["next_seq"])
-
-        entry_hash = _compute_hash(seq, timestamp, operation, payload_json, prev_hash)
-        conn.execute(
-            "INSERT INTO audit_log (seq, timestamp, operation, node_id, payload_json, prev_hash, entry_hash) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (seq, timestamp, operation, node_id, payload_json, prev_hash, entry_hash),
-        )
+        entry = append_audit_row(conn, operation, node_id=node_id, payload=payload)
         conn.commit()
-        return {"seq": seq, "timestamp": timestamp, "operation": operation, "entry_hash": entry_hash}
+        return entry
 
     # ── Seal baseline ─────────────────────────────────────────────────────────
 

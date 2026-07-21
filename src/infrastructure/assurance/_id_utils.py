@@ -20,6 +20,7 @@ _NODE_PREFIXES: dict[str, str] = {
     "incident": "INC",
     "corrective-action": "CRA",
     "obligation": "OBL",
+    "evidence": "EVD",
 }
 
 

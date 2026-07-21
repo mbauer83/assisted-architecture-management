@@ -14,7 +14,7 @@ findings list when disposition='accepted' is set on a safety/security constraint
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from src.application.assurance_ports import AssuranceArchive, ConfidentialAssuranceStore
@@ -24,14 +24,7 @@ if TYPE_CHECKING:
 VALID_NODE_TYPES: frozenset[str] = frozenset({
     "loss", "hazard", "control-structure-node", "control-action",
     "unsafe-control-action", "loss-scenario", "assurance-constraint",
-    "risk", "incident", "corrective-action", "obligation",
-})
-
-VALID_CONN_TYPES: frozenset[str] = frozenset({
-    "issues", "acts-on", "feedback", "concerns", "by-controller", "violates",
-    "leads-to", "explains", "derives", "refines", "satisfied-by", "accountable-to",
-    "responsible-of", "evidenced-by", "assesses", "treated-by", "complies-with",
-    "cites", "binds-to", "investigates",
+    "risk", "incident", "corrective-action", "obligation", "evidence",
 })
 
 # ── Typed outcomes ──────────────────────────────────────────────────────────────
@@ -57,7 +50,22 @@ class MutationNotFound:
     artifact_id: str
 
 
+@dataclass(frozen=True)
+class MutationIllegalPair:
+    """Edge create for a (source_type, target_type, conn_type) the ontology's
+    exhaustive matrix forbids; translate to HTTP 422 / MCP invalid envelope.
+    ``legal_types`` is the full legal set for the pair (possibly empty)."""
+
+    source_type: str
+    target_type: str
+    conn_type: str
+    legal_types: tuple[str, ...]
+
+
 MutationResult = MutationOk | MutationLocked | MutationNotFound
+
+# Only edge creation can be rejected by the ontology matrix.
+EdgeMutationResult = MutationResult | MutationIllegalPair
 
 # ── Post-write verification ────────────────────────────────────────────────────
 
@@ -197,14 +205,27 @@ def add_edge(
     source_id: str,
     target_id: str,
     conn_type: str,
+    legal_connection_types: Callable[[str, str], frozenset[str]],
     attributes: dict[str, object] | None = None,
-) -> MutationResult:
+) -> EdgeMutationResult:
     if not store.is_unlocked():
         return MutationLocked()
-    if store.get_node(source_id) is None:
+    source_node = store.get_node(source_id)
+    if source_node is None:
         return MutationNotFound(source_id)
-    if store.get_node(target_id) is None:
+    target_node = store.get_node(target_id)
+    if target_node is None:
         return MutationNotFound(target_id)
+    source_type = str(source_node.get("node_type", ""))
+    target_type = str(target_node.get("node_type", ""))
+    legal = legal_connection_types(source_type, target_type)
+    if conn_type not in legal:
+        return MutationIllegalPair(
+            source_type=source_type,
+            target_type=target_type,
+            conn_type=conn_type,
+            legal_types=tuple(sorted(legal)),
+        )
     edge_id = store.add_edge(source_id, target_id, conn_type, attributes=attributes)
     archive.append("ADD_EDGE", payload={
         "edge_id": edge_id, "source_id": source_id,

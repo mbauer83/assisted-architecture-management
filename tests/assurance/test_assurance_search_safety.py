@@ -112,21 +112,12 @@ def test_concurrent_search_via_http_completes() -> None:
         def stats(self):
             return {"node_count": 2, "edge_count": 0, "by_type": {}}
 
-    class _FakeConnector:
-        def list_bom_components(self, **_): return []
-        def list_vulnerabilities(self, **_): return []
-        def get_stats(self): return {}
-
     class _FakeCtx:
         max_classification = "TLP:RED"
         store = _ThreadSafeStore()
         archive = type("A", (), {"list_baselines": lambda self: []})()
-        connector = _FakeConnector()
 
         def is_available(self) -> bool:
-            return True
-
-        def signals_available(self) -> bool:
             return True
 
     ctx = _FakeCtx()

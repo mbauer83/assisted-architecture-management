@@ -22,7 +22,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from src.application.assurance_ports import AssuranceArchive, ConfidentialAssuranceStore, SecuritySignalConnector
+from src.application.assurance_ports import AssuranceArchive, ConfidentialAssuranceStore
 
 logger = logging.getLogger(__name__)
 
@@ -37,17 +37,39 @@ class _AssuranceBundle:
         self,
         store: ConfidentialAssuranceStore,
         archive: AssuranceArchive,
-        connector: SecuritySignalConnector,
         store_backend: str,
         signals_backend: str,
         archive_backend: str,
     ) -> None:
         self.store = store
         self.archive = archive
-        self.connector = connector
         self.store_backend = store_backend
         self.signals_backend = signals_backend
         self.archive_backend = archive_backend
+        # Run/VEX stores exist only where the transactional boundary does
+        # (SQLCipher store; the capability predicate denies mutations elsewhere).
+        self.refresh_run_store = _build_refresh_run_store(store, store_backend)
+        self.vex_store = _build_vex_store(store, store_backend)
+
+
+def _build_refresh_run_store(store: ConfidentialAssuranceStore, store_backend: str):
+    if store_backend != "sqlcipher":
+        return None
+    from src.infrastructure.assurance._refresh_run_store import SQLCipherRefreshRunStore
+    from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore
+
+    assert isinstance(store, SQLCipherAssuranceStore)
+    return SQLCipherRefreshRunStore(store._thread_conn_or_none)  # noqa: SLF001
+
+
+def _build_vex_store(store: ConfidentialAssuranceStore, store_backend: str):
+    if store_backend != "sqlcipher":
+        return None
+    from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore
+    from src.infrastructure.assurance._vex_assessment_store import SQLCipherVexAssessmentStore
+
+    assert isinstance(store, SQLCipherAssuranceStore)
+    return SQLCipherVexAssessmentStore(store._thread_conn_or_none)  # noqa: SLF001
 
 
 def get_assurance_bundle(
@@ -90,13 +112,15 @@ def _build_bundle(
     store_backend = storage_assurance_store_backend()
     signals_backend = storage_assurance_signals_backend()
     archive_backend = storage_assurance_archive_backend()
+    if signals_backend == "sqlcipher-colocated" and store_backend != "sqlcipher":
+        raise ValueError(
+            "signals_backend 'sqlcipher-colocated' requires store_backend 'sqlcipher'. "
+            f"Current store_backend: {store_backend!r}"
+        )
     assurance_dir = workspace / ".arch-assurance"
 
     store = _build_store(store_backend, workspace, db_path, assurance_dir)
     archive = _build_archive(store, store_backend, assurance_dir, archive_backend)
-    connector = _build_connector(
-        store, store_backend, signals_backend, assurance_dir, signals_db_path
-    )
 
     # Auto-unlock for key-backed backends. PocketBase omitted — its auth is
     # session-based (env-var HTTP credentials, not an OS-keychain key).
@@ -107,7 +131,7 @@ def _build_bundle(
         "Assurance bundle: store=%s signals=%s archive=%s",
         store_backend, signals_backend, archive_backend,
     )
-    return _AssuranceBundle(store, archive, connector, store_backend, signals_backend, archive_backend)
+    return _AssuranceBundle(store, archive, store_backend, signals_backend, archive_backend)
 
 
 def _build_store(
@@ -188,51 +212,6 @@ def _build_archive(
     archive_filename = f"{store_backend.replace('-', '_')}_archive.db"
     archive_path = assurance_dir / archive_filename
     return _make_local_sqlite_archive(archive_path)
-
-
-def _build_connector(
-    store: ConfidentialAssuranceStore,
-    store_backend: str,
-    signals_backend: str,
-    assurance_dir: Path,
-    signals_db_path: Path | None,
-) -> SecuritySignalConnector:
-    if signals_backend == "sqlcipher-colocated":
-        if store_backend != "sqlcipher":
-            raise ValueError(
-                "signals_backend 'sqlcipher-colocated' requires store_backend 'sqlcipher'. "
-                f"Current store_backend: {store_backend!r}"
-            )
-        from src.infrastructure.assurance._collocated_signals_connector import (
-            CollocatedSQLCipherSignalsConnector,
-        )
-        from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore
-
-        assert isinstance(store, SQLCipherAssuranceStore)
-        sqlcipher_store = store
-        return CollocatedSQLCipherSignalsConnector(sqlcipher_store._thread_conn_or_none)  # noqa: SLF001
-
-    if signals_backend == "sqlite":
-        from src.infrastructure.assurance._security_connector import SQLiteSecurityConnector
-
-        return SQLiteSecurityConnector(
-            signals_db_path or assurance_dir / "security-signals.db"
-        )
-
-    # "encrypted" — for sqlcipher store, co-locate; otherwise plain sqlite
-    if store_backend == "sqlcipher":
-        from src.infrastructure.assurance._collocated_signals_connector import (
-            CollocatedSQLCipherSignalsConnector,
-        )
-        from src.infrastructure.assurance._sqlcipher_store import SQLCipherAssuranceStore
-
-        assert isinstance(store, SQLCipherAssuranceStore)
-        sqlcipher_store = store
-        return CollocatedSQLCipherSignalsConnector(sqlcipher_store._thread_conn_or_none)  # noqa: SLF001
-
-    from src.infrastructure.assurance._security_connector import SQLiteSecurityConnector
-
-    return SQLiteSecurityConnector(signals_db_path or assurance_dir / "security-signals.db")
 
 
 def try_auto_unlock(store: ConfidentialAssuranceStore, store_backend: str) -> None:

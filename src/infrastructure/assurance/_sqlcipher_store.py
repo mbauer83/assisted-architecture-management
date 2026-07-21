@@ -54,6 +54,11 @@ class SQLCipherAssuranceStore:
     def is_unlocked(self) -> bool:
         return self._conns.is_open()
 
+    def availability_revision(self) -> int:
+        """AvailabilityState port: changes whenever the store locks, unlocks,
+        or reconnects — consumers revalidate snapshot tokens against it."""
+        return self._conns.availability_revision()
+
     def unlock(self) -> None:
         key = creds.get(_KEY_ACCOUNT)
         if key is None:

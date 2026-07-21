@@ -125,7 +125,7 @@ def test_hazard_with_full_chain_not_in_gap(store) -> None:  # type: ignore[no-un
         "unsafe-control-action", "UCA-1", uca_type="not-provided", concern_class="safety"
     )
     store.add_edge(uca_id, ca_id, "concerns")
-    store.add_edge(uca_id, haz_id, "violates")
+    store.add_edge(uca_id, haz_id, "leads-to")
     acn_id = store.create_node("assurance-constraint", "ACN-1", concern_class="safety")
     store.add_edge(uca_id, acn_id, "derives")
     result = draft_gsn_from_store(store)
@@ -142,7 +142,7 @@ def test_strategy_contains_uca_and_constraint_ids(store) -> None:  # type: ignor
         "unsafe-control-action", "UCA-1", uca_type="not-provided", concern_class="safety"
     )
     store.add_edge(uca_id, ca_id, "concerns")
-    store.add_edge(uca_id, haz_id, "violates")
+    store.add_edge(uca_id, haz_id, "leads-to")
     acn_id = store.create_node("assurance-constraint", "ACN-1", concern_class="safety")
     store.add_edge(uca_id, acn_id, "derives")
     result = draft_gsn_from_store(store)

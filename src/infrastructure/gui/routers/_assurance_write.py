@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from src.application import assurance_model_bind as model_bind
 from src.application import assurance_mutations as mutations
+from src.infrastructure.assurance.edge_legality import legal_connection_types
 from src.infrastructure.assurance.write_serialization import run_write
 from src.infrastructure.gui.routers._arch_entity_creator import GuiArchitectureEntityCreator
 from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
@@ -58,12 +59,25 @@ def _ok(result: mutations.MutationOk) -> JSONResponse:
     return JSONResponse(content=out, headers={"Cache-Control": _NO_STORE})
 
 
-def _translate(result: mutations.MutationResult) -> JSONResponse:
+def _translate(result: mutations.EdgeMutationResult) -> JSONResponse:
     if isinstance(result, mutations.MutationLocked):
         return _locked()
     if isinstance(result, mutations.MutationNotFound):
         return _not_found(result.artifact_id)
+    if isinstance(result, mutations.MutationIllegalPair):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": "illegal_connection_type",
+                "source_type": result.source_type,
+                "target_type": result.target_type,
+                "conn_type": result.conn_type,
+                "legal_types": list(result.legal_types),
+            },
+            headers={"Cache-Control": _NO_STORE},
+        )
     return _ok(result)
+
 
 
 # ── Request bodies ─────────────────────────────────────────────────────────────
@@ -125,24 +139,6 @@ class ModelThisBody(BaseModel):
     separation_of_duties: bool = False
 
 
-class ImportBomBody(BaseModel):
-    bom_data: dict[str, object]
-    anchor_entity_id: str
-    source_file: str = ""
-    bom_format: str = "cyclonedx"
-
-
-class ImportVulnsBody(BaseModel):
-    vuln_records: list[dict[str, object]]
-    source: str = "osv"
-
-
-class SetAnchorBody(BaseModel):
-    component_ref: str
-    arch_entity_id: str
-    ref_type: str = "purl"
-
-
 # ── Node endpoints ─────────────────────────────────────────────────────────────
 
 
@@ -188,6 +184,7 @@ def add_edge(body: AddEdgeBody) -> JSONResponse:
         ctx.store, ctx.archive,
         source_id=body.source_id, target_id=body.target_id,
         conn_type=body.conn_type, attributes=body.attributes,
+        legal_connection_types=legal_connection_types,
     )))
 
 
@@ -270,64 +267,3 @@ def model_this(body: ModelThisBody) -> JSONResponse:
     return _translate_bind(result)
 
 
-# ── Security signals ──────────────────────────────────────────────────────────
-
-
-@write_router.post("/api/assurance/bom/import", status_code=200)
-def import_bom(body: ImportBomBody) -> JSONResponse:
-    ctx = get_assurance_context()
-    if not ctx.signals_available():
-        return _locked()
-    result = run_write(lambda: ctx.connector.import_bom(
-        body.bom_data,
-        anchor_entity_id=body.anchor_entity_id,
-        bom_format=body.bom_format,
-        source_file=body.source_file,
-    ))
-    run_write(lambda: ctx.archive.append(
-        "IMPORT_BOM",
-        payload={
-            "anchor_entity_id": body.anchor_entity_id,
-            "bom_format": body.bom_format,
-            "source_file": body.source_file,
-        },
-    ))
-    return JSONResponse(content=result, headers={"Cache-Control": _NO_STORE})  # type: ignore[arg-type]
-
-
-@write_router.post("/api/assurance/vulnerabilities/import", status_code=200)
-def import_vulnerabilities(body: ImportVulnsBody) -> JSONResponse:
-    ctx = get_assurance_context()
-    if not ctx.signals_available():
-        return _locked()
-    result = run_write(lambda: ctx.connector.import_vulnerabilities(body.vuln_records, source=body.source))
-    run_write(lambda: ctx.archive.append(
-        "IMPORT_VULNERABILITIES",
-        payload={"source": body.source, "record_count": len(body.vuln_records)},
-    ))
-    return JSONResponse(content=result, headers={"Cache-Control": _NO_STORE})  # type: ignore[arg-type]
-
-
-@write_router.post("/api/assurance/anchors", status_code=200)
-def set_anchor(body: SetAnchorBody) -> JSONResponse:
-    ctx = get_assurance_context()
-    if not ctx.signals_available():
-        return _locked()
-    run_write(lambda: ctx.connector.set_anchor(body.component_ref, body.arch_entity_id, ref_type=body.ref_type))
-    run_write(lambda: ctx.archive.append(
-        "SET_ANCHOR",
-        payload={
-            "component_ref": body.component_ref,
-            "arch_entity_id": body.arch_entity_id,
-            "ref_type": body.ref_type,
-        },
-    ))
-    return JSONResponse(
-        content={
-            "component_ref": body.component_ref,
-            "arch_entity_id": body.arch_entity_id,
-            "ref_type": body.ref_type,
-            "status": "anchored",
-        },
-        headers={"Cache-Control": _NO_STORE},
-    )

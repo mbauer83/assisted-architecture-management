@@ -15,7 +15,9 @@ def _workspace_root() -> Path:
 
 
 def _default_db_path() -> Path:
-    return _workspace_root() / ".arch-assurance" / "store.db"
+    from src.infrastructure.deployment.layout import resolve_manifest  # noqa: PLC0415
+
+    return resolve_manifest().assurance_db_path.path
 
 
 def _default_signals_for(store_backend: str) -> str:
@@ -313,12 +315,6 @@ def cmd_pocketbase_status(args: argparse.Namespace) -> int:
     state = "healthy" if healthy else "unhealthy"
     print(f"PocketBase at {args.base_url}: {state}.")
     return 0 if healthy else 1
-
-
-def cmd_import_sbom(args: argparse.Namespace) -> int:
-    from src.infrastructure.cli._security_commands import cmd_import_sbom  # noqa: PLC0415
-
-    return cmd_import_sbom(args, _workspace_root())
 
 
 def cmd_export_aibom(args: argparse.Namespace) -> int:

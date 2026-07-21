@@ -22,6 +22,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
 from src.application import assurance_mutations as mutations
+from src.infrastructure.assurance.edge_legality import legal_connection_types
 from src.infrastructure.assurance.write_serialization import run_write
 from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
 from src.infrastructure.mcp.assurance_mcp.security_write_tools import register_security_write_tools
@@ -93,9 +94,14 @@ def register_write_tools(server: FastMCP) -> None:
         description=(
             "Add a typed assurance connection between two nodes. "
             "Both nodes must exist in the assurance store. "
-            "Valid connection types: issues, acts-on, feedback, concerns, by-controller, violates, "
-            "leads-to, explains, derives, refines, satisfied-by, accountable-to, responsible-of, "
-            "evidenced-by, assesses, treated-by, complies-with, cites, binds-to, investigates."
+            "The edge type must be legal for the concrete (source, target) node-type "
+            "pair per the assurance ontology matrix - an illegal pair is rejected "
+            "with the pair's full legal set in the error. "
+            "Edge vocabulary: issues, acts-on, feedback, concerns, by-controller, "
+            "leads-to, explains, derives, refines, responsible-for, accountable-for, "
+            "evidenced-by, assesses, treated-by, complies-with, investigates. "
+            "Cross-module architecture references (binds-to, refines-requirement, "
+            "evidenced-by-artifact, purl) go through assurance_register_arch_ref, never here."
         ),
     )
     def assurance_add_edge(
@@ -108,11 +114,26 @@ def register_write_tools(server: FastMCP) -> None:
             ctx.store, ctx.archive,
             source_id=source_id, target_id=target_id,
             conn_type=conn_type, attributes=attributes,
+            legal_connection_types=legal_connection_types,
         ))
         if isinstance(result, mutations.MutationLocked):
             return ctx.locked_response()
         if isinstance(result, mutations.MutationNotFound):
             return ctx.not_found_response(result.artifact_id)
+        if isinstance(result, mutations.MutationIllegalPair):
+            return {
+                "error": "illegal_connection_type",
+                "source_type": result.source_type,
+                "target_type": result.target_type,
+                "conn_type": result.conn_type,
+                "legal_types": list(result.legal_types),
+                "message": (
+                    f"'{result.conn_type}' is not a permitted edge type from "
+                    f"{result.source_type} to {result.target_type}. "
+                    + (f"Legal types for this pair: {', '.join(result.legal_types)}."
+                       if result.legal_types else "No edge type is legal for this pair.")
+                ),
+            }
         return _ok(result)
 
     @server.tool(
@@ -345,7 +366,7 @@ def register_write_tools(server: FastMCP) -> None:
         description=(
             "Pre-check safety/security assurance-constraints before promoting findings to a "
             "wider audience tier. Blocks promotion if any safety/security constraint is missing "
-            "an accountable-to owner OR an evidenced-by connection (§6 promotion pre-check, §23). "
+            "a responsible-for controller OR evidence (§6 promotion pre-check, §23). "
             "Returns a list of blocking issues and a promote_safe flag."
         ),
     )

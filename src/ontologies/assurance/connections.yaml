@@ -1,18 +1,30 @@
 # Assurance Ontology — connection types & permitted relationships
 #
 # All assurance connections are stored assurance-side (one-way persistence rule).
-# Cross-module refs (assurance→architecture) are handled via arch_refs table,
-# not as connections in this registry.
+# Cross-module refs (assurance→architecture) are handled via the arch_refs
+# reference-type catalog (`reference_types` below), never as connections in this
+# registry. External-vocabulary citations (obligation → scheme:code) are node
+# attributes validated against the reference vocabulary, not edges.
+#
+# Relationship vocabulary follows the STPA Handbook: `leads-to` is strictly
+# causal between chain elements (UCA → hazard → loss; the handbook reserves
+# "violate" for constraints); `explains` is the scenario's epistemic relation to
+# whatever it describes the causal pathway for — a type-a scenario explains a
+# UCA, a type-b scenario (improper execution/integration of a correct control
+# action) explains a hazard directly, bypassing any UCA; system-level
+# constraints derive from hazards and controller constraints from unsafe control
+# actions; controllers are RESPONSIBLE FOR enforcing constraints
+# (responsibilities refine system-level constraints); a risk owner is
+# ACCOUNTABLE FOR a risk (ISO 31000 risk ownership).
 
 matrix_abbreviations:
   LT: leads-to
-  VL: violates
   EX: explains
   DV: derives
   RF: refines
-  AT: accountable-to
+  RS: responsible-for
+  AF: accountable-for
   EV: evidenced-by
-  BT: binds-to
   AS: assesses
   TB: treated-by
   CW: complies-with
@@ -47,11 +59,6 @@ connection_types:
       symmetric: false
       classes: []
 
-    violates:
-      puml_arrow: "-->"
-      symmetric: false
-      classes: []
-
     leads-to:
       puml_arrow: "-->"
       symmetric: false
@@ -67,24 +74,14 @@ connection_types:
       symmetric: false
       classes: []
 
-    # ── Assurance-constraint linkage ─────────────────────────────────────────
+    # ── Constraint linkage, responsibility & evidence ────────────────────────
     refines:
       puml_arrow: "..>"
       symmetric: false
       classes: []
 
-    satisfied-by:
-      puml_arrow: "..|>"
-      symmetric: false
-      classes: []
-
-    accountable-to:
+    responsible-for:
       puml_arrow: "-->"
-      symmetric: false
-      classes: []
-
-    responsible-of:
-      puml_arrow: "..>"
       symmetric: false
       classes: []
 
@@ -94,6 +91,11 @@ connection_types:
       classes: []
 
     # ── GRC ──────────────────────────────────────────────────────────────────
+    accountable-for:
+      puml_arrow: "-->"
+      symmetric: false
+      classes: []
+
     assesses:
       puml_arrow: "..>"
       symmetric: false
@@ -109,39 +111,54 @@ connection_types:
       symmetric: false
       classes: []
 
-    cites:
-      puml_arrow: "..>"
-      symmetric: false
-      classes: []
-
-    # ── Architecture binding (assurance-side) ────────────────────────────────
-    binds-to:
-      puml_arrow: "-->"
-      symmetric: false
-      classes: []
-
     # ── CAST ─────────────────────────────────────────────────────────────────
     investigates:
       puml_arrow: "-->"
       symmetric: false
       classes: []
 
-# Permitted relationships: broad within the assurance ontology.
-# Fine-grained enforcement is handled by the AssuranceVerifier (Phase 1c).
+# Cross-module architecture references (arch_refs ref_type catalog). These are
+# NEVER node-pair matrix entries — they bind assurance nodes to architecture
+# artifacts and are validated against this catalog, not permitted_relationships.
+reference_types:
+  binds-to: >-
+    Binds an assurance node (control-structure node, evidence) to the
+    architecture entity it represents or draws on.
+  refines-requirement: >-
+    Links an assurance-constraint to the ArchiMate requirement it refines
+    (implementation reuses the requirement's realized-by edges). Deliberately
+    named apart from the refines edge (constraint refining constraint).
+  evidenced-by-artifact: >-
+    Substantiates an assurance node directly by an architecture artifact —
+    the lightweight alternative to an evidence node when no confidential
+    evidence content exists. Deliberately named apart from the
+    evidenced-by edge (assurance-constraint → evidence node).
+  purl: >-
+    Component identity reference (Package URL) for supply-chain
+    reconciliation.
+
+# Permitted relationships: the EXHAUSTIVE node-pair legality matrix for
+# assurance edges — an edge create outside it is rejected with a typed error.
 permitted_relationships:
   - [control-structure-node, control-action, [issues]]
   - [control-action, control-structure-node, [acts-on]]
   - [control-structure-node, control-structure-node, [feedback]]
   - [unsafe-control-action, control-action, [concerns]]
   - [unsafe-control-action, control-structure-node, [by-controller]]
-  - [unsafe-control-action, hazard, [violates]]
+  - [unsafe-control-action, hazard, [leads-to]]
   - [hazard, loss, [leads-to]]
   - [loss-scenario, unsafe-control-action, [explains]]
+  - [loss-scenario, hazard, [explains]]
+  - [hazard, assurance-constraint, [derives]]
+  - [unsafe-control-action, assurance-constraint, [derives]]
   - [loss-scenario, assurance-constraint, [derives]]
   - [incident, assurance-constraint, [derives]]
   - [corrective-action, assurance-constraint, [derives]]
   - [assurance-constraint, assurance-constraint, [refines]]
-  - [assurance-constraint, assurance-constraint, [satisfied-by]]
+  - [hazard, hazard, [refines]]
+  - [control-structure-node, assurance-constraint, [responsible-for]]
+  - [control-structure-node, risk, [accountable-for]]
+  - [assurance-constraint, evidence, [evidenced-by]]
   - [risk, hazard, [assesses]]
   - [risk, assurance-constraint, [treated-by]]
   - [assurance-constraint, obligation, [complies-with]]

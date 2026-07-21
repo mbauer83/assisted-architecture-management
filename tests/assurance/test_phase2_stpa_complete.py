@@ -38,8 +38,8 @@ def test_result_structure_shape(store) -> None:  # type: ignore[no-untyped-def]
     expected_keys = {
         "hazard_leads_to_loss",
         "uca_concerns_control_action",
-        "uca_violates_hazard",
-        "loss_scenario_explains_uca",
+        "uca_leads_to_hazard",
+        "loss_scenario_explains_uca_or_hazard",
         "uca_derives_constraint",
         "loss_scenario_derives_constraint",
     }
@@ -80,22 +80,38 @@ def test_uca_without_control_action_fails(store) -> None:  # type: ignore[no-unt
     assert result["checks"]["uca_concerns_control_action"]["passed"] is False
 
 
-def test_uca_without_violates_hazard_fails(store) -> None:  # type: ignore[no-untyped-def]
+def test_uca_without_hazard_trace_fails(store) -> None:  # type: ignore[no-untyped-def]
     from src.application.verification.stpa_complete import run_stpa_complete
 
     ca_id = store.create_node("control-action", "CA-1")
     uca_id = store.create_node("unsafe-control-action", "UCA-1", uca_type="not-provided", concern_class="safety")
     store.add_edge(uca_id, ca_id, "concerns")
     result = run_stpa_complete(store)
-    assert result["checks"]["uca_violates_hazard"]["passed"] is False
+    assert result["checks"]["uca_leads_to_hazard"]["passed"] is False
 
 
-def test_loss_scenario_without_uca_fails(store) -> None:  # type: ignore[no-untyped-def]
+def test_loss_scenario_without_uca_or_hazard_fails(store) -> None:  # type: ignore[no-untyped-def]
     from src.application.verification.stpa_complete import run_stpa_complete
 
     store.create_node("loss-scenario", "LS-orphan", concern_class="safety")
     result = run_stpa_complete(store)
-    assert result["checks"]["loss_scenario_explains_uca"]["passed"] is False
+    assert result["checks"]["loss_scenario_explains_uca_or_hazard"]["passed"] is False
+
+
+def test_type_b_scenario_explaining_a_hazard_without_uca_passes(store) -> None:  # type: ignore[no-untyped-def]
+    """The second handbook scenario type: a correct control action improperly
+    executed or not executed — the scenario explains the hazard directly,
+    without an intervening unsafe control action."""
+    from src.application.verification.stpa_complete import run_stpa_complete
+
+    haz_id = store.create_node("hazard", "H-exec", concern_class="safety")
+    ls_id = store.create_node(
+        "loss-scenario", "LS-exec", concern_class="safety",
+        attributes={"scenario_type": "improper-execution"},
+    )
+    store.add_edge(ls_id, haz_id, "explains")
+    result = run_stpa_complete(store)
+    assert result["checks"]["loss_scenario_explains_uca_or_hazard"]["passed"] is True
 
 
 def test_complete_stpa_chain_passes(store) -> None:  # type: ignore[no-untyped-def]
@@ -107,7 +123,7 @@ def test_complete_stpa_chain_passes(store) -> None:  # type: ignore[no-untyped-d
     ca_id = store.create_node("control-action", "CA-1")
     uca_id = store.create_node("unsafe-control-action", "UCA-1", uca_type="not-provided", concern_class="safety")
     store.add_edge(uca_id, ca_id, "concerns")
-    store.add_edge(uca_id, haz_id, "violates")
+    store.add_edge(uca_id, haz_id, "leads-to")
     ls_id = store.create_node("loss-scenario", "LS-1", concern_class="safety")
     store.add_edge(ls_id, uca_id, "explains")
     acn_id = store.create_node("assurance-constraint", "ACN-1", concern_class="safety")

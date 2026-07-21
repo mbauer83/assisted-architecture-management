@@ -48,6 +48,11 @@ class ThreadLocalConnectionManager:
         self._all_conns: list[Any] = []
         self._generation = 0
 
+    def availability_revision(self) -> int:
+        """Monotonic generation, bumped on every open/close (lock/unlock/rekey) —
+        the inward-facing availability signal snapshot tokens pin against."""
+        return self._generation
+
     def is_open(self) -> bool:
         return self._open
 

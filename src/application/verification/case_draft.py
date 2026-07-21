@@ -122,9 +122,10 @@ def draft_gsn_from_records(
         sub_goals.append(sub_goal)
 
         # Strategy: argument by constraint derivation for this hazard
-        # Find UCAs that violate this hazard
-        violates = _edges_of(all_edges, target_id=hid, conn_type="violates")
-        uca_ids = [str(e["source_id"]) for e in violates]
+        # Find UCAs that lead to this hazard
+        incoming = _edges_of(all_edges, target_id=hid, conn_type="leads-to")
+        uca_node_ids = {str(n["node_id"]) for n in _nodes_of(all_nodes, "unsafe-control-action")}
+        uca_ids = [str(e["source_id"]) for e in incoming if str(e["source_id"]) in uca_node_ids]
 
         # Find constraints derived from those UCAs
         constraint_ids: list[str] = []
@@ -168,8 +169,9 @@ def draft_gsn_from_records(
     # Identify hazards without any constraints via UCA chain
     for hazard in hazards:
         hid = str(hazard["node_id"])
-        violates = _edges_of(all_edges, target_id=hid, conn_type="violates")
-        uca_ids = [str(e["source_id"]) for e in violates]
+        incoming = _edges_of(all_edges, target_id=hid, conn_type="leads-to")
+        uca_node_ids = {str(n["node_id"]) for n in _nodes_of(all_nodes, "unsafe-control-action")}
+        uca_ids = [str(e["source_id"]) for e in incoming if str(e["source_id"]) in uca_node_ids]
         has_constraint = False
         for uid in uca_ids:
             derives = _edges_of(all_edges, source_id=uid, conn_type="derives")
@@ -246,8 +248,9 @@ def case_completeness_from_records(
     hazards_no_constraint: list[dict[str, str]] = []
     for hazard in hazards:
         hid = str(hazard["node_id"])
-        violates = _edges_of(all_edges, target_id=hid, conn_type="violates")
-        uca_ids = [str(e["source_id"]) for e in violates]
+        incoming = _edges_of(all_edges, target_id=hid, conn_type="leads-to")
+        uca_node_ids = {str(n["node_id"]) for n in _nodes_of(all_nodes, "unsafe-control-action")}
+        uca_ids = [str(e["source_id"]) for e in incoming if str(e["source_id"]) in uca_node_ids]
         has_constraint = False
         for uid in uca_ids:
             if _edges_of(all_edges, source_id=uid, conn_type="derives"):

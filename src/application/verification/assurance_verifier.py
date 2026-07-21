@@ -6,14 +6,16 @@ objects with codes in the E5xx/W5xx range.
 
 Hard rules (always enforced, block sign-off):
   E501 — UCA must reference exactly one control-action (concerns edge)
-  E502 — safety/security assurance-constraint must have accountable-to owner
+  E502 — safety/security assurance-constraint must have a responsible controller (incoming responsible-for)
+  E504 — edge references a nonexistent node (dangling endpoint; such edges are
+         omitted from every navigation surface and reported only here)
   E503 — disposition=accepted on safety/security requires justification + sign-off
   E504 — risk.treatment=accept cannot be sole disposition for a safety hazard
   E505 — incident has no investigates edge (CAST investigation incomplete)
 
 Informational findings (W5xx — never block writes):
   W501 — control-structure-node with binding_status=unbound-pending (modeling gap)
-  W502 — assurance-constraint with no evidenced-by connection
+  W502 — assurance-constraint with no evidence (edge to an evidence node or evidenced-by-artifact arch ref)
   W503 — hazard with no leads-to loss connection
   W504 — obligation with no complies-with constraint (coverage gap)
   W505 — risk with no treatment attribute set
@@ -89,19 +91,24 @@ def _check_constraint_has_owner(
     edges: list[dict[str, object]],
     result: AssuranceVerificationResult,
 ) -> None:
-    """E502: safety/security assurance-constraint must have accountable-to owner."""
+    """E502: a safety/security assurance-constraint must have a responsible controller
+    (incoming responsible-for — responsibilities assigned to control-structure entities
+    refine the system-level constraints)."""
     node_id = str(node["node_id"])
     concern_class = str(node.get("concern_class") or "")
     if concern_class not in _SAFETY_CLASSES:
         return
-    owner_edges = [e for e in edges if str(e["source_id"]) == node_id and str(e["conn_type"]) == "accountable-to"]
+    owner_edges = [
+        e for e in edges
+        if str(e["target_id"]) == node_id and str(e["conn_type"]) == "responsible-for"
+    ]
     if not owner_edges:
         result.issues.append(AssuranceIssue(
             severity="error",
             code="E502",
             message=(
-                f"Safety/security assurance-constraint ({concern_class}) must have an "
-                "'accountable-to' connection to an owner role."
+                f"Safety/security assurance-constraint ({concern_class}) must have an incoming "
+                "'responsible-for' connection from the controller responsible for enforcing it."
             ),
             node_id=node_id,
         ))
@@ -195,16 +202,21 @@ def _check_unbound_nodes(
 def _check_constraint_has_evidence(
     node: dict[str, object],
     edges: list[dict[str, object]],
+    evidenced_ref_node_ids: set[str],
     result: AssuranceVerificationResult,
 ) -> None:
-    """W502: assurance-constraint with no evidenced-by connection."""
+    """W502: assurance-constraint with no evidence — neither an evidenced-by edge to
+    an evidence node nor an evidenced-by-artifact architecture reference."""
     node_id = str(node["node_id"])
     ev_edges = [e for e in edges if str(e["source_id"]) == node_id and str(e["conn_type"]) == "evidenced-by"]
-    if not ev_edges:
+    if not ev_edges and node_id not in evidenced_ref_node_ids:
         result.issues.append(AssuranceIssue(
             severity="warning",
             code="W502",
-            message="Assurance constraint has no 'evidenced-by' connection. Add evidence for traceability.",
+            message=(
+                "Assurance constraint has no evidence: add an 'evidenced-by' connection to an "
+                "evidence node, or an 'evidenced-by-artifact' architecture reference."
+            ),
             node_id=node_id,
         ))
 
@@ -285,6 +297,31 @@ def _check_risk_has_treatment(
         ))
 
 
+def _check_dangling_edges(
+    all_nodes: list[dict[str, object]],
+    all_edges: list[dict[str, object]],
+    result: AssuranceVerificationResult,
+) -> None:
+    """E504: an edge whose source or target no longer exists. Navigation surfaces
+    omit such edges silently (indistinguishable from a hidden endpoint), so the
+    verifier is deliberately the only place they become visible."""
+    node_ids = {str(n["node_id"]) for n in all_nodes}
+    for edge in all_edges:
+        source_id = str(edge.get("source_id", ""))
+        target_id = str(edge.get("target_id", ""))
+        missing = [nid for nid in (source_id, target_id) if nid not in node_ids]
+        if missing:
+            result.issues.append(AssuranceIssue(
+                severity="error",
+                code="E504",
+                message=(
+                    f"Edge {edge.get('edge_id', '?')} ({edge.get('conn_type', '?')}) references "
+                    f"nonexistent node(s): {', '.join(missing)}. Delete the edge or restore the node."
+                ),
+                node_id=source_id if source_id in node_ids else target_id if target_id in node_ids else "",
+            ))
+
+
 def verify_store(store: ConfidentialAssuranceStore) -> AssuranceVerificationResult:
     """Run all §17(A) hard validity + informational checks on the assurance store."""
     result = AssuranceVerificationResult()
@@ -298,6 +335,13 @@ def verify_store(store: ConfidentialAssuranceStore) -> AssuranceVerificationResu
 
     all_nodes = store.list_nodes()
     all_edges = store.list_edges()
+    evidenced_ref_node_ids = {
+        str(r["assurance_node_id"])
+        for r in store.list_arch_refs()
+        if str(r.get("ref_type")) == "evidenced-by-artifact"
+    }
+
+    _check_dangling_edges(all_nodes, all_edges, result)
 
     for node in all_nodes:
         ntype = str(node.get("node_type", ""))
@@ -308,7 +352,7 @@ def verify_store(store: ConfidentialAssuranceStore) -> AssuranceVerificationResu
         if ntype == "assurance-constraint":
             _check_constraint_has_owner(node, all_edges, result)
             _check_accepted_disposition(node, all_edges, result)
-            _check_constraint_has_evidence(node, all_edges, result)
+            _check_constraint_has_evidence(node, all_edges, evidenced_ref_node_ids, result)
 
         if ntype == "risk":
             _check_risk_not_sole_accept_for_safety(node, all_nodes, all_edges, result)

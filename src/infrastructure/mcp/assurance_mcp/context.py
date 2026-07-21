@@ -1,29 +1,24 @@
-"""Shared context for assurance MCP tools (SC-1 refactor).
+"""Shared context for assurance MCP tools.
 
-Provides port-typed ConfidentialAssuranceStore, AssuranceArchive, and
-SecuritySignalConnector via the store factory (workspace-keyed singleton).
+Provides port-typed ConfidentialAssuranceStore, AssuranceArchive, and the
+refresh-run / VEX signal stores via the store factory (workspace-keyed singleton).
 Adapters are selected by `storage.assurance` config; default: SQLCipher store
 + co-located confidential signals.
 
-SC-4: exposes `max_classification` (TLP ceiling) and `_exposure_log` for
-filtering and logging at the arch-assurance-read boundary.
+Exposes `max_classification` (TLP ceiling) and `_exposure_log` for filtering and
+logging at the arch-assurance-read boundary.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 from src.application.assurance_ports import (
     AssuranceArchive,
     ConfidentialAssuranceStore,
-    SecuritySignalConnector,
     WORMAssuranceArchive,
 )
-
-_ENV_DB_PATH = "ARCH_ASSURANCE_DB_PATH"
-_ENV_SIGNALS_DB_PATH = "ARCH_SECURITY_SIGNALS_DB_PATH"
 
 _exposure_log = logging.getLogger("arch-assurance-exposure")
 
@@ -48,43 +43,39 @@ def _workspace_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
 
-def _resolve_db_path() -> Path | None:
-    env = os.getenv(_ENV_DB_PATH)
-    return Path(env).expanduser() if env else None
+def _manifest():  # type: ignore[no-untyped-def]
+    """The deployment manifest — one resolver shared with `arch-repair upgrade`
+    and Docker startup, so every surface opens the same physical stores."""
+    from src.infrastructure.deployment.layout import resolve_manifest  # noqa: PLC0415
 
-
-def _resolve_signals_db_path() -> Path | None:
-    env = os.getenv(_ENV_SIGNALS_DB_PATH)
-    return Path(env).expanduser() if env else None
+    return resolve_manifest()
 
 
 def default_db_path() -> Path:
-    """Return the default store path (env override or workspace default)."""
-    return _resolve_db_path() or _workspace_root() / ".arch-assurance" / "store.db"
+    """Return the deployment-resolved store path (env/settings override or default)."""
+    return _manifest().assurance_db_path.path
 
 
 def default_signals_db_path() -> Path:
-    """Return the default signals DB path (env override or workspace default)."""
-    return (
-        _resolve_signals_db_path()
-        or _workspace_root() / ".arch-assurance" / "security-signals.db"
-    )
+    """Return the deployment-resolved signals DB path (env/settings override or default)."""
+    return _manifest().signals_db_path.path
 
 
 class AssuranceContext:
     """Accessor for the shared assurance store, archive, and security connector.
 
     Return types are the port interfaces (ConfidentialAssuranceStore,
-    AssuranceArchive, SecuritySignalConnector) — no concrete adapter types leak.
+    AssuranceArchive) — no concrete adapter types leak.
     """
 
     def _bundle(self):  # type: ignore[return]
         from src.infrastructure.assurance.store_factory import get_assurance_bundle  # noqa: PLC0415
 
+        manifest = _manifest()
         return get_assurance_bundle(
             _workspace_root(),
-            db_path=_resolve_db_path(),
-            signals_db_path=_resolve_signals_db_path(),
+            db_path=manifest.assurance_db_path.path,
+            signals_db_path=manifest.signals_db_path.path,
         )
 
     @property
@@ -96,8 +87,14 @@ class AssuranceContext:
         return self._bundle().archive
 
     @property
-    def connector(self) -> SecuritySignalConnector:
-        return self._bundle().connector
+    def refresh_run_store(self):  # type: ignore[no-untyped-def] — port-typed at use sites
+        """Refresh-run reads/mutations; None outside the SQLCipher store."""
+        return self._bundle().refresh_run_store
+
+    @property
+    def vex_store(self):  # type: ignore[no-untyped-def] — port-typed at use sites
+        """VEX assessment reads/mutations; None outside the SQLCipher store."""
+        return self._bundle().vex_store
 
     @property
     def store_backend(self) -> str:
@@ -134,29 +131,12 @@ class AssuranceContext:
     def is_available(self) -> bool:
         return self.store.is_unlocked()
 
-    def signals_available(self) -> bool:
-        """True when connector is accessible (gated by store-unlock for confidential backends)."""
-        backend = self.signals_backend
-        if backend in ("sqlcipher-colocated", "encrypted"):
-            return self.store.is_unlocked()
-        return True  # plain sqlite is always accessible
-
     def locked_response(self) -> dict[str, object]:
         return {
             "error": "assurance_store_locked",
             "message": (
                 "The confidential assurance store is not unlocked. "
                 "Run `arch-assurance unlock` to enable assurance tools."
-            ),
-        }
-
-    def signals_locked_response(self) -> dict[str, object]:
-        return {
-            "error": "signals_store_locked",
-            "message": (
-                "Security signals require the assurance store to be unlocked "
-                "(signals_backend is confidential). "
-                "Run `arch-assurance unlock` to enable security signal tools."
             ),
         }
 

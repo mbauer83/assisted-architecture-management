@@ -82,11 +82,13 @@ _GUIDANCE: dict[str, dict[str, object]] = {
         ),
         "why": (
             "Constraints are directly implementable and testable. They link hazard analysis "
-            "to system requirements (via refines) and to evidence (via evidenced-by)."
+            "to system requirements (via the refines-requirement architecture reference) and "
+            "to evidence (via evidenced-by)."
         ),
         "how": (
             "For each UCA, derive its negation as a constraint. Set concern_class, disposition, level. "
-            "Link to an ArchiMate requirement via refines. Assign an owner via accountable-to."
+            "Link to an ArchiMate requirement via a refines-requirement architecture reference. "
+            "Assign the responsible controller via an incoming responsible-for connection."
         ),
         "standards": ["STPA Handbook §2.6", "ISO 26262 Part 4 §6 (functional safety concept)"],
     },
@@ -117,7 +119,7 @@ _GUIDANCE: dict[str, dict[str, object]] = {
             "They enable an auditable compliance statement."
         ),
         "how": (
-            "Create an obligation, set cites to a scheme:code reference (e.g. ISO26262:6-8). "
+            "Create an obligation, set the cites attribute to a scheme:code reference (e.g. ISO26262:6-8). "
             "Link assurance-constraints via complies-with. Add evidenced-by connections for evidence."
         ),
         "standards": [

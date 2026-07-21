@@ -155,3 +155,37 @@ def test_format_result(store) -> None:  # type: ignore[no-untyped-def]
     assert "error_count" in fmt
     assert "warning_count" in fmt
     assert "issues" in fmt
+
+
+def test_e504_dangling_edge_reported_by_verifier_only(store) -> None:  # type: ignore[no-untyped-def]
+    """A dangling edge is a hard integrity finding here — and only here; navigation
+    surfaces omit it silently. Ordinary deletes cascade (foreign_keys ON), so the
+    fixture simulates imported/corrupt data via a raw insert with FKs off."""
+    from src.application.verification.assurance_verifier import verify_store
+
+    store.create_node("hazard", "H-dangling", concern_class="safety")
+    conn = store.unlocked_connection()
+    conn.execute("PRAGMA foreign_keys = OFF")
+    conn.execute(
+        "INSERT INTO assurance_edges (edge_id, source_id, target_id, conn_type, created_at) "
+        "VALUES ('EDG@dangling', "
+        "(SELECT node_id FROM assurance_nodes LIMIT 1), 'LSS@gone-node', 'leads-to', '2026-01-01T00:00:00Z')"
+    )
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = ON")
+
+    result = verify_store(store)
+    e504 = [i for i in result.issues if i.code == "E504"]
+    assert len(e504) == 1
+    assert "LSS@gone-node" in e504[0].message
+
+
+def test_e504_absent_when_all_edges_resolve(store) -> None:  # type: ignore[no-untyped-def]
+    from src.application.verification.assurance_verifier import verify_store
+
+    haz_id = store.create_node("hazard", "H-ok", concern_class="safety")
+    loss_id = store.create_node("loss", "L-ok", concern_class="safety")
+    store.add_edge(haz_id, loss_id, "leads-to")
+
+    result = verify_store(store)
+    assert not [i for i in result.issues if i.code == "E504"]

@@ -14,14 +14,21 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
+from src.application.assurance_edge_catalog import build_edge_catalog
+from src.infrastructure.app_bootstrap import assurance_ontology_module, get_module_registry
 from src.infrastructure.gui.routers._assurance_aibom import aibom_router
 from src.infrastructure.gui.routers._assurance_analysis_routes import analysis_router
+from src.infrastructure.gui.routers._assurance_neighbors_routes import neighbors_router
 from src.infrastructure.gui.routers._assurance_read import read_router
+from src.infrastructure.gui.routers._assurance_signals_routes import signals_router
 from src.infrastructure.gui.routers._assurance_write import write_router
 
 router = APIRouter()
 router.include_router(read_router)
+router.include_router(neighbors_router)
+router.include_router(signals_router)
 router.include_router(write_router)
 router.include_router(analysis_router)
 router.include_router(aibom_router)
@@ -41,6 +48,21 @@ def assurance_reload() -> dict[str, object]:
     clear_context_cache()
     # Eagerly rebuild so the response reflects the new unlocked state.
     return assurance_status()
+
+
+@router.get("/api/assurance/edge-catalog")
+def assurance_edge_catalog() -> JSONResponse:
+    """Edge and reference type catalog from the loaded assurance module.
+
+    Configured-gated but NOT unlock-gated: it serves module configuration,
+    never store content. Registry enablement (capability present) is the gate.
+    """
+    if get_module_registry().find_ontology("assurance") is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "assurance_module_not_configured"},
+        )
+    return JSONResponse(content=build_edge_catalog(assurance_ontology_module()))
 
 
 @router.get("/api/assurance/status")

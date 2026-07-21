@@ -1,117 +1,19 @@
 """Security-signal write MCP tools.
 
 Tools registered on arch-assurance-write:
-  assurance_import_bom            — ingest a CycloneDX/SPDX BOM (inline JSON)
-  assurance_import_vulnerabilities — ingest OSV/NVD/GitHub Advisory vulnerability records
-  assurance_set_anchor            — map a component PURL to an architecture entity
   assurance_reconcile_aibom       — drift report: modeled vs discovered AI-BOM
 
-All write tools gate on the store being unlocked and append to the audit log.
+Signal ingestion is performed by the RefreshSecuritySignals command (the refresh
+tool / CLI), which owns the run lifecycle and the §6.0(a)/D21 mutation+audit
+transaction boundary. There is no ad-hoc MCP signal-write path.
 """
 
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.infrastructure.assurance.write_serialization import run_write
-from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
-
 
 def register_security_write_tools(server: FastMCP) -> None:
-    ctx = get_assurance_context()
-
-    @server.tool(
-        name="assurance_import_bom",
-        description=(
-            "Ingest a CycloneDX or SPDX BOM (as a JSON dict) and map its components to "
-            "architecture entities via existing anchor_mappings. "
-            "anchor_entity_id is the architecture entity ID this BOM belongs to (e.g. the "
-            "application-component or artifact representing the software product). "
-            "Re-ingesting the same BOM serial+version is idempotent (upsert). "
-            "After ingestion, call assurance_set_anchor to map individual components."
-        ),
-    )
-    def assurance_import_bom(
-        bom_data: dict[str, object],
-        anchor_entity_id: str,
-        source_file: str = "",
-        bom_format: str = "cyclonedx",
-    ) -> dict[str, object]:
-        if not ctx.is_available():
-            return ctx.locked_response()
-        result = run_write(lambda: ctx.connector.import_bom(
-            bom_data,
-            anchor_entity_id=anchor_entity_id,
-            bom_format=bom_format,
-            source_file=source_file,
-        ))
-        run_write(lambda: ctx.archive.append(
-            "IMPORT_BOM",
-            payload={
-                "anchor_entity_id": anchor_entity_id,
-                "bom_format": bom_format,
-                "source_file": source_file,
-            },
-        ))
-        return result  # type: ignore[return-value]
-
-    @server.tool(
-        name="assurance_import_vulnerabilities",
-        description=(
-            "Ingest vulnerability records (OSV / NVD / GitHub Advisory / CISA-KEV format). "
-            "Each record must have an 'id' or 'ext_id' field (e.g. CVE-2026-xxxxx, GHSA-xxxx). "
-            "Optional fields: purl (affected component), severity, cvss_score, vex_status "
-            "(affected | not_affected | fixed | under_investigation), vex_justification, "
-            "summary/description. "
-            "source identifies the feed (osv | nvd | ghsa | cisa-kev | dependencytrack)."
-        ),
-    )
-    def assurance_import_vulnerabilities(
-        vuln_records: list[dict[str, object]],
-        source: str = "osv",
-    ) -> dict[str, object]:
-        if not ctx.is_available():
-            return ctx.locked_response()
-        result = run_write(lambda: ctx.connector.import_vulnerabilities(vuln_records, source=source))
-        run_write(lambda: ctx.archive.append(
-            "IMPORT_VULNERABILITIES",
-            payload={"source": source, "record_count": len(vuln_records)},
-        ))
-        return result  # type: ignore[return-value]
-
-    @server.tool(
-        name="assurance_set_anchor",
-        description=(
-            "Map a component reference (typically a Package URL / PURL) to an architecture entity. "
-            "Persistent anchor mappings are applied automatically on future BOM re-ingestion, "
-            "so the component is linked to the architecture entity without manual intervention. "
-            "ref_type: 'purl' (default) | 'cpe' | 'name'. "
-            "Example purl: pkg:pypi/requests@2.31.0"
-        ),
-    )
-    def assurance_set_anchor(
-        component_ref: str,
-        arch_entity_id: str,
-        ref_type: str = "purl",
-    ) -> dict[str, object]:
-        if not ctx.is_available():
-            return ctx.locked_response()
-        run_write(lambda: ctx.connector.set_anchor(component_ref, arch_entity_id, ref_type=ref_type))
-        run_write(lambda: ctx.archive.append(
-            "SET_ANCHOR",
-            payload={
-                "component_ref": component_ref,
-                "arch_entity_id": arch_entity_id,
-                "ref_type": ref_type,
-            },
-        ))
-        return {
-            "component_ref": component_ref,
-            "arch_entity_id": arch_entity_id,
-            "ref_type": ref_type,
-            "status": "anchored",
-        }
-
     @server.tool(
         name="assurance_reconcile_aibom",
         description=(

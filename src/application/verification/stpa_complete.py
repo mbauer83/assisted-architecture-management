@@ -2,8 +2,11 @@
 
 Checks that the full STPA analysis chain is connected:
   - Every hazard has ≥1 loss via leads-to
-  - Every UCA has ≥1 control-action via concerns AND ≥1 hazard via violates
-  - Every loss-scenario has ≥1 UCA via explains
+  - Every UCA has ≥1 control-action via concerns AND ≥1 hazard via leads-to
+  - Every loss-scenario explains ≥1 UCA or ≥1 hazard (the handbook's two
+    scenario types: type-a explains why a UCA occurs; type-b explains how a
+    correct control action is improperly executed or not executed, producing
+    the hazard without an intervening UCA)
   - Every UCA and every loss-scenario has ≥1 constraint via derives
 """
 
@@ -95,11 +98,11 @@ def run_stpa_complete(
         _gap_nodes(all_nodes, "unsafe-control-action", all_edges, source_conn="concerns", target_conn=None),
     )
     _check(
-        checks, "uca_violates_hazard",
-        _gap_nodes(all_nodes, "unsafe-control-action", all_edges, source_conn="violates", target_conn=None),
+        checks, "uca_leads_to_hazard",
+        _gap_nodes(all_nodes, "unsafe-control-action", all_edges, source_conn="leads-to", target_conn=None),
     )
     _check(
-        checks, "loss_scenario_explains_uca",
+        checks, "loss_scenario_explains_uca_or_hazard",
         _gap_nodes(all_nodes, "loss-scenario", all_edges, source_conn="explains", target_conn=None),
     )
     _check(

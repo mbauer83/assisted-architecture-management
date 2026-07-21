@@ -1,10 +1,8 @@
-"""HTTP read endpoints for AI-BOM coverage, candidate scanning, and ML-BOM export.
+"""HTTP read endpoints for AI-BOM candidate scanning, role vocabulary, and ML-BOM export.
 
-These three capabilities are not exposed by the SecuritySignalConnector port, so
-they get a dedicated router (keeps _assurance_read.py within its size budget):
+These capabilities are pure transforms / public-model reads (no confidential store access),
+so they get a dedicated router (keeps _assurance_read.py within its size budget):
 
-  GET  /api/assurance/aibom/coverage  — coverage/gap report over store BOM components
-                                         + anchors (signals-gated, exposure-filtered).
   GET  /api/assurance/aibom/scan      — heuristic AI-candidate scan over the *public*
                                          architecture repository (un-gated: touches no
                                          confidential content, only ranks model entities).
@@ -20,34 +18,12 @@ All responses carry ``Cache-Control: no-store``.
 
 from __future__ import annotations
 
-import logging
-
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
-from src.application.assurance_queries import aibom_coverage
-from src.infrastructure.gui.routers._assurance_http import build_policy as _build_policy
-from src.infrastructure.gui.routers._assurance_http import locked_response as _locked_response
 from src.infrastructure.gui.routers._assurance_http import ok as _ok
 
-logger = logging.getLogger(__name__)
-
 aibom_router = APIRouter()
-
-
-@aibom_router.get("/api/assurance/aibom/coverage")
-def aibom_coverage_report() -> JSONResponse:
-    ctx, pol = _build_policy()
-    if not ctx.signals_available():
-        return _locked_response()
-    components, withheld = pol.filter_security_records(ctx.connector.list_bom_components())
-    anchors, _ = pol.filter_security_records(ctx.connector.list_anchors())
-    report = aibom_coverage(components, anchors)
-    report["withheld_components"] = withheld
-    report["visibility_limited"] = pol.scope().visibility_limited
-    if withheld:
-        logger.info("aibom_coverage: ceiling=%s withheld=%d", pol.scope().ceiling, withheld)
-    return _ok(report)
 
 
 @aibom_router.get("/api/assurance/aibom/scan")

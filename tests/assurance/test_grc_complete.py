@@ -87,8 +87,8 @@ def test_risk_with_owner_passes(store) -> None:  # type: ignore[no-untyped-def]
     from src.application.verification.grc_complete import run_grc_complete
 
     risk_id = store.create_node("risk", "RSK-1", attributes={"treatment": "mitigate"})
-    owner_id = store.create_node("assurance-constraint", "Role: Security Officer")
-    store.add_edge(risk_id, owner_id, "accountable-to")
+    owner_id = store.create_node("control-structure-node", "Security Officer", node_role="controller")
+    store.add_edge(owner_id, risk_id, "accountable-for")
     result = run_grc_complete(store)
     assert result["checks"]["risk_has_owner"]["passed"] is True
 
@@ -100,8 +100,8 @@ def test_complete_grc_chain_passes(store) -> None:  # type: ignore[no-untyped-de
     acn_id = store.create_node("assurance-constraint", "ACN-1", concern_class="security")
     store.add_edge(acn_id, obl_id, "complies-with")
     risk_id = store.create_node("risk", "RSK-1", attributes={"treatment": "mitigate", "likelihood": "low"})
-    owner_id = store.create_node("assurance-constraint", "Role: CISO")
-    store.add_edge(risk_id, owner_id, "accountable-to")
+    owner_id = store.create_node("control-structure-node", "CISO", node_role="controller")
+    store.add_edge(owner_id, risk_id, "accountable-for")
     result = run_grc_complete(store)
     assert result["passed"] is True
 
@@ -116,14 +116,17 @@ def test_summary_reports_gap_counts(store) -> None:  # type: ignore[no-untyped-d
     assert result["passed"] is False
 
 
-def test_risk_owner_satisfied_by_accountability_arch_ref(store) -> None:  # type: ignore[no-untyped-def]
+def test_arch_ref_alone_never_satisfies_ownership(store) -> None:  # type: ignore[no-untyped-def]
+    """Ownership has exactly ONE representation: the accountable-for edge from an
+    organizational controller. A bare architecture reference is not an owner —
+    the owner NODE may bind to an architecture role, but the reference cannot
+    replace the accountability edge."""
     from src.application.verification.grc_complete import run_grc_complete
 
     risk_id = store.create_node("risk", "RSK-1", attributes={"treatment": "mitigate"})
-    # Accountability points to an architecture role via an arch-ref, not an edge.
-    store.register_arch_ref(risk_id, "ACT@1712870400.role", "accountable-to")
+    store.register_arch_ref(risk_id, "ACT@1712870400.role", "binds-to")
     result = run_grc_complete(store)
-    assert result["checks"]["risk_has_owner"]["passed"] is True
+    assert result["checks"]["risk_has_owner"]["passed"] is False
 
 
 def test_unrelated_arch_ref_does_not_satisfy_owner(store) -> None:  # type: ignore[no-untyped-def]
@@ -143,7 +146,8 @@ def test_analysis_scoping_isolates_other_analyses(store) -> None:  # type: ignor
     # An untreated risk in a2 must not fail a1's coverage.
     store.create_node("risk", "A2-RSK", analysis_id=a2)
     risk_id = store.create_node("risk", "A1-RSK", attributes={"treatment": "mitigate"}, analysis_id=a1)
-    store.register_arch_ref(risk_id, "ACT@1.role", "accountable-to")
+    owner_id = store.create_node("control-structure-node", "Q3 Risk Owner", node_role="controller", analysis_id=a1)
+    store.add_edge(owner_id, risk_id, "accountable-for")
     scoped = run_grc_complete(store, analysis_id=a1)
     assert scoped["passed"] is True
     overall = run_grc_complete(store)

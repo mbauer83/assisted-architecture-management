@@ -3,9 +3,10 @@
 Checks:
   - every in-scope obligation has ≥1 assurance-constraint via complies-with
   - every risk has a treatment attribute set
-  - every risk is accountable to an owner — either an ``accountable-to`` edge or an
-    ``accountable-to`` architecture reference (accountability points to an
-    architecture role; assurance → architecture, one-way)
+  - every risk has an owner: an incoming ``accountable-for`` edge from an
+    organizational control-structure node (ISO 31000 risk ownership — the owner
+    is answerable FOR the risk; the owner node may itself be bound to an
+    architecture role via its binds-to reference)
 """
 
 from __future__ import annotations
@@ -15,10 +16,6 @@ from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from src.application.assurance_ports import ConfidentialAssuranceStore
-
-# Architecture-reference type denoting "this risk is accountable to that arch role".
-ACCOUNTABLE_REF_TYPE = "accountable-to"
-
 
 class _CheckEntry(TypedDict):
     passed: bool
@@ -66,24 +63,19 @@ def _risk_no_treatment(nodes: list[dict[str, object]]) -> list[dict[str, str]]:
 def _risk_no_owner(
     nodes: list[dict[str, object]],
     edges: list[dict[str, object]],
-    owner_ref_node_ids: set[str],
 ) -> list[dict[str, str]]:
-    """Return risk nodes with no accountability.
-
-    A risk is owned when it has an ``accountable-to`` edge to another assurance node
-    *or* an ``accountable-to`` architecture reference (the id is in
-    ``owner_ref_node_ids``) — accountability resolves to an architecture role.
-    """
+    """Return risk nodes with no owner: a risk is owned when a control-structure
+    node is accountable FOR it (incoming ``accountable-for`` edge)."""
     gaps: list[dict[str, str]] = []
     for node in nodes:
         if str(node.get("node_type", "")) != "risk":
             continue
         nid = str(node["node_id"])
         has_owner_edge = any(
-            str(e["source_id"]) == nid and str(e["conn_type"]) == "accountable-to"
+            str(e["target_id"]) == nid and str(e["conn_type"]) == "accountable-for"
             for e in edges
         )
-        if has_owner_edge or nid in owner_ref_node_ids:
+        if has_owner_edge:
             continue
         gaps.append({"node_id": nid, "name": str(node.get("name", ""))})
     return gaps
@@ -119,18 +111,11 @@ def run_grc_complete(
             if str(e.get("source_id")) in scoped_ids and str(e.get("target_id")) in scoped_ids
         ]
 
-    owner_ref_node_ids = {
-        str(r["assurance_node_id"])
-        for r in store.list_arch_refs()
-        if str(r.get("ref_type")) == ACCOUNTABLE_REF_TYPE
-        and (scoped_ids is None or str(r["assurance_node_id"]) in scoped_ids)
-    }
-
     checks: dict[str, _CheckEntry] = {}
 
     _check(checks, "obligation_has_constraint", _obligation_gaps(all_nodes, all_edges))
     _check(checks, "risk_has_treatment", _risk_no_treatment(all_nodes))
-    _check(checks, "risk_has_owner", _risk_no_owner(all_nodes, all_edges, owner_ref_node_ids))
+    _check(checks, "risk_has_owner", _risk_no_owner(all_nodes, all_edges))
 
     all_passed = all(v["passed"] for v in checks.values())
     total_gaps = sum(v["gap_count"] for v in checks.values())

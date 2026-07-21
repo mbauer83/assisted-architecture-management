@@ -148,7 +148,7 @@ class ArtifactVerifier:
                 continue
         return None
 
-    def verify_entity_file(self, path: Path) -> VerificationResult:
+    def verify_entity_file(self, path: Path, *, schema_repo_root: Path | None = None) -> VerificationResult:
         result = VerificationResult(path=path, file_type="entity")
         loc = str(path)
         content = read_file(path, result, loc)
@@ -169,7 +169,10 @@ class ArtifactVerifier:
         if is_internal_entity_type(str(fm.get("artifact-type", "")), self._runtime_catalogs.ontology):
             check_global_artifact_reference(fm, self.registry, result, loc)
 
-        repo_root = self._repo_root_for_path(path)
+        # Schema validation keys off the *governing* repo (its ``.arch-repo/schemata``),
+        # which the caller supplies when verifying proposed content in a temp path. Falling
+        # back to the file's on-disk location keeps in-repo verification unchanged.
+        repo_root = schema_repo_root if schema_repo_root is not None else self._repo_root_for_path(path)
         if repo_root is not None:
             check_frontmatter_schema(fm, repo_root, "entity", result, loc)
             check_attribute_schema(content, fm, repo_root, result, loc,

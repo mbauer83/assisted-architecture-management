@@ -86,7 +86,7 @@ def test_hazard_with_uca_constraint_chain_passes(store) -> None:  # type: ignore
         "unsafe-control-action", "UCA-1", uca_type="not-provided", concern_class="safety"
     )
     store.add_edge(uca_id, ca_id, "concerns")
-    store.add_edge(uca_id, haz_id, "violates")
+    store.add_edge(uca_id, haz_id, "leads-to")
     acn_id = store.create_node("assurance-constraint", "ACN-1", concern_class="safety")
     store.add_edge(uca_id, acn_id, "derives")
     result = run_case_completeness(store)
@@ -105,7 +105,7 @@ def test_hazard_via_loss_scenario_chain_passes(store) -> None:  # type: ignore[n
         "unsafe-control-action", "UCA-1", uca_type="not-provided", concern_class="safety"
     )
     store.add_edge(uca_id, ca_id, "concerns")
-    store.add_edge(uca_id, haz_id, "violates")
+    store.add_edge(uca_id, haz_id, "leads-to")
     ls_id = store.create_node("loss-scenario", "LS-1", concern_class="safety")
     store.add_edge(ls_id, uca_id, "explains")
     acn_id = store.create_node("assurance-constraint", "ACN-1", concern_class="safety")
@@ -149,7 +149,7 @@ def test_complete_chain_all_pass(store) -> None:  # type: ignore[no-untyped-def]
         "unsafe-control-action", "UCA-1", uca_type="not-provided", concern_class="safety"
     )
     store.add_edge(uca_id, ca_id, "concerns")
-    store.add_edge(uca_id, haz_id, "violates")
+    store.add_edge(uca_id, haz_id, "leads-to")
     acn_id = store.create_node("assurance-constraint", "ACN-1", concern_class="safety")
     store.add_edge(uca_id, acn_id, "derives")
     evid_id = store.create_node("evidence", "Test Report T-001")

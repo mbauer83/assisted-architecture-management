@@ -1,99 +1,126 @@
-"""Security-signal read-only MCP tools (SC-2/SC-4 updates).
+"""Security-signal read-only MCP tools.
 
 Tools registered on arch-assurance-read:
-  assurance_list_bom_components  — query ingested BOM components
-  assurance_list_vulnerabilities — query vuln findings by PURL/severity
-  assurance_security_stats       — counts of BOM/vuln/anchor data
+  assurance_list_bom_components  — components of the anchor's ACTIVE refresh run
+  assurance_list_vulnerabilities — vulnerability findings of the active run
+  assurance_security_stats       — refresh-run aggregate counts
+  assurance_security_metrics     — posture metrics from the active refresh run + VEX
   assurance_scan_ai_candidates   — heuristic AI-BOM candidate scan
   assurance_aibom_export         — emit CycloneDX 1.6 ML-BOM from provided components JSON
-  assurance_aibom_coverage       — coverage/gap report for AI-BOM marking
 
-SC-2: BOM/vuln tools are gated behind store-unlock when signals_backend is
-      confidential (sqlcipher-colocated or encrypted). Locked ⇒ signals_locked_response.
-SC-4: Results are filtered by max_classification TLP ceiling before return;
-      withheld counts are emitted to the exposure log.
+All read the refresh-run model. Confidential-backend reads are gated behind store-unlock
+and filtered by the max_classification TLP ceiling before return.
 """
 
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.application.assurance_exposure import AssuranceExposurePolicy
-from src.infrastructure.mcp.assurance_mcp.context import (
-    _exposure_log,
-    get_assurance_context,
-)
+from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
 
 
 def register_security_read_tools(server: FastMCP) -> None:
     ctx = get_assurance_context()
 
+    def _policy():  # type: ignore[no-untyped-def]
+        from src.application.assurance_exposure import AssuranceExposurePolicy  # noqa: PLC0415
+
+        return AssuranceExposurePolicy(ctx.max_classification, ctx.is_available())
+
     @server.tool(
         name="assurance_list_bom_components",
         description=(
-            "List BOM components ingested via assurance_import_bom. "
-            "Filter by anchor_entity_id (the architecture entity the BOM is anchored to) "
-            "or purl (Package URL for a specific component). "
-            "Requires the assurance store to be unlocked when using confidential signals storage."
+            "List the software components of the ACTIVE security refresh run for an "
+            "architecture anchor (the current SBOM). Exposure-filtered by the TLP ceiling. "
+            "Requires the assurance store to be unlocked."
         ),
     )
-    def assurance_list_bom_components(
-        anchor_entity_id: str | None = None,
-        purl: str | None = None,
-    ) -> dict[str, object]:
-        if not ctx.signals_available():
-            return ctx.signals_locked_response()
-        policy = AssuranceExposurePolicy(ctx.max_classification, True)
-        components = ctx.connector.list_bom_components(
-            anchor_entity_id=anchor_entity_id,
-            purl=purl,
-        )
-        kept, withheld = policy.filter_security_records(components)
-        if withheld:
-            _exposure_log.info(
-                "list_bom_components: ceiling=%s returned=%d withheld=%d",
-                ctx.max_classification, len(kept), withheld,
-            )
-        return {"components": kept, "count": len(kept), "withheld": withheld}
+    def assurance_list_bom_components(anchor_entity_id: str) -> dict[str, object]:
+        from src.application.security_refresh.signals_read import list_active_components  # noqa: PLC0415
+
+        if not ctx.is_available():
+            return ctx.locked_response()
+        run_store = ctx.refresh_run_store
+        if run_store is None:
+            return {"components": [], "count": 0, "reason": "no co-located signals store"}
+        components, withheld = list_active_components(
+            anchor_entity_id, run_store=run_store, policy=_policy())
+        return {"components": components, "count": len(components), "withheld": withheld}
 
     @server.tool(
         name="assurance_list_vulnerabilities",
         description=(
-            "List vulnerability findings ingested via assurance_import_vulnerabilities. "
-            "Filter by purl (Package URL of the affected component) or severity "
-            "(CRITICAL, HIGH, MEDIUM, LOW, NONE). "
-            "Contextualise these findings against STPA-Sec hazards and loss-scenarios. "
-            "Requires the assurance store to be unlocked when using confidential signals storage."
+            "List vulnerability findings of the ACTIVE refresh run for an architecture "
+            "anchor, each carrying its component name/purl/directness, severity band, CVSS "
+            "score, and applicability. Optionally scope to one component by purl or "
+            "component_id (the component-details view). Exposure-filtered; a finding is "
+            "hidden when its component is. Requires the assurance store to be unlocked."
         ),
     )
     def assurance_list_vulnerabilities(
-        purl: str | None = None,
-        severity: str | None = None,
+        anchor_entity_id: str, purl: str | None = None, component_id: str | None = None,
     ) -> dict[str, object]:
-        if not ctx.signals_available():
-            return ctx.signals_locked_response()
-        policy = AssuranceExposurePolicy(ctx.max_classification, True)
-        vulns = ctx.connector.list_vulnerabilities(purl=purl, severity=severity)
-        kept, withheld = policy.filter_security_records(vulns)
-        if withheld:
-            _exposure_log.info(
-                "list_vulnerabilities: ceiling=%s returned=%d withheld=%d",
-                ctx.max_classification, len(kept), withheld,
-            )
-        return {"vulnerabilities": kept, "count": len(kept), "withheld": withheld}
+        from src.application.security_refresh.signals_read import list_active_findings  # noqa: PLC0415
+
+        if not ctx.is_available():
+            return ctx.locked_response()
+        run_store = ctx.refresh_run_store
+        if run_store is None:
+            return {"findings": [], "count": 0, "reason": "no co-located signals store"}
+        findings, withheld = list_active_findings(
+            anchor_entity_id, run_store=run_store, policy=_policy(), purl=purl, component_id=component_id)
+        return {"findings": findings, "count": len(findings), "withheld": withheld}
 
     @server.tool(
         name="assurance_security_stats",
         description=(
-            "Return counts of security signal data: BOM ingests, BOM components, "
-            "vulnerability records, and anchor mappings. "
-            "Requires the assurance store to be unlocked when using confidential signals storage."
+            "Refresh-run aggregate counts: total_runs, active_runs, anchors_with_active_run, "
+            "and the component/finding totals across the active runs. Requires the assurance "
+            "store to be unlocked."
         ),
     )
     def assurance_security_stats() -> dict[str, object]:
-        if not ctx.signals_available():
-            return ctx.signals_locked_response()
-        return ctx.connector.get_stats()
+        from src.application.security_refresh.signals_read import signals_stats  # noqa: PLC0415
+
+        if not ctx.is_available():
+            return ctx.locked_response()
+        run_store = ctx.refresh_run_store
+        if run_store is None:
+            return {"reason": "no co-located signals store"}
+        return dict(signals_stats(run_store=run_store))
+
+    @server.tool(
+        name="assurance_security_metrics",
+        description=(
+            "Security posture metrics for one architecture anchor, computed from the "
+            "single ACTIVE refresh run plus visible VEX assessments, exposure-filtered "
+            "before any aggregation. Unit-explicit: finding_total and per-directness "
+            "open_component_findings count component findings; "
+            "distinct_open_vulnerabilities counts canonical vulnerability identities. "
+            "Includes basis run id/timestamp, computed classification, and closed "
+            "availability/content states (no_active_run / no_findings / "
+            "visibility_limited / complete)."
+        ),
+    )
+    def assurance_security_metrics(anchor_entity_id: str) -> dict[str, object]:
+        from dataclasses import asdict  # noqa: PLC0415
+
+        from src.application.assurance_exposure import AssuranceExposurePolicy  # noqa: PLC0415
+        from src.application.security_refresh.metrics import compute_security_metrics  # noqa: PLC0415
+
+        if not ctx.is_available():
+            return ctx.locked_response()
+        run_store = ctx.refresh_run_store
+        vex_store = ctx.vex_store
+        if run_store is None or vex_store is None:
+            return {
+                "availability": "unavailable",
+                "reason": "metrics require the SQLCipher store with co-located signals",
+            }
+        policy = AssuranceExposurePolicy(ctx.max_classification, ctx.is_available())
+        return asdict(compute_security_metrics(
+            anchor_entity_id, run_store=run_store, vex_store=vex_store, policy=policy,
+        ))
 
     @server.tool(
         name="assurance_scan_ai_candidates",
@@ -139,30 +166,3 @@ def register_security_read_tools(server: FastMCP) -> None:
 
         bom = build_cyclonedx_16(ai_components, notes=notes)
         return {"bom": bom, "component_count": len(ai_components)}
-
-    @server.tool(
-        name="assurance_aibom_coverage",
-        description=(
-            "AI-BOM coverage/gap report: shows BOM components that have no anchor mapping "
-            "(not linked to an architecture entity) and anchor mappings for entities "
-            "that are not yet marked with an ai_role. "
-            "Use this to identify where AI-component marking is incomplete. "
-            "Requires the assurance store to be unlocked when using confidential signals storage."
-        ),
-    )
-    def assurance_aibom_coverage() -> dict[str, object]:
-        if not ctx.signals_available():
-            return ctx.signals_locked_response()
-        from src.application.assurance_queries import aibom_coverage  # noqa: PLC0415
-
-        policy = AssuranceExposurePolicy(ctx.max_classification, True)
-        components, comp_withheld = policy.filter_security_records(ctx.connector.list_bom_components())
-        anchors, _ = policy.filter_security_records(ctx.connector.list_anchors())
-        report = aibom_coverage(components, anchors)
-        report["withheld_components"] = comp_withheld
-        report["summary"] = (
-            f"{report['summary']} "
-            "Call assurance_set_anchor to map them, or assurance_scan_ai_candidates to "
-            "find candidates."
-        )
-        return report

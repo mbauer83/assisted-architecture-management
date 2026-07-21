@@ -44,6 +44,7 @@ class _AssuranceModule:
         element_classes: dict[str, ElementClassInfo],
         derivation_rules: tuple[CompositionRule, ...] = (),
         derivation_restrictions: tuple[DerivationRestriction, ...] = (),
+        reference_types: dict[str, str] | None = None,
     ) -> None:
         self._entity_types = entity_types
         self._connection_types = connection_types
@@ -51,6 +52,7 @@ class _AssuranceModule:
         self._element_classes = element_classes
         self._derivation_rules = derivation_rules
         self._derivation_restrictions = derivation_restrictions
+        self._reference_types = dict(reference_types or {})
 
         self._class_index: dict[ElementClassName, frozenset[EntityTypeName]] = {}
         _cb: dict[ElementClassName, set[EntityTypeName]] = {}
@@ -77,6 +79,14 @@ class _AssuranceModule:
     @property
     def permitted_relationships(self) -> PermittedRelationshipSet:
         return self._permitted_relationships
+
+    @property
+    def reference_types(self) -> dict[str, str]:
+        """The arch_refs reference-type catalog (cross-module architecture
+        references) — deliberately distinct from assurance edge types so a
+        transport surface can never submit one through the other's mutation
+        use case."""
+        return dict(self._reference_types)
 
     @property
     def derivation_rules(self) -> tuple[CompositionRule, ...]:
@@ -239,6 +249,8 @@ def load_assurance_module(package_dir: Path, *, guidance: GuidanceOverlay | None
     connection_types = _load_connection_types(conn_data)
     permitted = _build_permitted_relationships(conn_data, entity_types)
     element_classes = _load_element_classes(entity_data)
+    reference_types_raw: dict[Any, Any] = conn_data.get("reference_types") or {}
+    reference_types = {str(name): str(description) for name, description in reference_types_raw.items()}
 
     return _AssuranceModule(
         entity_types=entity_types,
@@ -247,4 +259,5 @@ def load_assurance_module(package_dir: Path, *, guidance: GuidanceOverlay | None
         element_classes=element_classes,
         derivation_rules=load_composition_rules(package_dir),
         derivation_restrictions=load_derivation_restrictions(package_dir),
+        reference_types=reference_types,
     )

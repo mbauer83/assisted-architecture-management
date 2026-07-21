@@ -14,7 +14,6 @@ Commands:
   verify-chain          Verify the audit log hash chain integrity (sqlcipher only)
   pocketbase-init       Initialise PocketBase collections
   pocketbase-status     Check PocketBase health
-  import-sbom           Ingest a CycloneDX or SPDX BOM file
   export-aibom          Emit a CycloneDX 1.6 AI-BOM from provided components JSON
   scan-ai-candidates    Heuristic scan of architecture entities for AI-BOM relevance
 """
@@ -31,7 +30,6 @@ from src.infrastructure.cli._assurance_commands import (
     cmd_export_aibom,
     cmd_export_key,
     cmd_import,
-    cmd_import_sbom,
     cmd_init,
     cmd_lock,
     cmd_pocketbase_init,
@@ -125,11 +123,6 @@ def main() -> None:
     p_pb_status = sub.add_parser("pocketbase-status", help="Check PocketBase health")
     p_pb_status.add_argument("--base-url", required=True, metavar="URL", help="PocketBase base URL")
 
-    p_import_sbom = sub.add_parser("import-sbom", help="Ingest a CycloneDX or SPDX BOM file")
-    p_import_sbom.add_argument("file", metavar="FILE", help="Path to the BOM JSON file")
-    p_import_sbom.add_argument("--anchor", metavar="ENTITY_ID", help="Architecture entity ID to anchor this BOM to")
-    p_import_sbom.add_argument("--signals-db-path", metavar="PATH", help="Override security signals DB path")
-
     p_export_aibom = sub.add_parser("export-aibom", help="Emit a CycloneDX 1.6 AI-BOM")
     p_export_aibom.add_argument("--components-file", metavar="PATH", help="JSON file with AI-component dicts")
     p_export_aibom.add_argument("--output", metavar="PATH", help="Output file (default: stdout)")
@@ -146,7 +139,7 @@ def main() -> None:
         "rotate-key": cmd_rotate_key, "export-key": cmd_export_key,
         "verify": cmd_verify, "verify-chain": cmd_verify_chain,
         "pocketbase-init": cmd_pocketbase_init, "pocketbase-status": cmd_pocketbase_status,
-        "import-sbom": cmd_import_sbom, "export-aibom": cmd_export_aibom,
+        "export-aibom": cmd_export_aibom,
         "scan-ai-candidates": cmd_scan_ai_candidates,
     }
     sys.exit(dispatch[args.command](args))

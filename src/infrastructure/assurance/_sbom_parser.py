@@ -1,13 +1,16 @@
 """SBOM parsing — CycloneDX JSON and SPDX JSON component extraction.
 
 Returns a normalised list of component dicts regardless of input format.
-Each component dict has: purl, cpe, name, version, component_type, group_name.
+Each component dict has: purl, cpe, name, version, component_type, group_name,
+bom_ref, and is_root. Metadata preserves the BOM identity (serial/version),
+the root component's ref, and the dependency graph as normalized edges —
+directness classification needs all three, so the parser never drops them.
 """
 
 from __future__ import annotations
 
 
-def _normalise_cdx_component(comp: dict[str, object]) -> dict[str, object]:
+def _normalise_cdx_component(comp: dict[str, object], *, is_root: bool = False) -> dict[str, object]:
     return {
         "purl": str(comp.get("purl") or ""),
         "cpe": str(comp.get("cpe") or ""),
@@ -15,7 +18,27 @@ def _normalise_cdx_component(comp: dict[str, object]) -> dict[str, object]:
         "version": str(comp.get("version") or ""),
         "component_type": str(comp.get("type") or "library"),
         "group_name": str(comp.get("group") or ""),
+        "bom_ref": str(comp.get("bom-ref") or ""),
+        "is_root": is_root,
     }
+
+
+def _cdx_dependency_edges(data: dict[str, object]) -> list[dict[str, object]]:
+    """CycloneDX `dependencies` as normalized {ref, depends_on} entries."""
+    raw = data.get("dependencies")
+    if not isinstance(raw, list):
+        return []
+    edges: list[dict[str, object]] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        ref = str(entry.get("ref") or "")
+        if not ref:
+            continue
+        depends_on = entry.get("dependsOn")
+        targets = [str(t) for t in depends_on if isinstance(t, str)] if isinstance(depends_on, list) else []
+        edges.append({"ref": ref, "depends_on": targets})
+    return edges
 
 
 def parse_cyclonedx(data: dict[str, object]) -> tuple[dict[str, object], list[dict[str, object]]]:
@@ -34,12 +57,16 @@ def parse_cyclonedx(data: dict[str, object]) -> tuple[dict[str, object], list[di
     components = [
         _normalise_cdx_component(c) for c in raw_components if isinstance(c, dict)
     ]
-    # Also pick up top-level metadata.component if present (the root component)
+    # The metadata root component is preserved AND flagged — it is the subject
+    # of the BOM, not a dependency, and directness classification starts at it.
     meta_block = data.get("metadata")
     if isinstance(meta_block, dict):
         root_comp = meta_block.get("component")
         if isinstance(root_comp, dict):
-            components.insert(0, _normalise_cdx_component(root_comp))
+            normalised_root = _normalise_cdx_component(root_comp, is_root=True)
+            components.insert(0, normalised_root)
+            meta["root_bom_ref"] = normalised_root["bom_ref"]
+    meta["dependencies"] = _cdx_dependency_edges(data)
     return meta, components
 
 
@@ -94,8 +121,29 @@ def parse_spdx(data: dict[str, object]) -> tuple[dict[str, object], list[dict[st
             "version": _parse_spdx_version(pkg),
             "component_type": "library",
             "group_name": "",
+            "bom_ref": str(pkg.get("SPDXID") or ""),
+            "is_root": False,
         })
+    meta["dependencies"] = _spdx_dependency_edges(data)
     return meta, components
+
+
+def _spdx_dependency_edges(data: dict[str, object]) -> list[dict[str, object]]:
+    """SPDX DEPENDS_ON relationships as normalized {ref, depends_on} entries."""
+    raw = data.get("relationships")
+    if not isinstance(raw, list):
+        return []
+    by_ref: dict[str, list[str]] = {}
+    for rel in raw:
+        if not isinstance(rel, dict):
+            continue
+        if str(rel.get("relationshipType") or "").upper() != "DEPENDS_ON":
+            continue
+        source = str(rel.get("spdxElementId") or "")
+        target = str(rel.get("relatedSpdxElement") or "")
+        if source and target:
+            by_ref.setdefault(source, []).append(target)
+    return [{"ref": ref, "depends_on": targets} for ref, targets in by_ref.items()]
 
 
 def parse_bom(data: dict[str, object]) -> tuple[dict[str, object], list[dict[str, object]]]:

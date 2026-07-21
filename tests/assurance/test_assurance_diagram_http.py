@@ -58,22 +58,10 @@ class _FakeArchive:
         return list(self._baselines)
 
 
-class _FakeConnector:
-    def list_bom_components(self, **_kw: object) -> list[Any]:
-        return []
-
-    def list_vulnerabilities(self, **_kw: object) -> list[Any]:
-        return []
-
-    def get_stats(self) -> dict[str, Any]:
-        return {}
-
-
 class _FakeContext:
     def __init__(self, store: _FakeStore, archive: _FakeArchive | None = None) -> None:
         self._store = store
         self._archive = archive or _FakeArchive()
-        self._connector = _FakeConnector()
         self.max_classification = "TLP:RED"
 
     @property
@@ -84,21 +72,11 @@ class _FakeContext:
     def archive(self) -> _FakeArchive:
         return self._archive
 
-    @property
-    def connector(self) -> _FakeConnector:
-        return self._connector
-
     def is_available(self) -> bool:
-        return self._store.is_unlocked()
-
-    def signals_available(self) -> bool:
         return self._store.is_unlocked()
 
     def locked_response(self) -> dict[str, Any]:
         return {"error": "assurance_store_locked"}
-
-    def signals_locked_response(self) -> dict[str, Any]:
-        return {"error": "signals_store_locked"}
 
     def not_found_response(self, node_id: str) -> dict[str, Any]:
         return {"error": "not_found", "node_id": node_id}

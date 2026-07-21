@@ -161,7 +161,7 @@ def register_read_tools(server: FastMCP) -> None:
         description=(
             "Run the §17(B) stpa-basic-complete coverage profile check on the assurance store. "
             "Checks: every hazard has ≥1 leads-to loss; every UCA has ≥1 concerns control-action "
-            "AND ≥1 violates hazard; every loss-scenario has ≥1 explains UCA; every UCA and "
+            "AND ≥1 leads-to hazard; every loss-scenario explains ≥1 UCA or ≥1 hazard; every UCA and "
             "loss-scenario has ≥1 derives constraint. Returns gap counts and node IDs for each check."
         ),
     )
@@ -207,7 +207,7 @@ def register_read_tools(server: FastMCP) -> None:
         description=(
             "Run the §17(B) grc-control-coverage-complete profile check. "
             "Checks: every obligation has ≥1 complies-with constraint; "
-            "every risk has a treatment attribute; every risk has an accountable-to owner. "
+            "every risk has a treatment attribute; every risk has an accountable-for owner. "
             "Returns gap counts per check."
         ),
     )

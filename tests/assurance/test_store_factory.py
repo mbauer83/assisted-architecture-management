@@ -97,7 +97,6 @@ class TestStoreFactoryPrivateGit:
         from src.application.assurance_ports import (
             AssuranceArchive,
             ConfidentialAssuranceStore,
-            SecuritySignalConnector,
         )
         from src.infrastructure.assurance.store_factory import get_assurance_bundle
 
@@ -118,7 +117,6 @@ class TestStoreFactoryPrivateGit:
             bundle = get_assurance_bundle(workspace)
             assert isinstance(bundle.store, ConfidentialAssuranceStore)
             assert isinstance(bundle.archive, AssuranceArchive)
-            assert isinstance(bundle.connector, SecuritySignalConnector)
             assert bundle.store_backend == "private-git"
             assert bundle.signals_backend == "sqlite"
 
