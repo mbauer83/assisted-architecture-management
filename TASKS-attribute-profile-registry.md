@@ -328,6 +328,24 @@ already locked because WU-P3 depends on it.
 - [ ] GUI picker single-select → multi-select; `types.generated.ts` regenerated.
 - [ ] Tests: per-transport write coverage; Vitest for the picker.
 
+## Stream Y — Attribute-profile fields in the entity authoring GUI (owner-requested 2026-07-21)
+
+See PLAN §6 (Stream Y). Pairs naturally with WU-S2 (both touch the entity form) and depends
+on the P/Q resolved-schema at the write boundary (landed).
+
+### WU-Y1 — Create-page list widgets
+- [ ] A `list`-typed profile attribute renders as a real add / remove / reorder list editor,
+      not the single "JSON-Array" free-text box it is today — typed per the item schema,
+      reusing the `TypedPropertyInput` path the other attribute kinds use.
+- [ ] Vitest coverage for the list editor.
+
+### WU-Y2 — Edit-page profile fields with merge semantics
+- [ ] The entity EDIT page renders the specialization's attribute-profile fields (today only
+      create does) and re-renders on a specialization change, applying MERGE semantics for
+      already-present values (keep an existing value where the new profile still declares its
+      attribute; drop/quarantine only where the attribute is gone).
+- [ ] Vitest coverage; the resolved schema comes from `GET /api/entity-schemata` (WU-S1).
+
 ## Stream U — AIBOM handoff
 
 ### WU-U1 — Unblock the AIBOM plan
