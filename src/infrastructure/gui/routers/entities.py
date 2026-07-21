@@ -221,8 +221,9 @@ def get_entity_schemata(artifact_type: str, specialization: str = "") -> dict[st
     schema, conflicts = compute_effective_attribute_schema(
         repo_root,
         artifact_type,
-        specialization,
+        [specialization],
         specialization_catalog=_catalogs().specializations,
+        profile_registry=_catalogs().profiles,
     )
     if schema is None:
         return {

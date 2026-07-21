@@ -86,18 +86,35 @@ never hardcode `archimate_4`.
 - Tests: `tests/domain/test_specialization_profile_bindings.py` (6). ruff + zuban clean.
 
 ### WU-P3 — Resolution order (needs P2)
-- [ ] Extend `compute_effective_attribute_schema` to append bound-profile
+- [x] Extend `compute_effective_attribute_schema` to append bound-profile
       fragments between the base schema and specialization profiles
       (PLAN §3 P2). The merge itself is already N-ary — do not modify it.
-- [ ] **Accept an ordered list of applied specializations, not a scalar**
+- [x] **Accept an ordered list of applied specializations, not a scalar**
       (PLAN §3 P2a) even before Stream V rolls out multiple specializations
       model-wide. Retrofitting scalar→list through the merge, verifier, and
       conflict classifier later is far more expensive than accepting a list now.
-- [ ] Tests: order holds (specialization overrides shared profile overrides
+- [x] Tests: order holds (specialization overrides shared profile overrides
       base); parent-attribute inheritance still works (regression — this
       already works today via fragment 1 and must not break); two
       specializations contributing an incompatible attribute is an ordinary
       Class B conflict.
+
+#### WU-P3 PROGRESS (2026-07-21)
+- `compute_effective_attribute_schema` now takes `specialization_slugs: Sequence[str]`
+  (list-native, P2a) + a `profile_registry` kwarg (shipped; default empty). Order is
+  base → bound named profiles (declaration order across the applied specializations,
+  deduped) → each specialization's own inline+attachment (declaration order) → one
+  unchanged N-ary `merge_property_schemas`. The repo-level registry (loaded via a cached
+  `_repo_profile_registry`, cleared by `clear_schema_cache`) overrides a shipped profile of
+  the same name. An undefined bound name is LEFT UNRESOLVED (contributes nothing) — Class A
+  is WU-Q1's startup check, never invented here.
+- All three consumers pass the real registry from `RuntimeCatalogs.profiles`:
+  registry_snapshot, GUI `entities.py`, and the verifier (`check_attribute_schema` gained a
+  `profile_registry` param, threaded from `artifact_verifier`), so bound-profile attributes
+  and conflicts flow through the snapshot AND the E043 verifier path once profiles ship.
+- Existing scalar callers/tests updated to lists (`""`→`[]`, `"slug"`→`["slug"]`).
+- Tests: `TestNamedProfileResolution` in test_effective_attribute_schema.py (order,
+  parent-inheritance regression, Class-B conflict, undefined-name-unresolved). ruff + zuban clean.
 
 ### WU-P4 — Conflict classification (needs P3)
 - [ ] Classify each conflict as Class A (structural) or Class B (scoped) per

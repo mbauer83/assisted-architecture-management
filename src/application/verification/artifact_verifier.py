@@ -176,7 +176,8 @@ class ArtifactVerifier:
         if repo_root is not None:
             check_frontmatter_schema(fm, repo_root, "entity", result, loc)
             check_attribute_schema(content, fm, repo_root, result, loc,
-                specialization_catalog=self._runtime_catalogs.specializations)
+                specialization_catalog=self._runtime_catalogs.specializations,
+                profile_registry=self._runtime_catalogs.profiles)
 
         check_module_source_path(content, path, result, loc)
 
@@ -184,11 +185,8 @@ class ArtifactVerifier:
 
     def verify_outgoing_file(self, path: Path) -> VerificationResult:
         return verify_outgoing(
-            path,
-            registry=self.registry,
-            catalogs=self._runtime_catalogs,
-            scope=self._scope_for_path(path),
-            repo_root=self._repo_root_for_path(path),
+            path, registry=self.registry, catalogs=self._runtime_catalogs,
+            scope=self._scope_for_path(path), repo_root=self._repo_root_for_path(path),
         )
 
     def verify_connection_file(self, path: Path) -> VerificationResult:

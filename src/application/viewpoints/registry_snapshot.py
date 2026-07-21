@@ -68,8 +68,9 @@ def _entity_attribute_schema_facets(
                 schema, _conflicts = compute_effective_attribute_schema(
                     repo_root,
                     entity_type,
-                    slug,
+                    [slug],
                     specialization_catalog=runtime_catalogs.specializations,
+                    profile_registry=runtime_catalogs.profiles,
                 )
                 types.update(_property_types(schema))
                 enums.update(_property_enums(schema))

@@ -12,6 +12,7 @@ from src.application.artifact_schema import (
     validate_against_schema,
 )
 from src.application.verification.artifact_verifier_types import Issue, Severity, VerificationResult
+from src.domain.profile_registry import ProfileRegistry
 from src.domain.property_value import decode_lenient, get_adhoc_type
 from src.domain.specializations import SpecializationCatalog
 
@@ -56,6 +57,7 @@ def check_attribute_schema(
     loc: str,
     *,
     specialization_catalog: SpecializationCatalog | None = None,
+    profile_registry: ProfileRegistry | None = None,
 ) -> None:
     """Validate Properties table attributes against the effective per-type attribute schema.
 
@@ -75,8 +77,9 @@ def check_attribute_schema(
     schema, conflicts = compute_effective_attribute_schema(
         repo_root,
         str(artifact_type),
-        str(fm.get("specialization", "") or ""),
+        [str(fm.get("specialization", "") or "")],
         specialization_catalog=specialization_catalog or SpecializationCatalog.empty(),
+        profile_registry=profile_registry or ProfileRegistry.empty(),
     )
     for msg in conflicts:
         result.issues.append(Issue(Severity.ERROR, "E043", f"Attribute schema ({artifact_type}): {msg}", loc))

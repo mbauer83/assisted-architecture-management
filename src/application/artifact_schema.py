@@ -17,6 +17,7 @@ validation is skipped (free schema).
 """
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -24,6 +25,8 @@ from typing import Any, Literal
 
 import jsonschema  # type: ignore[import-untyped]
 
+from src.application.profile_registry_loading import load_repo_profile_registry
+from src.domain.profile_registry import ProfileRegistry
 from src.domain.profiles import (
     compile_profile_schema,
     merge_property_schemas,
@@ -129,38 +132,58 @@ def list_schema_files(repo_root: Path) -> tuple[SchemaFileRef, ...]:
 def compute_effective_attribute_schema(
     repo_root: Path,
     artifact_type: str,
-    specialization_slug: str,
+    specialization_slugs: Sequence[str],
     *,
     specialization_catalog: SpecializationCatalog,
+    profile_registry: ProfileRegistry = ProfileRegistry.empty(),
 ) -> tuple[dict[str, Any] | None, list[str]]:
-    """Merge the base-type attribute schema with an entity's own specialization's profile.
+    """Merge the base-type attribute schema with the applied specializations' contributions.
 
-    An entity carries at most one specialization (D6), so this is base ⊕ (at most) one
-    specialization-contributed fragment. A specialization's profile is one-to-one with it —
-    never a separately reusable, named registry entry — sourced from inline `attributes:`
-    and/or its dedicated `attributes.{artifact_type}.{slug}.schema.json` attachment file,
-    both already scoped to that one specialization by construction. Returns
-    ``(merged_schema, conflict_messages)`` — ``merged_schema`` is ``None`` only when there is
-    no base schema, no specialization, and no attachment file (free schema).
+    Resolution order is deterministic (PLAN §3 P2): ``base → bound named profiles
+    (declaration order) → each applied specialization's own profile (declaration order)``.
+    A specialization's own profile (inline ``attributes:`` and/or its
+    ``attributes.{type}.{slug}.schema.json`` attachment) is last so the specific always wins
+    over a shared profile it composes. The applied set is an ordered LIST (P2a) — today an
+    entity carries at most one, but the pipeline is N-specialization from the start.
+
+    ``profile_registry`` is the shipped registry; the repo's own registry (loaded here,
+    cached) overrides a shipped profile of the same name. A bound name with no definition is
+    left unresolved — it is a Class-A structural error surfaced at startup (WU-Q1), never
+    silently invented here. The merge itself is unchanged (already N-ary). Returns
+    ``(merged_schema, conflict_messages)``; ``merged_schema`` is ``None`` only when nothing
+    contributes a fragment (free schema).
     """
+    slugs = [slug for slug in specialization_slugs if slug]
+    infos = [(slug, specialization_catalog.get("entity", artifact_type, slug)) for slug in slugs]
+
     fragments: list[dict[str, Any]] = []
     base = load_attribute_schema(repo_root, artifact_type)
     if base is not None:
         fragments.append(base)
 
-    if specialization_slug:
-        spec_info = specialization_catalog.get("entity", artifact_type, specialization_slug)
-        if spec_info is not None and spec_info.attributes:
-            inline = profile_from_inline_attributes(specialization_slug, spec_info.attributes)
-            fragments.append(compile_profile_schema(inline))
-        attachment = load_specialization_attachment_schema(repo_root, artifact_type, specialization_slug)
+    repo_registry = _repo_profile_registry(repo_root)
+    seen_profiles: set[str] = set()
+    for _slug, info in infos:
+        if info is None:
+            continue
+        for name in info.bound_profiles:
+            if name in seen_profiles:
+                continue
+            seen_profiles.add(name)
+            resolved = repo_registry.get(name) or profile_registry.get(name)
+            if resolved is not None:
+                fragments.append(compile_profile_schema(resolved.definition))
+
+    for slug, info in infos:
+        if info is not None and info.attributes:
+            fragments.append(compile_profile_schema(profile_from_inline_attributes(slug, info.attributes)))
+        attachment = load_specialization_attachment_schema(repo_root, artifact_type, slug)
         if attachment is not None:
             fragments.append(attachment)
 
     if not fragments:
         return None, []
-    merged, conflicts = merge_property_schemas(fragments)
-    return merged, conflicts
+    return merge_property_schemas(fragments)
 
 
 def find_orphan_attachment_schemata(repo_root: Path, specialization_catalog: SpecializationCatalog) -> list[str]:
@@ -212,6 +235,14 @@ def _load_schema_file(repo_root: Path, filename: str) -> dict[str, Any] | None:
         return json.load(fh)
 
 
+@lru_cache(maxsize=32)
+def _repo_profile_registry(repo_root: Path) -> ProfileRegistry:
+    """The repo's optional named-profile registry, cached per root — schema resolution reads
+    it once per (type, specialization) pair otherwise, so caching keeps the hot path cheap."""
+    return load_repo_profile_registry(repo_root)
+
+
 def clear_schema_cache() -> None:
-    """Clear the in-memory schema cache (useful in tests)."""
+    """Clear the in-memory schema caches (useful in tests)."""
     _load_schema_file.cache_clear()
+    _repo_profile_registry.cache_clear()

@@ -15,6 +15,7 @@ from src.application.artifact_schema import (
 )
 from src.application.verification._verifier_rules_schema import check_attribute_schema
 from src.application.verification.artifact_verifier_types import VerificationResult
+from src.domain.profile_registry import profile_registry_from_mapping
 from src.domain.specializations import SpecializationCatalog, SpecializationInfo
 
 _FAKE_PATH = Path("/tmp/entity.md")
@@ -37,7 +38,7 @@ def setup_function() -> None:
 class TestComputeEffectiveAttributeSchema:
     def test_no_base_no_specialization_is_none(self, tmp_path: Path) -> None:
         schema, conflicts = compute_effective_attribute_schema(
-            tmp_path, "requirement", "",
+            tmp_path, "requirement", [],
             specialization_catalog=SpecializationCatalog.empty(),
         )
         assert schema is None
@@ -46,7 +47,7 @@ class TestComputeEffectiveAttributeSchema:
     def test_base_only_when_no_specialization(self, tmp_path: Path) -> None:
         _write_schema(tmp_path, "attributes.requirement.schema.json", {"properties": {"rationale": {"type": "string"}}})
         schema, conflicts = compute_effective_attribute_schema(
-            tmp_path, "requirement", "",
+            tmp_path, "requirement", [],
             specialization_catalog=SpecializationCatalog.empty(),
         )
         assert conflicts == []
@@ -64,7 +65,7 @@ class TestComputeEffectiveAttributeSchema:
             )
         )
         schema, conflicts = compute_effective_attribute_schema(
-            tmp_path, "collaboration", "business-collaboration",
+            tmp_path, "collaboration", ["business-collaboration"],
             specialization_catalog=spec_catalog,
         )
         assert conflicts == []
@@ -86,7 +87,7 @@ class TestComputeEffectiveAttributeSchema:
             )
         )
         schema, conflicts = compute_effective_attribute_schema(
-            tmp_path, "collaboration", "business-collaboration",
+            tmp_path, "collaboration", ["business-collaboration"],
             specialization_catalog=spec_catalog,
         )
         assert conflicts == []
@@ -105,11 +106,89 @@ class TestComputeEffectiveAttributeSchema:
             )
         )
         schema, conflicts = compute_effective_attribute_schema(
-            tmp_path, "collaboration", "business-collaboration",
+            tmp_path, "collaboration", ["business-collaboration"],
             specialization_catalog=spec_catalog,
         )
         assert len(conflicts) == 1
         assert "scope" in conflicts[0]
+
+
+class TestNamedProfileResolution:
+    """WU-P3: bound named profiles resolve between the base schema and a specialization's
+    own profile (PLAN §3 P2 order)."""
+
+    def _catalog(self, *, bound: tuple[str, ...], attributes: dict) -> SpecializationCatalog:
+        return SpecializationCatalog(
+            (
+                SpecializationInfo(
+                    slug="service", name="Service", concept_kind="entity",
+                    parent_type="application-component", module_alias="archimate-4",
+                    bound_profiles=bound, attributes=attributes,
+                ),
+            )
+        )
+
+    def test_specialization_own_profile_overrides_bound_profile_overrides_base(self, tmp_path: Path) -> None:
+        # base: token=string ; bound profile: token=string(default shared) ; spec own: token wins as an enum default.
+        _write_schema(
+            tmp_path, "attributes.application-component.schema.json", {"properties": {"tier": {"type": "string"}}}
+        )
+        registry = profile_registry_from_mapping(
+            {
+                "profile_schema": 1,
+                "profiles": {"shared": {"version": 1, "attributes": {"Supplier": {"type": "string"}}}},
+            },
+            label="test",
+        )
+        catalog = self._catalog(bound=("shared",), attributes={"Cadence": {"type": "string", "level": "required"}})
+        schema, conflicts = compute_effective_attribute_schema(
+            tmp_path, "application-component", ["service"],
+            specialization_catalog=catalog, profile_registry=registry,
+        )
+        assert conflicts == []
+        assert schema is not None
+        # base + bound profile + own profile all present, in one merged schema.
+        assert set(schema["properties"]) == {"tier", "Supplier", "Cadence"}
+        assert schema["required"] == ["Cadence"]
+
+    def test_parent_attribute_inheritance_still_works(self, tmp_path: Path) -> None:
+        # Regression: the base-type schema (fragment 1) still contributes with no bound profiles.
+        _write_schema(
+            tmp_path, "attributes.application-component.schema.json", {"properties": {"tier": {"type": "string"}}}
+        )
+        schema, conflicts = compute_effective_attribute_schema(
+            tmp_path, "application-component", [],
+            specialization_catalog=SpecializationCatalog.empty(),
+        )
+        assert conflicts == []
+        assert schema is not None
+        assert set(schema["properties"]) == {"tier"}
+
+    def test_incompatible_bound_profile_type_is_a_class_b_conflict(self, tmp_path: Path) -> None:
+        _write_schema(
+            tmp_path, "attributes.application-component.schema.json", {"properties": {"Score": {"type": "string"}}}
+        )
+        registry = profile_registry_from_mapping(
+            {"profile_schema": 1, "profiles": {"metrics": {"version": 1, "attributes": {"Score": {"type": "number"}}}}},
+            label="test",
+        )
+        catalog = self._catalog(bound=("metrics",), attributes={})
+        schema, conflicts = compute_effective_attribute_schema(
+            tmp_path, "application-component", ["service"],
+            specialization_catalog=catalog, profile_registry=registry,
+        )
+        assert len(conflicts) == 1
+        assert "Score" in conflicts[0]
+
+    def test_undefined_bound_profile_is_left_unresolved_not_invented(self, tmp_path: Path) -> None:
+        # A name with no registry entry contributes nothing here (Class A is a startup check).
+        catalog = self._catalog(bound=("does-not-exist",), attributes={})
+        schema, conflicts = compute_effective_attribute_schema(
+            tmp_path, "application-component", ["service"],
+            specialization_catalog=catalog,
+        )
+        assert conflicts == []
+        assert schema is None  # no base, no resolvable profile, no attachment
 
 
 class TestFindOrphanAttachmentSchemata:

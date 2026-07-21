@@ -100,7 +100,7 @@ class TestSpecializationOverlayResolves:
         key = "attributes.application-component.service.schema.json"
         (schemata / key).write_text(json.dumps(ARCHIMATE_ATTRIBUTE_SCHEMATA[key]), encoding="utf-8")
         merged, conflicts = compute_effective_attribute_schema(
-            tmp_path, "application-component", "service",
+            tmp_path, "application-component", ["service"],
             specialization_catalog=SpecializationCatalog.empty(),
         )
         assert conflicts == []
