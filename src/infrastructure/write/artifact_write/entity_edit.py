@@ -167,7 +167,7 @@ def edit_entity(
     # Gate on the EFFECTIVE (post-merge) specialization: an edit that moves an entity onto a
     # quarantined profile pair must be refused just like a create (WU-Q3).
     assert_not_quarantined(
-        repo_root, artifact_type, [str(merged.specialization or "")],
+        repo_root, "entity", artifact_type, [str(merged.specialization or "")],
         catalogs=build_runtime_catalogs(get_module_registry()),
     )
     effective_artifact_id, target_entity_file = _resolve_target_identity(

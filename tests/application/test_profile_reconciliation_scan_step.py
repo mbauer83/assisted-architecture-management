@@ -49,10 +49,38 @@ def test_conflicting_bound_profile_is_reported_as_quarantined(tmp_path: Path) ->
     findings = ProfileReconciliationScanStep().detect(FilesystemRepoUpgradeView(root))
     assert len(findings) == 1
     finding = findings[0]
-    assert finding.finding_id.startswith("profile-conflict:application-component/metric-service")
+    # The concept kind is part of the finding identity — an entity and a connection may
+    # each declare the same parent-type/slug pair.
+    assert finding.finding_id.startswith("profile-conflict:entity:application-component/metric-service")
     assert finding.severity == "warning"
     assert finding.auto_migratable is False  # reconciliation is report-only in R1
     assert "Score" in finding.description
+
+
+def test_connection_specialization_conflicts_are_reported_too(tmp_path: Path) -> None:
+    """WU-W2: a connection specialization binds profiles on the same terms as an entity
+    one, so scanning only entities would report half the repo's conflicts."""
+    root = tmp_path / "repo"
+    arch = root / ".arch-repo"
+    (arch / "schemata").mkdir(parents=True)
+    (arch / "schemata" / "connection-metadata.archimate-flow.schema.json").write_text(
+        _BASE_SCORE_STRING, encoding="utf-8"
+    )
+    (arch / "profiles.yaml").write_text(_PROFILES, encoding="utf-8")
+    (arch / "specializations.yaml").write_text(
+        "specializations:\n"
+        "  connection:\n"
+        "    archimate-flow:\n"
+        "      - slug: metric-flow\n"
+        "        profiles: [metrics]\n",
+        encoding="utf-8",
+    )
+    clear_schema_cache()
+    findings = ProfileReconciliationScanStep().detect(FilesystemRepoUpgradeView(root))
+    assert len(findings) == 1
+    assert findings[0].finding_id.startswith("profile-conflict:connection:archimate-flow/metric-flow")
+    assert "Score" in findings[0].description
+    assert "Connections" in findings[0].manual_instructions
 
 
 def test_non_conflicting_binding_is_quiet(tmp_path: Path) -> None:

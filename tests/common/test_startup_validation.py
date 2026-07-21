@@ -337,6 +337,27 @@ class TestSchemaFilenames:
             validate_repo_compatibility(repo, reg)
         assert any("ghost-type" in e for e in exc_info.value.errors)
 
+    def test_connection_attachment_schema_for_known_type_passes(self, tmp_path: Path) -> None:
+        """`connection-metadata.{type}.{slug}.schema.json` gates on the connection type
+        only — the same rule as the entity attachment above, since it is the same
+        convention on the other concept kind."""
+        schemata = tmp_path / ".arch-repo" / "schemata"
+        schemata.mkdir(parents=True)
+        (schemata / "connection-metadata.flows.deployment-flow.schema.json").write_text("{}")
+        reg = _make_registry([], ["flows"], [])
+        repo = _FakeRepo(repo_roots=[tmp_path])
+        validate_repo_compatibility(repo, reg)  # must not raise
+
+    def test_connection_attachment_schema_for_unknown_type_is_error(self, tmp_path: Path) -> None:
+        schemata = tmp_path / ".arch-repo" / "schemata"
+        schemata.mkdir(parents=True)
+        (schemata / "connection-metadata.ghost-conn.some-slug.schema.json").write_text("{}")
+        reg = _make_registry([], ["flows"], [])
+        repo = _FakeRepo(repo_roots=[tmp_path])
+        with pytest.raises(RepoCompatibilityError) as exc_info:
+            validate_repo_compatibility(repo, reg)
+        assert any("ghost-conn" in e for e in exc_info.value.errors)
+
     def test_unconventional_schema_filename_warns_but_never_aborts(self, tmp_path: Path) -> None:
         """A filename no loader will ever pick up must be surfaced (it is otherwise
         silently dead configuration) without blocking startup."""

@@ -11,7 +11,8 @@ from pathlib import Path
 
 from src.application.artifact_schema import clear_schema_cache
 from src.application.verification._verifier_rules_schema import check_connection_metadata_schema
-from src.application.verification.artifact_verifier_types import VerificationResult
+from src.application.verification.artifact_verifier_types import Severity, VerificationResult
+from src.domain.specializations import SpecializationCatalog, SpecializationInfo
 
 _FAKE_PATH = Path("/tmp/connection.md")
 
@@ -73,5 +74,49 @@ class TestConnectionMetadataSchema:
         result = _fresh_result()
         check_connection_metadata_schema(
             {"priority": "not-an-integer"}, "archimate-serving", tmp_path, result, "test"
+        )
+        assert result.issues == []
+
+
+class TestEffectiveSchemaMerge:
+    """WU-W2: the check validates against the EFFECTIVE schema for the connection's
+    (type, specialization) pair — the connection mirror of E043's entity path."""
+
+    def _catalog(self, attributes: dict) -> SpecializationCatalog:
+        return SpecializationCatalog(
+            (
+                SpecializationInfo(
+                    slug="deployment-flow", name="Deployment Flow", concept_kind="connection",
+                    parent_type="archimate-flow", module_alias="archimate-4", attributes=attributes,
+                ),
+            )
+        )
+
+    def test_specialization_contribution_is_validated(self, tmp_path: Path) -> None:
+        result = _fresh_result()
+        check_connection_metadata_schema(
+            {"specialization": "deployment-flow", "priority": "not-an-integer"},
+            "archimate-flow", tmp_path, result, "test",
+            specialization_catalog=self._catalog({"priority": {"type": "integer"}}),
+        )
+        assert [i.code for i in result.issues] == ["W043"]
+
+    def test_conflicting_merge_is_a_blocking_e045(self, tmp_path: Path) -> None:
+        _write_schema(tmp_path, "archimate-flow", {"properties": {"scope": {"type": "string"}}})
+        result = _fresh_result()
+        check_connection_metadata_schema(
+            {"specialization": "deployment-flow"}, "archimate-flow", tmp_path, result, "test",
+            specialization_catalog=self._catalog({"scope": {"type": "integer"}}),
+        )
+        codes = [i.code for i in result.issues]
+        assert "E045" in codes
+        assert any(i.severity is Severity.ERROR and "scope" in i.message for i in result.issues)
+
+    def test_an_unspecialized_connection_sees_only_the_base_schema(self, tmp_path: Path) -> None:
+        _write_schema(tmp_path, "archimate-flow", {"properties": {"scope": {"type": "string"}}})
+        result = _fresh_result()
+        check_connection_metadata_schema(
+            {}, "archimate-flow", tmp_path, result, "test",
+            specialization_catalog=self._catalog({"scope": {"type": "integer"}}),
         )
         assert result.issues == []

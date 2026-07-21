@@ -293,19 +293,57 @@ Land WITH the entity work, not after: both share the resolver, conflict
 classifier, quarantine machinery, and reconciliation step.
 
 ### WU-W1 — Specialization-scoped connection schemata (needs P3)
-- [ ] `connection-metadata.{type}.{slug}.schema.json` filename convention.
-- [ ] `list_schema_files` classifies it (today `specialization-attachment` is
+- [x] `connection-metadata.{type}.{slug}.schema.json` filename convention.
+- [x] `list_schema_files` classifies it (today `specialization-attachment` is
       entity-only), and `startup_validation._schema_inventory_findings`
       validates its subject.
-- [ ] `compute_effective_connection_metadata_schema`, mirroring the entity
+- [x] `compute_effective_connection_metadata_schema`, mirroring the entity
       resolver including named-profile bindings and resolution order.
-- [ ] Tests: mirror the entity resolution tests.
+- [x] Tests: mirror the entity resolution tests.
+
+#### WU-W1 PROGRESS (2026-07-22)
+- The resolver is NOT a mirror-by-copy: `compute_effective_attribute_schema` and the new
+  `compute_effective_connection_metadata_schema` are both thin wrappers over one private
+  `_compute_effective_schema`, parameterised by concept kind + the two loaders. Order,
+  profile de-duplication, and merge live in one place, so the two kinds cannot drift.
+- New `SchemaFileKind` member `connection-specialization-attachment`; the classifier splits
+  the `connection-metadata.` remainder the same way the `attributes.` one is split, so a
+  third segment is `unrecognized` on both sides. `ATTACHMENT_KINDS` maps both attachment
+  kinds to their concept kind, and `find_orphan_attachment_schemata` now covers connection
+  attachments through it (an orphan is the same mistake either side).
+- `_schema_inventory_findings` gates the new kind on the known CONNECTION types.
 
 ### WU-W2 — Verifier merge for connections (needs W1)
-- [ ] `check_connection_metadata_schema` validates against the MERGED effective
+- [x] `check_connection_metadata_schema` validates against the MERGED effective
       schema and reports conflicts, mirroring E043.
-- [ ] Tests: conflict reported; quarantine applies to a (connection-type,
+- [x] Tests: conflict reported; quarantine applies to a (connection-type,
       specialization) pair exactly as for entities.
+
+#### WU-W2 PROGRESS (2026-07-22)
+- `check_connection_metadata_schema` takes the catalogs (as `check_attribute_schema` does),
+  reads the connection's own `metadata["specialization"]`, and validates against the
+  effective schema. A conflicting merge is a blocking **E045** — E043's connection
+  counterpart, a new code because the pair then has no schema to validate against at all;
+  instance violations stay W043.
+- `profile_quarantine` is now concept-kind parameterised rather than entity-only:
+  `pair_quarantine_conflicts`, `assert_not_quarantined`, and `ProfileQuarantineError` all
+  take a `ConceptKind`, and `compute_quarantine_set` keys on `(kind, type, slug)` and
+  sweeps both kinds. The two entity call sites pass `"entity"` explicitly — no default,
+  because a silent default is how the two kinds would drift.
+- Connection write boundary: `_assert_pair_writable` in `connection.py`, called by
+  `add_connection` (after input validation) and by `edit_connection` on the EFFECTIVE
+  post-merge specialization — the same shape as the entity create/edit gates.
+- The R1 reconciliation scan no longer skips `concept_kind != "entity"`; it resolves per
+  kind and puts the kind in the finding id (an entity and a connection may share a
+  parent-type/slug pair) and in the operator instructions ("Entities"/"Connections").
+- Tests: `tests/tools/test_effective_connection_metadata_schema.py` (classification,
+  resolution, named profiles, orphans, and a guard that an entity specialization of the
+  same slug does not leak into a connection lookup);
+  `tests/tools/test_connection_write_quarantine_gate.py` (add/edit refused, unspecialized
+  and clean-specialized pairs still write); connection cases added to
+  `test_profile_quarantine.py`, `test_connection_metadata_schema.py`,
+  `test_profile_reconciliation_scan_step.py`, and `test_startup_validation.py`.
+- Gates: backend 6323 passed / 5 skipped; ruff + zuban clean.
 
 ### WU-W3 — Surfaces (needs W1)
 - [ ] Effective merged connection-metadata schema in the authoring-guidance

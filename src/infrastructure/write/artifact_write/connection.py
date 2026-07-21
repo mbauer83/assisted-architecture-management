@@ -133,6 +133,19 @@ def _validate_inputs(
             )
 
 
+def _assert_pair_writable(repo_root: Path, connection_type: str, specialization: str | None) -> None:
+    """The connection side of the WU-Q3 write gate: refuse a write onto a quarantined
+    ``(connection-type, specialization)`` pair, exactly as the entity paths do. Kept at the
+    write boundary both transports funnel through, so REST and MCP cannot diverge."""
+    from src.application.profile_quarantine import assert_not_quarantined  # noqa: PLC0415
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    assert_not_quarantined(
+        repo_root, "connection", connection_type, [specialization or ""],
+        catalogs=build_runtime_catalogs(get_module_registry()),
+    )
+
+
 def _resolve_outgoing_path(
     registry: ArtifactRegistry,
     source_entity: str,
@@ -301,6 +314,7 @@ def add_connection(
     """Add a connection to the source entity's .outgoing.md file."""
     assert_engagement_write_root(repo_root)
     _validate_inputs(registry, connection_type, source_entity, target_entity, extra_known_ids)
+    _assert_pair_writable(repo_root, connection_type, specialization)
     source_entity = _canonical_entity_id(registry, source_entity, extra_known_ids)
     target_entity = _canonical_entity_id(registry, target_entity, extra_known_ids)
 

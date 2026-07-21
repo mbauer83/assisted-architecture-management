@@ -9,7 +9,7 @@ from src.domain.artifact_id import stable_id
 
 from .boundary import assert_engagement_write_root, today_iso
 from .coerce import as_optional_str_list
-from .connection import _resolve_outgoing_path, _rollback, verification_to_conn_dict
+from .connection import _assert_pair_writable, _resolve_outgoing_path, _rollback, verification_to_conn_dict
 from .types import WriteResult
 
 _UNSET = object()
@@ -72,10 +72,15 @@ def edit_connection(
                 else:
                     conn.pop("specialization", None)
             found = True
+            effective_specialization = str(conn.get("specialization", "") or "")
             break
 
     if not found:
         raise ValueError(f"Connection '{connection_type} -> {target_entity}' not found in {outgoing_path.name}")
+
+    # Gate on the EFFECTIVE (post-merge) specialization: an edit that moves a connection
+    # onto a quarantined pair must be refused just like an add (WU-Q3).
+    _assert_pair_writable(repo_root, connection_type, effective_specialization)
 
     content = format_outgoing_markdown(
         source_entity=source_entity,

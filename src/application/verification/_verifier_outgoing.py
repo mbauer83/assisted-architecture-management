@@ -149,7 +149,11 @@ def _check_connection_block(
         _check_connection_specialization(specialization, conn_type, catalogs.specializations, result, loc)
 
     if decl.metadata and repo_root is not None:
-        check_connection_metadata_schema(decl.metadata, conn_type, repo_root, result, loc)
+        check_connection_metadata_schema(
+            decl.metadata, conn_type, repo_root, result, loc,
+            specialization_catalog=catalogs.specializations,
+            profile_registry=catalogs.profiles,
+        )
 
     return decl
 

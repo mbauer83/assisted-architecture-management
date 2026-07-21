@@ -90,7 +90,7 @@ def create_entity(
             "Use ensure_global_artifact_reference (MCP) or "
             "POST /api/global-entity-reference (GUI) instead."
         )
-    assert_not_quarantined(repo_root, artifact_type, [specialization or ""], catalogs=catalogs)
+    assert_not_quarantined(repo_root, "entity", artifact_type, [specialization or ""], catalogs=catalogs)
 
     info = get_module_registry().find_entity_type(EntityTypeName(artifact_type))
     if info is None:

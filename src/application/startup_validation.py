@@ -319,8 +319,9 @@ def _schema_inventory_findings(
 ) -> tuple[list[str], list[str]]:
     """``(errors, warnings)`` from the classified schema-file inventory
     (``artifact_schema.list_schema_files``, the one owner of the filename conventions):
-    entity-attribute and specialization-attachment schemas must name a known entity type,
-    connection-metadata schemas a known connection type (errors); a filename matching no
+    entity-attribute and entity-attachment schemas must name a known entity type,
+    connection-metadata and connection-attachment schemas a known connection type
+    (errors); a filename matching no
     convention is warned about — it would otherwise be silently ignored by every loader —
     but never aborts startup. An unknown specialization slug is deliberately not checked
     here: that is the verifier's orphan-attachment warning."""
@@ -332,7 +333,7 @@ def _schema_inventory_findings(
             if ref.kind in ("entity-attributes", "specialization-attachment"):
                 if ref.subject not in known_entity_types:
                     errors.append(f"Attribute schema for unknown entity type {ref.subject!r} {location}")
-            elif ref.kind == "connection-metadata":
+            elif ref.kind in ("connection-metadata", "connection-specialization-attachment"):
                 if ref.subject not in known_connection_types:
                     errors.append(f"Connection metadata schema for unknown connection type {ref.subject!r} {location}")
             elif ref.kind == "unrecognized":

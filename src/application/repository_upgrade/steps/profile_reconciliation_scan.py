@@ -1,11 +1,11 @@
-"""Reconciliation reporter for named attribute-profile conflicts (WU-R1).
+"""Reconciliation reporter for named profile conflicts (WU-R1).
 
 Detect-only and non-destructive — mirroring ``DefaultSchemataEnsureStep``'s contract, it
 never rewrites operator content. For every specialization the repo declares that binds
-named profiles, it resolves the effective schema and reports each incompatible-type
-conflict as a quarantined ``(entity-type, specialization)`` pair (the profiles/field/types
-are named in the merge message). Proposed resolutions (rename / align-type / unbind, and
-safe auto-migration) are WU-R2.
+named profiles — entity and connection alike — it resolves the effective schema and reports
+each incompatible-type conflict as a quarantined ``(type, specialization)`` pair (the
+profiles/field/types are named in the merge message). Proposed resolutions (rename /
+align-type / unbind, and safe auto-migration) are WU-R2.
 
 Content-version DRIFT (a shipped profile advanced past a repo customisation — what P4's
 per-profile ``version`` exists for) is NOT reported here yet: no reusable profiles are
@@ -17,21 +17,34 @@ module registry through the adapter).
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 import yaml  # type: ignore[import-untyped]
 
-from src.application.artifact_schema import compute_effective_attribute_schema
+from src.application.artifact_schema import (
+    compute_effective_attribute_schema,
+    compute_effective_connection_metadata_schema,
+)
 from src.application.repository_upgrade.ports import RepoUpgradeView, RepoUpgradeWriter
 from src.domain.profile_registry import ProfileRegistry
 from src.domain.repository_upgrade import AppliedFinding, ScannedSurface, UpgradeFinding
-from src.domain.specializations import SpecializationCatalog, specialization_catalog_from_mapping
+from src.domain.specializations import ConceptKind, SpecializationCatalog, specialization_catalog_from_mapping
 
 _SPECIALIZATIONS = ".arch-repo/specializations.yaml"
+
+#: Both concept kinds are scanned: a connection specialization binds profiles on the same
+#: terms as an entity one, so leaving connections out would report half the conflicts.
+_RESOLVERS: dict[ConceptKind, Callable[..., tuple[dict[str, Any] | None, list[str]]]] = {
+    "entity": compute_effective_attribute_schema,
+    "connection": compute_effective_connection_metadata_schema,
+}
 
 
 class ProfileReconciliationScanStep:
     id = "profile-reconciliation-scan"
     version = 1
-    description = "Report attribute-profile conflicts (quarantined entity-type/specialization pairs)"
+    description = "Report named-profile conflicts (quarantined type/specialization pairs)"
     scanned_surface: ScannedSurface = "profiles"
 
     def detect(self, view: RepoUpgradeView) -> list[UpgradeFinding]:
@@ -40,9 +53,10 @@ class ProfileReconciliationScanStep:
             return []
         findings: list[UpgradeFinding] = []
         for entry in specializations.entries:
-            if entry.concept_kind != "entity" or not entry.bound_profiles:
+            if not entry.bound_profiles:
                 continue
-            _schema, conflicts = compute_effective_attribute_schema(
+            resolve = _RESOLVERS[entry.concept_kind]
+            _schema, conflicts = resolve(
                 view.root,
                 entry.parent_type,
                 [entry.slug],
@@ -51,17 +65,22 @@ class ProfileReconciliationScanStep:
             )
             for index, message in enumerate(conflicts):
                 pair = f"{entry.parent_type}/{entry.slug}"
+                subjects = "Entities" if entry.concept_kind == "entity" else "Connections"
                 findings.append(
                     UpgradeFinding(
                         step_id=self.id,
-                        finding_id=f"profile-conflict:{pair}:{index}",
+                        # The kind is part of the identity: an entity and a connection may
+                        # each declare the same parent-type/slug pair.
+                        finding_id=f"profile-conflict:{entry.concept_kind}:{pair}:{index}",
                         location=_SPECIALIZATIONS,
-                        description=f"{pair} is quarantined by an attribute-profile conflict — {message}",
+                        description=(
+                            f"{entry.concept_kind} {pair} is quarantined by a profile conflict — {message}"
+                        ),
                         severity="warning",
                         auto_migratable=False,
                         manual_instructions=(
                             "Resolve the conflicting named profiles (rename the attribute, align its "
-                            "type, or unbind one profile from this specialization), then re-run. Entities "
+                            f"type, or unbind one profile from this specialization), then re-run. {subjects} "
                             f"of {pair} cannot be created or edited until the conflict is cleared."
                         ),
                     )

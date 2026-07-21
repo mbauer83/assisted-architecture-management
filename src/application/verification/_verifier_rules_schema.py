@@ -7,7 +7,7 @@ from typing import Any
 
 from src.application.artifact_schema import (
     compute_effective_attribute_schema,
-    load_connection_metadata_schema,
+    compute_effective_connection_metadata_schema,
     load_frontmatter_schema,
     validate_against_schema,
 )
@@ -151,14 +151,33 @@ def check_connection_metadata_schema(
     repo_root: Path,
     result: VerificationResult,
     loc: str,
+    *,
+    specialization_catalog: SpecializationCatalog | None = None,
+    profile_registry: ProfileRegistry | None = None,
 ) -> None:
-    """Validate a connection's per-connection metadata block against
-    ``connection-metadata.{connection-type}.schema.json``.
+    """Validate a connection's per-connection metadata block against the EFFECTIVE schema
+    for its ``(connection-type, specialization)`` pair — the base
+    ``connection-metadata.{connection-type}.schema.json`` merged with the connection's own
+    specialization contribution and its bound named profiles.
 
-    If no schema file exists for the connection type, validation is silently
-    skipped (free schema, matching the other schema conventions in this module).
+    The entity mirror of this is ``check_attribute_schema``: a property redefined
+    incompatibly across those fragments is a blocking E045 error (E043's connection
+    counterpart), because the pair then has no unambiguous schema to validate against at
+    all. Instance violations stay W043 warnings, as before. If nothing declares a fragment,
+    validation is silently skipped (free schema).
     """
-    schema = load_connection_metadata_schema(repo_root, connection_type)
+    specialization = str(metadata.get("specialization", "") or "")
+    schema, conflicts = compute_effective_connection_metadata_schema(
+        repo_root,
+        connection_type,
+        [specialization],
+        specialization_catalog=specialization_catalog or SpecializationCatalog.empty(),
+        profile_registry=profile_registry or ProfileRegistry.empty(),
+    )
+    for msg in conflicts:
+        result.issues.append(
+            Issue(Severity.ERROR, "E045", f"Connection metadata schema ({connection_type}): {msg}", loc)
+        )
     if schema is None:
         return
     for msg in validate_against_schema(metadata, schema):
