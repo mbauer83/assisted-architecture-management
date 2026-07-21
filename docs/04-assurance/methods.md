@@ -62,13 +62,16 @@ Two overlays on top of the safety/security model:
 
 ## Supply-chain signals
 
-External supply-chain and cybersecurity signals can be ingested and linked to the model.
-SBOM/AI-BOM tooling is built in:
+External supply-chain and cybersecurity signals are ingested as **signal
+snapshots** anchored on architecture entities, then read back as component
+inventories, vulnerability findings, and impact analysis. See
+[Security signals](security-signals.md) for the full capability.
 
 ```bash
-arch-assurance import-sbom         # ingest a CycloneDX or SPDX bill-of-materials
-arch-assurance export-aibom        # emit a CycloneDX 1.6 AI-BOM from component data
-arch-assurance scan-ai-candidates  # heuristic scan of architecture entities for AI-BOM relevance
+arch-assurance seed --with-signals  # bootstrap a store, then ingest for its declared anchors
+uv run tools/ingest_security_signals.py --target python --anchor <entity-id>
+arch-assurance export-aibom         # emit a CycloneDX 1.6 AI-BOM from component data
+arch-assurance scan-ai-candidates   # heuristic scan of architecture entities for AI-BOM relevance
 ```
 
 &nbsp;

@@ -146,3 +146,37 @@ test.describe('assurance media', () => {
 
 // graph-explore.gif is intentionally manual: record /graph?id=<entity> after opening
 // first-degree neighbours, then optimize the GIF before replacing docs/media/graph-explore.gif.
+
+test.describe('security signals media', () => {
+  /* Anchored on the repository's OWN backend component, so these images show the
+     real dogfooded snapshot (its actual SBOM and CVEs) rather than a contrived
+     fixture. `watch()` asserts no runtime problems, so a capture fails if the view
+     is broken — the images double as a smoke test of the signals surfaces. */
+  const BACKEND_ANCHOR = 'APP@1777293133.OYEmP1.architecture-backend'
+
+  test('captures the entity panel, component vulnerabilities, and impact', async ({ page }) => {
+    const problems = watch(page)
+    await page.goto(`/entity?id=${encodeURIComponent(BACKEND_ANCHOR)}`, { waitUntil: 'load' })
+    // The derived-attributes panel is absent until signals resolve; without this
+    // wait the capture races it and silently produces a screenshot of nothing.
+    await page.locator('.derived-security').waitFor({ timeout: 10_000 })
+    await capture(page, 'security-entity-panel.png')
+    expect(problems, 'runtime problems while capturing security-entity-panel.png').toEqual([])
+
+    const findingProblems = watch(page)
+    await page.goto(
+      `/assurance/security/findings?anchor=${encodeURIComponent(BACKEND_ANCHOR)}`,
+      { waitUntil: 'load' },
+    )
+    await page.locator('[data-testid="component-group"]').first().waitFor({ timeout: 10_000 })
+    await capture(page, 'security-findings.png')
+    expect(findingProblems, 'runtime problems while capturing security-findings.png').toEqual([])
+
+    // Reached the way a user reaches it, so the capture also proves the link works.
+    const impactProblems = watch(page)
+    await page.locator('[data-testid="vulnerability-link"]').first().click()
+    await page.locator('[data-testid="impact-headline"]').waitFor({ timeout: 10_000 })
+    await capture(page, 'security-vulnerability-impact.png')
+    expect(impactProblems, 'runtime problems while capturing security-vulnerability-impact.png').toEqual([])
+  })
+})

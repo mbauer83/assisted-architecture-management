@@ -3167,8 +3167,39 @@ only existing nodes cannot measure a missing one".
        (transitive, high, CVSS 7.2) with aliases CVE-2026-7246 / GHSA-47FR-3FFG-HGMW /
        PYSEC-2026-2132. Wizard loads with no import step and no 404s.
        25 new frontend tests (1124 total); lint + typecheck clean.
-6. [ ] Docs: reference/cli-and-backend + configuration for the removed import/list endpoints + the
-       new snapshot list endpoints; regenerate MCP docs after the ingest-MCP tool + rename.
+6. [x] Docs — DONE 2026-07-21. New `docs/04-assurance/security-signals.md`: the ingest→snapshot
+       model, the four ways to produce a snapshot, reading one (entity panel → findings →
+       impact), vulnerability identity/alias merging, directness and why it needs a BOM ROOT,
+       what the numbers can and cannot tell you (exposure-before-aggregation, VEX reported not
+       applied, active-only), deletion and its blast radius, and the co-located-storage caveat.
+       Linked from the assurance index. `reference/cli-and-backend.md` gained a
+       security-signal-surfaces section (8 endpoints + the status codes that matter + why the
+       legacy connector endpoints went) and the ingest script.
+       THREE STALE-DOC DEFECTS FOUND AND FIXED — all documenting things that do not exist:
+       · `arch-assurance import-sbom` was documented in methods.md AND
+         storage-and-confidentiality.md. It has NEVER existed in the CLI.
+       · `gui-capability-design.md` still listed Import BOM / Import vulnerabilities / Set
+         component anchor as capabilities; those adapters were deleted in e83b12c (the
+         connector→snapshot consolidation) without updating the document. Rows replaced with
+         the current surfaces plus a dated note explaining why the old ones went, rather than
+         silently deleting them.
+       VERIFIED, not assumed: every `arch-assurance` command named anywhere in docs/ (16) and
+       every `/api/assurance/*` endpoint named in docs/ (8) now resolves against the code.
+       SCREENSHOTS via the EXISTING harness, not a new script: `tools/gui/tests/media/
+       media.spec.ts` (`npm run media`, fixed 1440x900, deviceScaleFactor 2) already produced
+       17 media files; added a `security signals media` block for security-entity-panel.png,
+       security-findings.png, security-vulnerability-impact.png. They are anchored on
+       APP@1777293133.OYEmP1 so they show the repository's OWN SBOM and CVEs, and the harness's
+       `watch()` fails a capture on any page error or 5xx — so the images double as a smoke
+       test of the signals surfaces. NOTE: an earlier statement in this session that "no
+       scripted-media tooling exists" was WRONG; the harness predates this work.
+       PROCESS FINDING (owner-raised, worth a backlog item): the capability inventory drifted
+       for a month with nothing to catch it. Its CONTRACTS are normative and were followed
+       (architecture-model-as-navigation-spine, AssuranceExposurePolicy in the application
+       layer — verified: `_vulnerability_impact_ops.py` only SELECTs tlp columns and never
+       filters); its INVENTORY is descriptive and must follow the code. A test asserting the
+       inventory's HTTP column against the live route list would close the gap, matching the
+       drift-detector pattern already used for MCP tool descriptions and generated docs.
 7. [~] RESTART-GATED live re-verify — signals surfaces DONE 2026-07-21 on the restarted
        backend + session: anchor normalization (full slugged id now resolves), renamed stats
        keys, directness ({"direct": 4, "transitive": 20}), `assurance_delete_security_snapshot`

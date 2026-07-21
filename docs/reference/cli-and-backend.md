@@ -239,6 +239,38 @@ for the full precedence and empty-state behavior.
 | `arch-mcp-stdio-assurance-read` / `arch-mcp-stdio-assurance-write` | Assurance MCP servers |
 | `arch-write-cli` | Command-line authoring against the write pipeline |
 | `arch-assurance …` | Assurance store/archive management — see [Assurance CLI](../04-assurance/storage-and-confidentiality.md#cli-reference) |
+| `tools/ingest_security_signals.py` | Generate an SBOM, acquire OSV data, and ingest one signal snapshot |
+
+&nbsp;
+
+## Security-signal surfaces
+
+Signals are ingested as snapshots anchored on architecture entities; see
+[Security signals](../04-assurance/security-signals.md) for the model. All
+endpoints require the assurance store unlocked with co-located signals, and are
+exposure-filtered before aggregation.
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/assurance/security-ingest` | POST | Ingest a supplied BOM (+ optional advisories) as a new active snapshot |
+| `/api/assurance/security-snapshot-delete` | POST | Delete one snapshot, or every snapshot for an anchor |
+| `/api/assurance/security-metrics` | GET | Posture metrics for one anchor, from its active snapshot plus VEX |
+| `/api/assurance/security-components` | GET | Components of the anchor's active snapshot |
+| `/api/assurance/security-findings` | GET | Vulnerability findings, optionally scoped to one component |
+| `/api/assurance/security-stats` | GET | Snapshot aggregate counts across the store |
+| `/api/assurance/vulnerability-impact` | GET | Every entity currently affected by one vulnerability |
+| `/api/assurance/vex` | POST | Record a VEX assessment |
+
+Status codes worth knowing: `423` the store is locked; `403` signal mutations are
+denied by the deployment's capability predicate; `409` a reused `request_id` with a
+different payload (nothing was written); `404` on `vulnerability-impact` means the
+identifier is unknown to the store — distinct from a known vulnerability that
+currently affects nothing, which is `200` with an empty list.
+
+The legacy connector endpoints (`bom/import`, `bom/components`,
+`vulnerabilities/import`, `vulnerabilities`, `aibom/coverage`) were removed when
+signals consolidated on the snapshot model. Ingest now has one command behind every
+transport, so a write cannot bypass the capability gate or the audit record.
 
 &nbsp;
 

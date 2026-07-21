@@ -38,6 +38,7 @@ work traceable without building a dedicated assurance department.
 |---|---|
 | [Methods](methods.md) | STPA, STPA-Sec, CAST, GRC, supply-chain signals; wizards; method-completion verification |
 | [Diagrams](diagrams.md) | Bowtie, STAMP control structure, GSN assurance cases, UCA matrix; unified assurance viewer; GSN dual-home |
+| [Security signals](security-signals.md) | SBOM ingest, signal snapshots, vulnerability identity, directness, impact analysis, VEX |
 | [Storage & confidentiality](storage-and-confidentiality.md) | Store vs. archive, backends, credential storage, TLP ceiling, withheld content, WORM, WAL, CLI reference |
 | [MCP tools](mcp-tools.md) | The assurance MCP server surface for AI agents |
 

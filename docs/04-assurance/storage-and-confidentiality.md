@@ -174,7 +174,8 @@ key).
 | `arch-assurance verify` | Backend-aware chain integrity check (all archive backends) |
 | `arch-assurance verify-chain` | Verify the audit hash chain (SQLCipher only) |
 | `arch-assurance use-backend B [--archive-backend A]` | Switch store and/or archive backend |
-| `arch-assurance import-sbom` | Ingest a CycloneDX or SPDX bill-of-materials |
+| `arch-assurance import FILE [--replace]` | Restore an exported JSON bundle |
+| `arch-assurance seed [--with-signals]` | Load a demo/bootstrap bundle, optionally ingesting signals |
 | `arch-assurance export-aibom` | Emit a CycloneDX 1.6 AI-BOM |
 | `arch-assurance scan-ai-candidates` | Heuristic scan of entities for AI-BOM relevance |
 

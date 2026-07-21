@@ -52,17 +52,27 @@ Legend:
 | Register architecture reference | — | — | register | — | — | Y | N | Y | N |
 | Model and bind architecture gap | — | — | task spec only | — | — | Y | N | N | N |
 | Promotion preflight | promotion preflight | — | preflight | — | — | Y | P | N | P |
-| Import BOM | — | — | import | — | — | N | N | N | N |
-| Import vulnerabilities | — | — | import | — | — | N | N | N | N |
-| Set component anchor | — | — | set | — | — | N | N | N | N |
+| Ingest security signals | ingest command | — | ingest | ingest | — (CLI/MCP/REST only) | S | Y | Y | N |
+| Delete signal snapshot | — | — | delete | snapshot-delete | — | S | Y | Y | N |
+| Component vulnerabilities | signals read | list | — | security-findings | findings view | S | Y | N | N |
+| Vulnerability impact | impact use case | impact | — | vulnerability-impact | impact view | S | Y | N | N |
 | Reconcile AI-BOM | — | — | reconcile | — | — | N | N/A | N | N |
 
 `P` for node reads means list/read filter node records, but a direct forbidden
 read discloses classification and node identity, and the read-node response
 returns unfiltered adjacent edges. Withheld counts also disclose classified
 cardinality. Aggregate, verification, and dashboard tools operate over the
-unfiltered graph. Security-signal writes call connector adapters directly and
-do not consistently gate, audit, or verify.
+unfiltered graph.
+
+**Signals superseded (2026-07-21).** The legacy connector rows in this inventory
+(`Import BOM`, `Import vulnerabilities`, `Set component anchor`, AI-BOM coverage)
+described adapters that called connectors directly and did not consistently gate,
+audit, or verify. They were replaced by the signal-snapshot model, in which every
+ingest runs through one application command under the signal-mutation capability
+gate and lands its audit record in the same transaction. The rows above reflect
+the current surfaces; see [Security signals](security-signals.md). Ingest is
+deliberately absent from the GUI — a browser form can carry neither a request id
+nor generator provenance.
 
 ### Required application use cases
 
