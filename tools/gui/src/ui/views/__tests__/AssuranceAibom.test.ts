@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   parseRoles,
-  parseCoverage,
   parseCandidates,
   selectedAiComponents,
   scoreBand,
@@ -22,31 +21,6 @@ describe('parseRoles', () => {
   })
 })
 
-describe('parseCoverage', () => {
-  it('decodes a full coverage report', () => {
-    const report = parseCoverage({
-      total_bom_components: 3,
-      unanchored_components: 1,
-      anchor_mappings: 2,
-      unanchored_truncated: false,
-      unanchored: [{ name: 'orphan' }],
-      anchored_entity_ids: ['APP@1'],
-      withheld_components: 0,
-      summary: 'ok',
-    })
-    expect(report.total_bom_components).toBe(3)
-    expect(report.unanchored_components).toBe(1)
-    expect(report.unanchored[0].name).toBe('orphan')
-    expect(report.anchored_entity_ids).toEqual(['APP@1'])
-  })
-
-  it('falls back to a stable empty shape on garbage', () => {
-    const report = parseCoverage('not-an-object')
-    expect(report.total_bom_components).toBe(0)
-    expect(report.unanchored).toEqual([])
-    expect(report.anchored_entity_ids).toEqual([])
-  })
-})
 
 describe('parseCandidates', () => {
   it('decodes candidates and coerces fields', () => {

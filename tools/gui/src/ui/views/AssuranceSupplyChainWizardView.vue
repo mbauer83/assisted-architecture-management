@@ -7,16 +7,12 @@ import {
   SUPPLY_STEPS,
   ADMISSIBLE_ANCHOR_TYPES,
   SEVERITY_ORDER,
-  parseJsonObject,
-  parseJsonArray,
   summariseSeverities,
-  componentMatchSummary,
   type SupplyStep,
   type BomComponent,
   type VulnRecord,
 } from './AssuranceSupplyChainWizard.helpers'
 import SecurityPostureDashboard from '../components/SecurityPostureDashboard.vue'
-import SupplyVulnerabilityTable from '../components/SupplyVulnerabilityTable.vue'
 
 const stepKey = ref<string>('scope')
 const currentStep = computed<SupplyStep>(
@@ -27,19 +23,20 @@ const anchorId = ref<string>('')
 const anchorName = ref<string>('')
 const anchorType = ref<string>('')
 
-const bomText = ref('')
-const vulnText = ref('')
 const components = ref<BomComponent[]>([])
 const vulns = ref<VulnRecord[]>([])
 const severityFilter = ref<string>('')
-const importResult = ref<string | null>(null)
+const withheld = ref(0)
 const error = ref<string | null>(null)
-const busy = ref(false)
 
 const fixedTypes = [...ADMISSIBLE_ANCHOR_TYPES]
 const hasAnchor = computed(() => anchorId.value !== '')
-const matchSummary = computed(() => componentMatchSummary(components.value))
 const severityCounts = computed(() => summariseSeverities(vulns.value))
+const filteredVulns = computed(() => (
+  severityFilter.value
+    ? vulns.value.filter((v) => (v.severity ?? 'unknown').toLowerCase() === severityFilter.value)
+    : vulns.value
+))
 
 function onScopeSelect(entity: EntityDisplayInfo) {
   anchorId.value = entity.artifact_id
@@ -63,77 +60,52 @@ function goToStep(key: string) {
   if (key === 'vulnerabilities') void loadVulns()
 }
 
-async function importBom() {
-  const parsed = parseJsonObject(bomText.value)
-  if (parsed.error || !parsed.value) { error.value = parsed.error ?? 'Parse error'; return }
-  busy.value = true
-  error.value = null
-  importResult.value = null
-  try {
-    const resp = await fetch('/api/assurance/bom/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        bom_data: parsed.value, anchor_entity_id: anchorId.value, bom_format: 'cyclonedx',
-      }),
-    })
-    const body = await resp.json().catch(() => ({})) as Record<string, unknown>
-    if (resp.status === 423) { error.value = 'Assurance signals are not available (store locked).'; return }
-    if (!resp.ok || typeof body['error'] === 'string') {
-      error.value = typeof body['error'] === 'string' ? body['error'] : `HTTP ${resp.status}`
-      return
-    }
-    const count = typeof body['component_count'] === 'number' ? body['component_count'] : 0
-    const matched = typeof body['anchor_matched'] === 'number' ? body['anchor_matched'] : 0
-    importResult.value = `Imported ${count} component(s) under ${anchorName.value} — ${matched} anchor-matched.`
-    bomText.value = ''
-    await loadComponents()
-  } catch (e) {
-    error.value = String(e)
-  } finally {
-    busy.value = false
-  }
-}
-
 async function loadComponents() {
   if (!hasAnchor.value) return
-  const resp = await fetch(`/api/assurance/bom/components?anchor_entity_id=${encodeURIComponent(anchorId.value)}`)
+  const resp = await fetch(
+    `/api/assurance/security-components?anchor_entity_id=${encodeURIComponent(anchorId.value)}`)
   if (resp.status === 423) { error.value = 'Assurance signals are not available (store locked).'; return }
   if (!resp.ok) { components.value = []; return }
-  const body = await resp.json() as { components: BomComponent[] }
-  components.value = body.components
-}
-
-async function importVulns() {
-  const parsed = parseJsonArray(vulnText.value)
-  if (parsed.error || !parsed.value) { error.value = parsed.error ?? 'Parse error'; return }
-  busy.value = true
-  error.value = null
-  try {
-    const resp = await fetch('/api/assurance/vulnerabilities/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vuln_records: parsed.value, source: 'osv' }),
-    })
-    if (resp.status === 423) { error.value = 'Assurance signals are not available (store locked).'; return }
-    if (!resp.ok) { error.value = `HTTP ${resp.status}`; return }
-    vulnText.value = ''
-    await loadVulns()
-  } catch (e) {
-    error.value = String(e)
-  } finally {
-    busy.value = false
-  }
+  const body = await resp.json() as { components: BomComponent[]; withheld?: number }
+  components.value = body.components ?? []
+  withheld.value = body.withheld ?? 0
 }
 
 async function loadVulns() {
-  const qs = severityFilter.value ? `?severity=${encodeURIComponent(severityFilter.value)}` : ''
-  const resp = await fetch(`/api/assurance/vulnerabilities${qs}`)
+  if (!hasAnchor.value) return
+  const resp = await fetch(
+    `/api/assurance/security-findings?anchor_entity_id=${encodeURIComponent(anchorId.value)}`)
   if (resp.status === 423) { error.value = 'Assurance signals are not available (store locked).'; return }
   if (!resp.ok) { vulns.value = []; return }
-  const body = await resp.json() as { vulnerabilities: VulnRecord[] }
-  vulns.value = body.vulnerabilities
+  // The findings surface names its fields for the snapshot model; map them onto the
+  // table's shape rather than reshaping the endpoint for one view.
+  const body = await resp.json() as {
+    findings: {
+      canonical_vulnerability_id: string
+      severity_band?: string | null
+      component_purl?: string | null
+      component_name?: string | null
+      provenance?: string | null
+    }[]
+    withheld?: number
+  }
+  vulns.value = (body.findings ?? []).map((f) => {
+    let osvId: string | undefined
+    try {
+      const provenance = f.provenance ? JSON.parse(f.provenance) as Record<string, string> : {}
+      osvId = provenance['osv_id']
+    } catch { osvId = undefined }
+    return {
+      vuln_id: osvId ?? f.canonical_vulnerability_id,
+      id: f.canonical_vulnerability_id,
+      severity: f.severity_band ?? 'unknown',
+      purl: f.component_purl ?? '',
+      summary: f.component_name ?? '',
+    }
+  })
+  withheld.value = body.withheld ?? 0
 }
+
 </script>
 
 <template>
@@ -143,7 +115,9 @@ async function loadVulns() {
         Supply-chain wizard
       </h1>
       <p class="wiz-sub">
-        SBOM ingest, scoped to an architecture element, with a per-scope vulnerability view.
+        The ACTIVE signal snapshot for an architecture element: its components,
+        vulnerabilities, posture and VEX. Ingest runs from the CLI, MCP, or the REST
+        ingest endpoint — this view reads what those produced.
       </p>
     </div>
 
@@ -213,40 +187,8 @@ async function loadVulns() {
         v-if="hasAnchor"
         class="ok-note"
       >
-        Scope set. Continue to <strong>Import SBOM</strong>.
+        Scope set. Continue to <strong>Components</strong>.
       </p>
-    </section>
-
-    <!-- Import SBOM -->
-    <section
-      v-else-if="currentStep.key === 'import'"
-      class="step-body"
-    >
-      <p class="scope-line">
-        Scope: <strong>{{ anchorName }}</strong> <span class="anchor-type">{{ anchorType }}</span>
-      </p>
-      <textarea
-        v-model="bomText"
-        class="json-input"
-        rows="10"
-        placeholder="Paste a CycloneDX SBOM (JSON)…"
-      />
-      <div class="row">
-        <button
-          class="add-btn"
-          type="button"
-          :disabled="busy"
-          @click="importBom"
-        >
-          Import SBOM
-        </button>
-        <p
-          v-if="importResult"
-          class="ok-note"
-        >
-          {{ importResult }}
-        </p>
-      </div>
     </section>
 
     <!-- Components -->
@@ -266,19 +208,47 @@ async function loadVulns() {
           ↺ Reload
         </button>
         <span class="match-summary">
-          {{ matchSummary.matched }} / {{ matchSummary.total }} anchor-matched
+          {{ components.length }} component{{ components.length === 1 ? '' : 's' }}
         </span>
       </div>
+      <p
+        v-if="withheld > 0"
+        class="hint-note"
+      >
+        {{ withheld }} record(s) above your classification ceiling are not shown.
+      </p>
       <p
         v-if="components.length === 0"
         class="empty"
       >
-        No components for this scope yet. Import an SBOM first.
+        No active signal snapshot for this scope. Run an ingest
+        (<code>arch-assurance seed --with-signals</code>, the ingest script, or the
+        MCP/REST ingest surface) to produce one.
       </p>
-      <SupplyVulnerabilityTable
+      <table
         v-else
-        :vulns="vulns"
-      />
+        class="grid"
+      >
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Version</th>
+            <th>Directness</th>
+            <th>purl</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="c in components"
+            :key="c.component_id ?? c.purl ?? c.name"
+          >
+            <td>{{ c.name }}</td>
+            <td>{{ c.version }}</td>
+            <td>{{ c.directness ?? 'unknown' }}</td>
+            <td><code>{{ c.purl }}</code></td>
+          </tr>
+        </tbody>
+      </table>
     </section>
 
     <!-- Vulnerabilities -->
@@ -286,26 +256,15 @@ async function loadVulns() {
       v-else-if="currentStep.key === 'vulnerabilities'"
       class="step-body"
     >
-      <textarea
-        v-model="vulnText"
-        class="json-input"
-        rows="6"
-        placeholder="Paste vulnerability records (JSON array, e.g. OSV)…"
-      />
       <div class="row">
-        <button
-          class="add-btn"
-          type="button"
-          :disabled="busy"
-          @click="importVulns"
-        >
-          Import vulnerabilities
-        </button>
+        <p class="scope-line">
+          Scope: <strong>{{ anchorName }}</strong>
+        </p>
         <select
           v-model="severityFilter"
           class="sev-select"
           aria-label="Severity filter"
-          @change="loadVulns"
+          @change="() => {}"
         >
           <option value="">
             all severities
@@ -338,10 +297,10 @@ async function loadVulns() {
         >{{ s.severity }}: {{ s.count }}</span>
       </div>
       <p
-        v-if="vulns.length === 0"
+        v-if="filteredVulns.length === 0"
         class="empty"
       >
-        No vulnerabilities loaded for the current filter.
+        No vulnerability findings in the active snapshot for the current filter.
       </p>
       <table
         v-else
@@ -357,7 +316,7 @@ async function loadVulns() {
         </thead>
         <tbody>
           <tr
-            v-for="(v, idx) in vulns"
+            v-for="(v, idx) in filteredVulns"
             :key="v.vuln_id ?? v.id ?? idx"
           >
             <td class="mono">

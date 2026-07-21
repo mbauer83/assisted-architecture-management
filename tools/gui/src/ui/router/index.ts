@@ -57,6 +57,8 @@ export const router = createRouter({
     { path: '/assurance/cast', component: () => import('../views/AssuranceCastWizardView.vue') },
     { path: '/assurance/gsn', component: () => import('../views/AssuranceGsnWizardView.vue') },
     { path: '/assurance/supply-chain', component: () => import('../views/AssuranceSupplyChainWizardView.vue') },
+    { path: '/assurance/security/findings', component: () => import('../views/SecurityFindingsView.vue') },
+    { path: '/assurance/security/vulnerability', component: () => import('../views/VulnerabilityImpactView.vue') },
     { path: '/assurance/baselines', component: () => import('../views/AssuranceBaselinesView.vue') },
     { path: '/assurance/diagrams', component: () => import('../views/AssuranceDiagramsView.vue') },
     { path: '/assurance/analyses', redirect: '/assurance/browse' },

@@ -2,18 +2,13 @@
 import { ref, computed, onMounted } from 'vue'
 import {
   parseRoles,
-  parseCoverage,
   parseCandidates,
   selectedAiComponents,
   scoreBand,
-  type CoverageReport,
   type ScanCandidate,
   type AiRole,
 } from './AssuranceAibom.helpers'
 
-const LOCKED_MSG = 'Assurance signals are not available (store locked).'
-
-const coverage = ref<CoverageReport | null>(null)
 const candidates = ref<ScanCandidate[]>([])
 const selected = ref<Set<string>>(new Set())
 const roles = ref<AiRole[]>([])
@@ -31,14 +26,6 @@ async function loadRoles() {
   if (!resp.ok) return
   roles.value = parseRoles(await resp.json())
   if (!defaultRole.value && roles.value.length) defaultRole.value = roles.value[0]
-}
-
-async function loadCoverage() {
-  error.value = null
-  const resp = await fetch('/api/assurance/aibom/coverage')
-  if (resp.status === 423) { error.value = LOCKED_MSG; return }
-  if (!resp.ok) { error.value = `HTTP ${resp.status}`; return }
-  coverage.value = parseCoverage(await resp.json())
 }
 
 async function runScan() {
@@ -99,7 +86,7 @@ function download() {
   <section class="aibom">
     <p class="hint-note">
       AI-BOM marks which architecture elements are AI components (models, datasets, agents,
-      MCP servers, RAG pipelines). Review coverage gaps, scan the architecture for unmarked
+      MCP servers, RAG pipelines). Scan the architecture for unmarked
       candidates, then export a CycloneDX 1.6 ML-BOM for the components you confirm.
     </p>
 
@@ -108,66 +95,6 @@ function download() {
       class="wiz-error"
     >
       {{ error }}
-    </div>
-
-    <!-- Coverage -->
-    <div class="block">
-      <div class="row">
-        <h3 class="block-title">
-          Coverage
-        </h3>
-        <button
-          class="add-btn add-btn--ghost"
-          type="button"
-          @click="loadCoverage"
-        >
-          ↺ Load coverage
-        </button>
-      </div>
-      <div
-        v-if="coverage"
-        class="cov"
-      >
-        <div class="cov-stats">
-          <span class="stat">{{ coverage.total_bom_components }} BOM components</span>
-          <span class="stat stat--warn">{{ coverage.unanchored_components }} unanchored</span>
-          <span class="stat">{{ coverage.anchor_mappings }} anchor mappings</span>
-          <span
-            v-if="coverage.withheld_components"
-            class="stat"
-          >{{ coverage.withheld_components }} withheld</span>
-        </div>
-        <p class="cov-summary">
-          {{ coverage.summary }}
-        </p>
-        <ul
-          v-if="coverage.unanchored.length"
-          class="unanchored"
-        >
-          <li
-            v-for="(c, i) in coverage.unanchored"
-            :key="c.purl ?? c.name ?? i"
-          >
-            <span class="mono">{{ c.name }}</span>
-            <span
-              v-if="c.purl"
-              class="mono dim"
-            >{{ c.purl }}</span>
-          </li>
-        </ul>
-        <p
-          v-if="coverage.unanchored_truncated"
-          class="dim"
-        >
-          (first 50 shown)
-        </p>
-      </div>
-      <p
-        v-else
-        class="empty"
-      >
-        Load the coverage report to see unanchored components.
-      </p>
     </div>
 
     <!-- Candidate scan -->

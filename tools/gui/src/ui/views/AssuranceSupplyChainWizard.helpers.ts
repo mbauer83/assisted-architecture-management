@@ -7,12 +7,17 @@ export interface SupplyStep {
   needsAnchor: boolean
 }
 
-// Supply-chain flow: Scope (ArchiMate anchor) → Import SBOM → Components →
-// Vulnerabilities → AI-BOM. The AI-BOM step is store-/architecture-wide (coverage,
-// candidate scan, ML-BOM export), so it does not require a per-scope anchor.
+// Supply-chain flow: Scope (ArchiMate anchor) → Components → Vulnerabilities →
+// Posture & VEX → AI-BOM. The AI-BOM step is store-/architecture-wide (candidate
+// scan, ML-BOM export), so it does not require a per-scope anchor.
+//
+// There is deliberately NO import step. Ingest is a serialised, audited, idempotent
+// act owned by the IngestSecuritySignals command, reached through the CLI, MCP, or
+// the REST ingest endpoint. A paste-JSON box could not carry a request id or
+// generator provenance, so this wizard VIEWS the active snapshot rather than
+// pretending to produce one.
 export const SUPPLY_STEPS: SupplyStep[] = [
   { key: 'scope', label: 'Scope', needsAnchor: false },
-  { key: 'import', label: 'Import SBOM', needsAnchor: true },
   { key: 'components', label: 'Components', needsAnchor: true },
   { key: 'vulnerabilities', label: 'Vulnerabilities', needsAnchor: true },
   { key: 'posture', label: 'Posture & VEX', needsAnchor: true },
@@ -34,41 +39,6 @@ export const ADMISSIBLE_ANCHOR_TYPES = [
 ] as const
 
 export const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'unknown'] as const
-
-export interface ParseResult<T> {
-  value?: T
-  error?: string
-}
-
-/** Parse text as a JSON object (CycloneDX SBOM document). */
-export function parseJsonObject(text: string): ParseResult<Record<string, unknown>> {
-  if (!text.trim()) return { error: 'Paste a CycloneDX SBOM (JSON) first.' }
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(text)
-  } catch (e) {
-    return { error: `Invalid JSON: ${String(e)}` }
-  }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return { error: 'Expected a JSON object (a CycloneDX SBOM document).' }
-  }
-  return { value: parsed as Record<string, unknown> }
-}
-
-/** Parse text as a JSON array (vulnerability records). */
-export function parseJsonArray(text: string): ParseResult<unknown[]> {
-  if (!text.trim()) return { error: 'Paste vulnerability records (a JSON array) first.' }
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(text)
-  } catch (e) {
-    return { error: `Invalid JSON: ${String(e)}` }
-  }
-  if (!Array.isArray(parsed)) {
-    return { error: 'Expected a JSON array of vulnerability records.' }
-  }
-  return { value: parsed }
-}
 
 export interface VulnRecord {
   vuln_id?: string
@@ -95,17 +65,12 @@ export function summariseSeverities(vulns: VulnRecord[]): { severity: string; co
   return ordered
 }
 
+/** A component row of the active signal snapshot. */
 export interface BomComponent {
   component_id?: string
   name?: string
   version?: string
   component_type?: string
   purl?: string
-  match_type?: string
-}
-
-/** How many components resolved to an architecture anchor (per-scope binding health). */
-export function componentMatchSummary(components: BomComponent[]): { matched: number; total: number } {
-  const matched = components.filter((c) => c.match_type === 'anchor').length
-  return { matched, total: components.length }
+  directness?: string
 }

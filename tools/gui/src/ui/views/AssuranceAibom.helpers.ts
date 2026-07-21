@@ -14,27 +14,6 @@ export function parseRoles(body: unknown): AiRole[] {
   return Array.isArray(raw) ? raw.map(String) : []
 }
 
-export interface CoverageReport {
-  total_bom_components: number
-  unanchored_components: number
-  anchor_mappings: number
-  unanchored_truncated: boolean
-  unanchored: { name?: string; purl?: string; arch_entity_id?: string }[]
-  anchored_entity_ids: string[]
-  withheld_components?: number
-  summary: string
-}
-
-const EMPTY_COVERAGE: CoverageReport = {
-  total_bom_components: 0,
-  unanchored_components: 0,
-  anchor_mappings: 0,
-  unanchored_truncated: false,
-  unanchored: [],
-  anchored_entity_ids: [],
-  summary: '',
-}
-
 /** Coerce an unknown to a string, but only for primitives (objects → ''). */
 function asStr(v: unknown): string {
   return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : ''
@@ -42,29 +21,6 @@ function asStr(v: unknown): string {
 
 function asNum(v: unknown): number {
   return typeof v === 'number' ? v : 0
-}
-
-/** Decode the coverage endpoint response defensively into a stable shape. */
-export function parseCoverage(body: unknown): CoverageReport {
-  if (!body || typeof body !== 'object') return EMPTY_COVERAGE
-  const b = body as Record<string, unknown>
-  const unanchored = Array.isArray(b['unanchored'])
-    ? (b['unanchored'].filter((c): c is Record<string, unknown> => !!c && typeof c === 'object')
-        .map((c) => ({ name: asStr(c['name']), purl: asStr(c['purl']), arch_entity_id: asStr(c['arch_entity_id']) })))
-    : []
-  const anchoredIds = Array.isArray(b['anchored_entity_ids'])
-    ? b['anchored_entity_ids'].map(asStr).filter((s) => s !== '')
-    : []
-  return {
-    total_bom_components: asNum(b['total_bom_components']),
-    unanchored_components: asNum(b['unanchored_components']),
-    anchor_mappings: asNum(b['anchor_mappings']),
-    unanchored_truncated: b['unanchored_truncated'] === true,
-    unanchored,
-    anchored_entity_ids: anchoredIds,
-    withheld_components: asNum(b['withheld_components']),
-    summary: asStr(b['summary']),
-  }
 }
 
 export interface ScanCandidate {
@@ -75,7 +31,6 @@ export interface ScanCandidate {
   reasons: string[]
 }
 
-/** Decode the scan endpoint response into a list of candidates. */
 export function parseCandidates(body: unknown): ScanCandidate[] {
   if (!body || typeof body !== 'object') return []
   const raw = (body as Record<string, unknown>)['candidates']

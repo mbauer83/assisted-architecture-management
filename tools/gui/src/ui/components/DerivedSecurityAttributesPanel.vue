@@ -2,7 +2,7 @@
 /**
  * Read-only derived security attributes for one entity (C-S4): values from the
  * ACTIVE signal snapshot via the same metrics use case the MCP tool serializes.
- * ABSENT unless signals are available and an active run anchors this entity —
+ * ABSENT unless signals are available and an active snapshot anchors this entity —
  * locked store, unconfigured deployment, or anchor-less entity all collapse to
  * nothing. Deliberately contains no form element: the payload is disjoint from
  * every editable property (I-C10) and never enters edit-form state.
@@ -60,6 +60,16 @@ watch(() => props.artifactId, load, { immediate: true })
     >
       Figures cover records visible at your classification ceiling only.
     </p>
+    <!-- The drill-down lives here rather than on a global menu: the panel is
+         rendered only when this entity HAS an active snapshot, so the link can
+         never lead to an empty view. -->
+    <RouterLink
+      class="drill-down"
+      :to="`/assurance/security/findings?anchor=${encodeURIComponent(props.artifactId)}`"
+      data-testid="component-vulnerabilities-link"
+    >
+      View component vulnerabilities →
+    </RouterLink>
   </section>
 </template>
 
@@ -89,4 +99,9 @@ watch(() => props.artifactId, load, { immediate: true })
 .row dt { color: #64748b; min-width: 220px; }
 .row dd { margin: 0; color: #0f172a; font-weight: 500; }
 .caveat { font-size: 11px; color: #92400e; margin: 8px 0 0; }
+.drill-down {
+  display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 500;
+  color: #1d4ed8; text-decoration: none;
+}
+.drill-down:hover { text-decoration: underline; }
 </style>

@@ -3135,12 +3135,38 @@ only existing nodes cannot measure a missing one".
        {"direct": 4, "transitive": 20} on SNAP@840c9c7d9e614473, zero unknown remaining.
        Tests pin it at the parser level (no subprocess), including one isolating that the
        edges parse identically with and without a root.
-5. [ ] GUI: the snapshot/vulnerability details view is PRIMARILY reached by a LINK from the arch
-       ENTITY details page (EntityDetailView) of the entity the SBOM/vuln-analysis is anchored to —
-       NOT (just/mainly) from the supply-chain wizard (owner 2026-07-21). Add a component-vulnerability
-       details view fed by the new /security-findings endpoint; link to it from EntityDetailView (the
-       anchor) and, secondarily, the wizard. Rework AssuranceSupplyChainWizardView (currently calls
-       the removed REST endpoints → 404) to VIEW the active snapshot; drop the aibom-coverage panel bits.
+5. [x] GUI — DONE 2026-07-21. New `SecurityFindingsView` (component vulnerabilities for one
+       anchor, grouped by component, worst-first at both levels) and `VulnerabilityImpactView`
+       (affected entities). Entry point is the drill-down link on
+       `DerivedSecurityAttributesPanel` in EntityDetailView — chosen because that panel
+       renders ONLY when the entity has an active snapshot, so the link can never lead to an
+       empty view. Each listed vulnerability links onward to its affected entities (owner-
+       approved addition): the label shows the feed id an analyst recognises, the href uses
+       the CANONICAL id, which resolves whichever alias the scanner reported.
+       WIZARD REWORKED: the 4 dead endpoints are gone with the import step. Ingest is a
+       serialised, audited, idempotent act owned by the command — a paste-JSON box could carry
+       neither a request id nor generator provenance — so the wizard now VIEWS the active
+       snapshot via /security-components + /security-findings. aibom-coverage panel removed
+       (the capability was dropped with the snapshot model) along with its now-dead parser,
+       and the orphaned SupplyVulnerabilityTable component.
+       TWO DEFECTS FOUND BY THE LIVE WALK, neither reachable by unit test:
+       · **404 conflation.** The impact view treated ANY 404 as the endpoint's legitimate
+         "unknown vulnerability" answer. Against a backend that predated the route it rendered
+         "Not a vulnerability this store knows about" — a confident falsehood about a CVE that
+         really does affect the anchor. Now a typed 404 (`found` present) is the answer and a
+         bare `{"detail":"Not Found"}` is an error. Logic extracted to
+         `interpretImpactResponse` with 6 tests, one pinning this regression.
+       · **Column misalignment** (owner-reported). Each component group renders its own table,
+         so content-based layout sized every table independently: Severity began at x=527 for
+         a group of 15-char PYSEC ids but x=573 for 19-char GHSA ids — 46px drift, different
+         per group. Fixed with `table-layout: fixed` + explicit `<colgroup>` widths; re-measured
+         0px drift across all 9 groups, 0 overflowing cells (long ids wrap).
+       LIVE-VERIFIED post-restart, real seeded data: entity panel (24 vulns, direct 4 /
+       transitive 20, max CVSS 8.7) → 24 findings across 9 components, 24 vulnerability links →
+       impact view for VID@dc11d49c2e002164 showing 1 affected entity via click@8.3.2
+       (transitive, high, CVSS 7.2) with aliases CVE-2026-7246 / GHSA-47FR-3FFG-HGMW /
+       PYSEC-2026-2132. Wizard loads with no import step and no 404s.
+       25 new frontend tests (1124 total); lint + typecheck clean.
 6. [ ] Docs: reference/cli-and-backend + configuration for the removed import/list endpoints + the
        new snapshot list endpoints; regenerate MCP docs after the ingest-MCP tool + rename.
 7. [~] RESTART-GATED live re-verify — signals surfaces DONE 2026-07-21 on the restarted
