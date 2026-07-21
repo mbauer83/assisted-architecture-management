@@ -18,44 +18,7 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
-from src.application.security_refresh.command import (
-    RefreshActivated,
-    RefreshConflict,
-    RefreshFailed,
-    RefreshInvalid,
-    RefreshReplayed,
-    RefreshResult,
-)
 from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
-
-
-def _ingest_response(result: RefreshResult) -> dict[str, object]:
-    """Project the command's typed outcome onto the tool's response."""
-    match result:
-        case RefreshActivated(run_id, superseded, components, findings):
-            return {
-                "status": "activated",
-                "snapshot_id": run_id,
-                "superseded_snapshot_id": superseded,
-                "component_count": components,
-                "finding_count": findings,
-            }
-        case RefreshInvalid(errors):
-            return {
-                "status": "invalid",
-                "errors": [{"field": e.field, "message": e.message} for e in errors],
-            }
-        case RefreshReplayed(run_id, outcome, message):
-            return {
-                "status": "replayed",
-                "snapshot_id": run_id,
-                "stored_outcome": outcome,
-                "message": message,
-            }
-        case RefreshConflict(run_id, message):
-            return {"status": "conflict", "snapshot_id": run_id, "message": message}
-        case RefreshFailed(run_id, reason):
-            return {"status": "failed", "snapshot_id": run_id, "reason": reason}
 
 
 def register_security_write_tools(server: FastMCP) -> None:
@@ -87,15 +50,12 @@ def register_security_write_tools(server: FastMCP) -> None:
         source: str = "",
     ) -> dict[str, object]:
         from src.application.security_refresh.capability import SignalMutationDenied  # noqa: PLC0415
-        from src.application.security_refresh.supplied_acquisition import (  # noqa: PLC0415
-            acquisition_from_records,
-        )
         from src.infrastructure.assurance.signal_gate import (  # noqa: PLC0415
             current_signal_mutation_capability,
         )
         from src.infrastructure.assurance.signal_ingest import (  # noqa: PLC0415
-            assemble_bundle,
-            submit_bundle,
+            ingest_outcome_payload,
+            ingest_supplied_bom,
         )
 
         capability = current_signal_mutation_capability(unlocked=ctx.is_available())
@@ -110,16 +70,14 @@ def register_security_write_tools(server: FastMCP) -> None:
         run_store = ctx.refresh_run_store
         if run_store is None:  # unreachable once the capability allowed the write
             return ctx.locked_response()
-        records = vulnerabilities or []
-        bundle = assemble_bundle(
+        return ingest_outcome_payload(ingest_supplied_bom(
             anchor_entity_id,
             bom,
-            acquire=lambda queryable: acquisition_from_records(queryable, records),
+            records=vulnerabilities or [],
+            run_store=run_store,
             request_id=request_id,
-            generator_metadata={"generator": "mcp-supplied-bom"},
-            source_metadata={"vulnerability_source": source or "caller-supplied"},
-        )
-        return _ingest_response(submit_bundle(bundle, run_store=run_store))
+            source=source,
+        ))
 
     @server.tool(
         name="assurance_reconcile_aibom",

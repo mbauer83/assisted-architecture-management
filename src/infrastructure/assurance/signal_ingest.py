@@ -1,11 +1,13 @@
 """The one submission boundary for security-signal ingestion.
 
-Every ingest surface — the dogfooding script, the MCP tool — assembles a typed
-bundle here and submits it through the same serialised write, so run-id policy
-and the single-writer boundary have exactly one definition. Acquisition is
-injected (`acquire`): live OSV querying for the script, caller-supplied records
-for the MCP tool. Neither surface touches the run lifecycle directly — the
-RefreshSecuritySignals command owns staging → populate → complete → activate.
+Every ingest surface — the dogfooding script, the REST route, the MCP tool —
+assembles a typed bundle here, submits it through the same serialised write, and
+renders the outcome through the same projection, so run-id policy, the
+single-writer boundary, and the response shape each have exactly one definition.
+Acquisition is injected (`acquire`): live OSV querying for the script,
+caller-supplied records for the REST/MCP surfaces. No surface touches the run
+lifecycle directly — the RefreshSecuritySignals command owns staging → populate
+→ complete → activate.
 """
 
 from __future__ import annotations
@@ -21,7 +23,12 @@ from src.application.security_refresh.bundle_assembly import (
     prepare_components,
 )
 from src.application.security_refresh.command import (
+    RefreshActivated,
     RefreshBundle,
+    RefreshConflict,
+    RefreshFailed,
+    RefreshInvalid,
+    RefreshReplayed,
     RefreshResult,
     refresh_security_signals,
 )
@@ -77,3 +84,74 @@ def submit_bundle(bundle: RefreshBundle, *, run_store: RefreshRunStore) -> Refre
     return run_write(lambda: refresh_security_signals(
         bundle, store=run_store, new_run_id=new_run_id,
     ))
+
+
+def ingest_supplied_bom(
+    anchor_entity_id: str,
+    bom: Mapping[str, Any],
+    *,
+    records: Sequence[Mapping[str, Any]],
+    run_store: RefreshRunStore,
+    request_id: str = "",
+    source: str = "",
+) -> RefreshResult:
+    """Ingest a caller-supplied BOM (+ advisories) for one anchor.
+
+    The whole act behind both the REST route and the MCP tool: assemble the bundle
+    with supplied-record acquisition, then submit it. Callers gate on the
+    signal-mutation capability first — they render a denial differently, but the
+    ingest itself is defined once, here.
+    """
+    from src.application.security_refresh.supplied_acquisition import (  # noqa: PLC0415
+        acquisition_from_records,
+    )
+
+    bundle = assemble_bundle(
+        anchor_entity_id,
+        bom,
+        acquire=lambda queryable: acquisition_from_records(queryable, records),
+        request_id=request_id,
+        generator_metadata={"generator": "supplied-bom"},
+        source_metadata={"vulnerability_source": source or "caller-supplied"},
+    )
+    return submit_bundle(bundle, run_store=run_store)
+
+
+# HTTP status per ingest outcome; the MCP surface reports the same `status`
+# string and ignores the code, so both transports stay in lockstep.
+INGEST_STATUS_CODES: Mapping[str, int] = {
+    "activated": 200,
+    "replayed": 200,  # idempotent replay: the stored outcome, nothing written
+    "invalid": 422,
+    "conflict": 409,  # request_id reused with a different payload
+    "failed": 500,
+}
+
+
+def ingest_outcome_payload(result: RefreshResult) -> dict[str, object]:
+    """Project the command's typed outcome onto the shared response body."""
+    match result:
+        case RefreshActivated(run_id, superseded, components, findings):
+            return {
+                "status": "activated",
+                "snapshot_id": run_id,
+                "superseded_snapshot_id": superseded,
+                "component_count": components,
+                "finding_count": findings,
+            }
+        case RefreshInvalid(errors):
+            return {
+                "status": "invalid",
+                "errors": [{"field": e.field, "message": e.message} for e in errors],
+            }
+        case RefreshReplayed(run_id, outcome, message):
+            return {
+                "status": "replayed",
+                "snapshot_id": run_id,
+                "stored_outcome": outcome,
+                "message": message,
+            }
+        case RefreshConflict(run_id, message):
+            return {"status": "conflict", "snapshot_id": run_id, "message": message}
+        case RefreshFailed(run_id, reason):
+            return {"status": "failed", "snapshot_id": run_id, "reason": reason}

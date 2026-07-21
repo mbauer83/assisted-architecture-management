@@ -2778,9 +2778,49 @@ only existing nodes cannot measure a missing one".
   · RESTART-GATED: the new tool appears on arch-assurance-write only after a backend restart (and
     an MCP surface change also needs a Claude session restart to be callable).
 
+- 2026-07-21 · INGEST REST PARITY (owner: "security-signals must have valid REST and MCP
+  interfaces, MCP bridging to the unified backend") · DONE, full backend suite GREEN (6124
+  passed / 5 skipped), ruff + zuban clean. The ingest capability was MCP-only; every other
+  signals capability (metrics/components/findings/stats/vex) had both. Closed:
+  · NEW `POST /api/assurance/security-ingest` in _assurance_signals_routes.py — same capability
+    gate, same command, same outcome projection as the MCP tool. Status mapping via the shared
+    INGEST_STATUS_CODES: 200 activated, 200 replayed (idempotent), 409 conflict, 422 invalid,
+    500 failed; 423 locked / 403 signal_mutation_denied from the gate.
+  · SHARED-BOUNDARY REFACTOR: the outcome→body projection moved out of the MCP tool into
+    signal_ingest.ingest_outcome_payload, and the whole act (assemble + submit) into
+    signal_ingest.ingest_supplied_bom. Both transports now differ ONLY in how they render a
+    denial — the ingest itself has one definition. The MCP tool shrank to gate → store → call.
+  · TESTS tests/assurance/test_security_ingest_http.py (11): outcome→status mapping, both gate
+    denials write nothing, ingest→list round trip over the REST read surface, and a
+    CROSS-SURFACE PARITY test asserting REST and MCP return the same body for the same ingest.
+  · ARCHITECTURE NOTE (verified, not assumed): MCP does NOT call REST over loopback, and should
+    not. The assurance FastMCP apps are MOUNTED IN the backend (arch_backend_app.py:210-216,
+    /mcp/assurance-read|write); the thin HTTP bridge is arch_mcp_stdio_assurance.py. So an MCP
+    tool body already executes INSIDE the unified backend and delegates downward to the
+    application layer — the same layer the REST route calls. REST and MCP are sibling adapters
+    on one backend, not a caller/callee chain; hence parity is enforced by TEST, which is the
+    only thing that can enforce it between siblings.
+  · LIVE-VERIFIED on the restarted backend (MCP side; the REST route is restart-gated):
+    assurance_ingest_security_signals for a throwaway anchor APP@live-check-ingest-tool →
+    RUN@1e149a72dcc9405f, 3 components / 1 finding; assurance_list_vulnerabilities returns it
+    with directness "direct" (dep-graph classified), severity high / CVSS 7.5, applicability
+    "applicable", and the advisory correctly matched to urllib3 and NOT to the sibling attrs
+    component. NOTE: this left a junk anchor in the dev store; there is no snapshot-delete
+    capability on any surface. Acceptable pre-alpha (the seed work recreates the store), but
+    flagged as a real gap.
+
+- 2026-07-21 · OPENAPI QUALITY BASELINE (measured against the live backend /openapi.json, for
+  the owner's REST-documentation question): 145 operations; only 10 carry a real 200 response
+  schema, 135 are generic/empty because every handler returns a bare JSONResponse with no
+  `response_model`; 39/145 have a description; 8/145 are tagged; 0 declare any non-200/422
+  status even though 423/403/409 are routinely returned. FastAPI already serves /openapi.json
+  + /docs dynamically, so the gap is schema fidelity, not exposure. Proposal recorded in the
+  answer to the owner; NOT yet a work unit.
+
 ### REMAINING BACKLOG (assurance security-signals — sequenced, owner-directed)
 1. [x] INGEST-via-MCP tool (bundle-submit to the ingest command) + decide aibom_coverage — DONE
-       2026-07-21 (see the entry above); aibom_coverage DROPPED with rationale.
+       2026-07-21 (see the entry above); aibom_coverage DROPPED with rationale. REST parity
+       endpoint added the same day (see the ingest-REST-parity entry).
 2. [ ] Rename sweep: refresh→ingest (act) + →snapshot (data), consistent & role-functional (above).
 3. [ ] `arch-assurance seed [--with-signals]` command (loads seed-assurance.json; opt-in signal
        ingest for frontend+backend anchors) + Quickstart/README/docs for demo use.

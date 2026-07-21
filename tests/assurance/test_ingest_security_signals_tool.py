@@ -22,9 +22,9 @@ from src.application.security_refresh.command import (
     RefreshReplayed,
     RefreshValidationError,
 )
+from src.infrastructure.assurance.signal_ingest import ingest_outcome_payload
 from src.infrastructure.mcp.assurance_mcp import security_write_tools
 from src.infrastructure.mcp.assurance_mcp.security_write_tools import (
-    _ingest_response,
     register_security_write_tools,
 )
 
@@ -96,7 +96,7 @@ def allow_mutation(monkeypatch: pytest.MonkeyPatch) -> None:
 
 class TestOutcomeProjection:
     def test_activated(self) -> None:
-        assert _ingest_response(RefreshActivated("RUN@1", "RUN@0", 3, 2)) == {
+        assert ingest_outcome_payload(RefreshActivated("RUN@1", "RUN@0", 3, 2)) == {
             "status": "activated",
             "snapshot_id": "RUN@1",
             "superseded_snapshot_id": "RUN@0",
@@ -105,7 +105,7 @@ class TestOutcomeProjection:
         }
 
     def test_invalid_reports_every_field_error(self) -> None:
-        result = _ingest_response(RefreshInvalid((
+        result = ingest_outcome_payload(RefreshInvalid((
             RefreshValidationError("anchor_entity_id", "anchor is required"),)))
 
         assert result["status"] == "invalid"
@@ -113,9 +113,9 @@ class TestOutcomeProjection:
             {"field": "anchor_entity_id", "message": "anchor is required"}]
 
     def test_replayed_conflict_and_failed_are_distinguishable(self) -> None:
-        replayed = _ingest_response(RefreshReplayed("RUN@1", "success", "already"))
-        conflict = _ingest_response(RefreshConflict("RUN@1", "reused"))
-        failed = _ingest_response(RefreshFailed("RUN@2", "OperationalError"))
+        replayed = ingest_outcome_payload(RefreshReplayed("RUN@1", "success", "already"))
+        conflict = ingest_outcome_payload(RefreshConflict("RUN@1", "reused"))
+        failed = ingest_outcome_payload(RefreshFailed("RUN@2", "OperationalError"))
 
         assert replayed["status"] == "replayed"
         assert replayed["stored_outcome"] == "success"

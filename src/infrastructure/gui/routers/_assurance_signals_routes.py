@@ -6,6 +6,7 @@ capability gate (typed denial) and land data + audit in one transaction."""
 from __future__ import annotations
 
 from dataclasses import asdict
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -118,6 +119,57 @@ def security_stats() -> JSONResponse:
     if run_store is None:
         return _ok({"reason": "no co-located signals store"})
     return _ok(dict(signals_stats(run_store=run_store)))
+
+
+class IngestSignalsBody(BaseModel):
+    anchor_entity_id: str
+    bom: dict[str, Any]
+    vulnerabilities: list[dict[str, Any]] = []
+    request_id: str = ""
+    source: str = ""
+
+
+@signals_router.post("/api/assurance/security-ingest")
+def ingest_security_signals(body: IngestSignalsBody) -> JSONResponse:
+    """Ingest a supplied CycloneDX BOM (+ optional OSV advisories) for one anchor,
+    producing a new active signal snapshot. Same capability gate, same command, and
+    same outcome projection as the MCP tool — only the status codes are HTTP's."""
+    from src.infrastructure.assurance.signal_ingest import (  # noqa: PLC0415
+        INGEST_STATUS_CODES,
+        ingest_outcome_payload,
+        ingest_supplied_bom,
+    )
+
+    ctx = get_assurance_context()
+    capability = current_signal_mutation_capability(unlocked=ctx.is_available())
+    if isinstance(capability, SignalMutationDenied):
+        if capability.reason_code == "store_locked":
+            return _locked_response()
+        return JSONResponse(
+            status_code=403,
+            content={
+                "error": "signal_mutation_denied",
+                "reason_code": capability.reason_code,
+                "message": capability.message,
+            },
+            headers={"Cache-Control": _NO_STORE},
+        )
+    run_store = ctx.refresh_run_store
+    if run_store is None:  # unreachable when the capability allowed the write
+        return _locked_response()
+    payload = ingest_outcome_payload(ingest_supplied_bom(
+        body.anchor_entity_id,
+        body.bom,
+        records=body.vulnerabilities,
+        run_store=run_store,
+        request_id=body.request_id,
+        source=body.source,
+    ))
+    return JSONResponse(
+        status_code=INGEST_STATUS_CODES[str(payload["status"])],
+        content=payload,
+        headers={"Cache-Control": _NO_STORE},
+    )
 
 
 class RecordVexBody(BaseModel):
