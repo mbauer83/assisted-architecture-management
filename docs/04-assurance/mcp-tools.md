@@ -81,6 +81,7 @@ agent cannot, for example, mark a safety constraint as `accept`-risk-treated.
 | Security signals | `assurance_ingest_security_signals` | Write | Ingest security signals for one architecture anchor: submit a CycloneDX BOM document (and, optionally, the OSV advisory records for its components) as a single ingest, producing a new ACTIVE signal snapshot that supersedes the anchor's previous one. |
 | Security signals | `assurance_register_arch_ref` | Write | Record an assurance→architecture cross-reference. |
 | Security signals | `assurance_model_this` | Write | Propose an architecture entity to bind an unbound-pending control-structure-node. |
+| Other | `assurance_delete_security_snapshot` | Destructive | Delete security-signal snapshots. |
 <!-- mcp-tools:end assurance-write -->
 
 The tables above are generated from the registered assurance MCP servers by

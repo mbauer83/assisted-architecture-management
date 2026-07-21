@@ -252,3 +252,61 @@ def list_vex(
         "count": len(visible),
         "visibility_limited": pol.scope().visibility_limited,
     })
+
+
+class DeleteSnapshotBody(BaseModel):
+    snapshot_id: str = ""
+    anchor_entity_id: str = ""
+
+
+@signals_router.post("/api/assurance/security-snapshot-delete")
+def delete_security_snapshot(body: DeleteSnapshotBody) -> JSONResponse:
+    """Delete one snapshot, or every snapshot for an anchor. Same capability gate
+    and same body as the MCP tool — only the status codes are HTTP's.
+
+    POST rather than DELETE: the request carries a body selecting EITHER a
+    snapshot id OR an anchor, and DELETE with a semantic body is poorly supported
+    across intermediaries.
+    """
+    from src.infrastructure.assurance.signal_deletion import (  # noqa: PLC0415
+        DELETE_STATUS_CODES,
+        delete_anchor_snapshots,
+        delete_snapshot,
+    )
+
+    if bool(body.snapshot_id) == bool(body.anchor_entity_id):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": "invalid_request",
+                "message": "Pass exactly one of snapshot_id or anchor_entity_id.",
+            },
+            headers={"Cache-Control": _NO_STORE},
+        )
+    ctx = get_assurance_context()
+    capability = current_signal_mutation_capability(unlocked=ctx.is_available())
+    if isinstance(capability, SignalMutationDenied):
+        if capability.reason_code == "store_locked":
+            return _locked_response()
+        return JSONResponse(
+            status_code=403,
+            content={
+                "error": "signal_mutation_denied",
+                "reason_code": capability.reason_code,
+                "message": capability.message,
+            },
+            headers={"Cache-Control": _NO_STORE},
+        )
+    snapshot_store = ctx.snapshot_store
+    if snapshot_store is None:  # unreachable when the capability allowed the write
+        return _locked_response()
+    payload = (
+        delete_snapshot(body.snapshot_id, snapshot_store=snapshot_store)
+        if body.snapshot_id
+        else delete_anchor_snapshots(body.anchor_entity_id, snapshot_store=snapshot_store)
+    )
+    return JSONResponse(
+        status_code=DELETE_STATUS_CODES[str(payload["status"])],
+        content=payload,
+        headers={"Cache-Control": _NO_STORE},
+    )

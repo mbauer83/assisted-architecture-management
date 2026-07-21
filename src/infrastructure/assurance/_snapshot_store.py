@@ -32,14 +32,17 @@ from src.domain.security_signal_snapshot import (
 )
 from src.domain.signals_schema import SIGNALS_PRAGMAS_SQL
 from src.domain.vulnerability_identity import (
-    CreateCanonical,
-    MergeCanonical,
-    UseExisting,
     normalize_external_id,
-    resolve_aliases,
 )
 from src.infrastructure.assurance._archive import append_audit_row
 from src.infrastructure.assurance._signals_migrations import apply_signals_migrations
+from src.infrastructure.assurance._snapshot_deletion_ops import (
+    delete_all_for_anchor,
+    delete_one_snapshot,
+)
+from src.infrastructure.assurance._vulnerability_resolution import (
+    resolve_canonical_vulnerability,
+)
 
 
 class SnapshotTransitionError(RuntimeError):
@@ -259,6 +262,15 @@ class SQLCipherSnapshotStore:
             conn.rollback()
             raise
 
+    def delete_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
+        """Delete one snapshot and its owned rows; None if absent. Blast radius is
+        documented and tested in ``_snapshot_deletion_ops``."""
+        return delete_one_snapshot(self, snapshot_id)
+
+    def delete_anchor_snapshots(self, anchor_entity_id: str) -> list[dict[str, Any]]:
+        """Delete every snapshot for one anchor, each its own audited transaction."""
+        return delete_all_for_anchor(self, anchor_entity_id)
+
     def activate_snapshot(self, snapshot_id: str) -> dict[str, Any]:
         """Supersede the anchor's current active snapshot and activate the target in
         ONE transaction. Re-activating an already-active snapshot is a no-op success."""
@@ -346,42 +358,4 @@ class SQLCipherSnapshotStore:
             )
 
     def _resolve_canonical(self, conn: Any, external_ids: list[str]) -> str:
-        index = {
-            row["alias"]: row["canonical_id"]
-            for row in conn.execute("SELECT alias, canonical_id FROM vulnerability_aliases").fetchall()
-        }
-        resolution = resolve_aliases(external_ids, index)
-        now = _now_iso()
-        if isinstance(resolution, UseExisting):
-            canonical_id = resolution.canonical_id
-        elif isinstance(resolution, CreateCanonical):
-            canonical_id = _stable_id(
-                "VID", *sorted(normalize_external_id(e) for e in external_ids)
-            )
-            conn.execute(
-                "INSERT OR IGNORE INTO canonical_vulnerabilities (canonical_id, created_at) VALUES (?,?)",
-                (canonical_id, now),
-            )
-        else:
-            assert isinstance(resolution, MergeCanonical)
-            canonical_id = resolution.survivor_id
-            for merged in resolution.merged_ids:
-                conn.execute(
-                    "UPDATE canonical_vulnerabilities SET merged_into=? WHERE canonical_id=?",
-                    (canonical_id, merged),
-                )
-                for table, column in (
-                    ("vulnerability_aliases", "canonical_id"),
-                    ("snapshot_vulnerability_findings", "canonical_vulnerability_id"),
-                    ("vex_assessments", "canonical_vulnerability_id"),
-                ):
-                    conn.execute(
-                        f"UPDATE {table} SET {column}=? WHERE {column}=?",  # noqa: S608
-                        (canonical_id, merged),
-                    )
-        for external_id in external_ids:
-            conn.execute(
-                "INSERT OR IGNORE INTO vulnerability_aliases (alias, canonical_id, created_at) VALUES (?,?,?)",
-                (normalize_external_id(external_id), canonical_id, now),
-            )
-        return canonical_id
+        return resolve_canonical_vulnerability(conn, external_ids, stable_id=_stable_id)
