@@ -153,7 +153,7 @@ const EntityAttributeConstraintsSchema = Schema.Struct({
   pattern: Schema.optional(Schema.String),
 })
 
-const EntityAttributeDescriptorSchema = Schema.Struct({
+export const EntityAttributeDescriptorSchema = Schema.Struct({
   type: Schema.String,
   enum: Schema.optional(Schema.Array(Schema.String)),
   default: Schema.optional(Schema.String),

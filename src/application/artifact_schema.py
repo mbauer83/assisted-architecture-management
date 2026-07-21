@@ -302,6 +302,39 @@ def schema_all_properties(schema: dict[str, Any]) -> list[str]:
     return list(schema.get("properties", {}).keys())
 
 
+_CONSTRAINT_KEYS = (
+    "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "minLength", "maxLength", "pattern",
+)
+
+
+def attribute_descriptors(schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Per-attribute UI descriptors (type, enum, default, constraints) from a JSON Schema.
+
+    One shape for every authoring surface — the entity schema endpoint and the connection
+    metadata guidance both serve it, so one typed input component can render either without
+    knowing which side it came from.
+    """
+    props: dict[str, Any] = schema.get("properties", {}) or {}
+    out: dict[str, dict[str, Any]] = {}
+    for name, prop_schema in props.items():
+        if not isinstance(prop_schema, dict):
+            continue
+        descriptor: dict[str, Any] = {"type": prop_schema.get("type", "string")}
+        if "enum" in prop_schema:
+            descriptor["enum"] = [str(v) for v in prop_schema["enum"]]
+        if "default" in prop_schema:
+            raw = prop_schema["default"]
+            if isinstance(raw, bool):
+                descriptor["default"] = "true" if raw else "false"
+            elif raw is not None:
+                descriptor["default"] = str(raw)
+        constraints = {key: prop_schema[key] for key in _CONSTRAINT_KEYS if key in prop_schema}
+        if constraints:
+            descriptor["constraints"] = constraints
+        out[name] = descriptor
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------

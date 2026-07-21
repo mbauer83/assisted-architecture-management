@@ -112,14 +112,16 @@ def artifact_edit_connection(
     src_multiplicity: str | None = None,
     tgt_multiplicity: str | None = None,
     specialization: str | None = None,
+    metadata: dict[str, str] | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
     """Edit or remove a connection.
 
-    For operation='update': description, src_multiplicity, tgt_multiplicity, specialization
-    are applied. Pass "" for a multiplicity or specialization to remove it; omit (None) to
-    preserve it.
+    For operation='update': description, src_multiplicity, tgt_multiplicity, specialization,
+    metadata are applied. Pass "" for a multiplicity or specialization to remove it; omit
+    (None) to preserve it. metadata REPLACES the schema-declared per-connection attributes
+    wholesale; pass {} to clear them.
     """
     root, registry, verifier = _resolve(repo_root, need_registry=True)
     registry = _require_registry(registry)
@@ -153,6 +155,7 @@ def artifact_edit_connection(
             src_multiplicity=src_multiplicity if src_multiplicity is not None else _UNSET,
             tgt_multiplicity=tgt_multiplicity if tgt_multiplicity is not None else _UNSET,
             specialization=specialization if specialization is not None else _UNSET,
+            metadata=metadata if metadata is not None else _UNSET,
             dry_run=dry_run,
         )
     return _finalize_authoritative_write(dry_run, result, mutation_context)

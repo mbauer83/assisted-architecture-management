@@ -28,6 +28,7 @@ def edit_connection(
     src_multiplicity: str | None | object = _UNSET,
     tgt_multiplicity: str | None | object = _UNSET,
     specialization: str | None | object = _UNSET,
+    metadata: dict[str, str] | None | object = _UNSET,
     dry_run: bool,
 ) -> WriteResult:
     """Update an existing connection (description, multiplicities, and/or specialization).
@@ -37,7 +38,9 @@ def edit_connection(
     (incl. its own specialization, if any) is carried through `parsed.connections`
     unmodified, so a sibling's metadata block round-trips byte-for-byte.
     Pass src_multiplicity="" or tgt_multiplicity="" to remove an existing multiplicity, or
-    specialization="" to remove an existing specialization.
+    specialization="" to remove an existing specialization. ``metadata`` REPLACES the
+    schema-declared per-connection attributes wholesale (mirroring the entity edit API's
+    `properties`); pass {} to clear them.
     Omit (leave as _UNSET) to preserve the existing value.
     """
     assert_engagement_write_root(repo_root)
@@ -71,6 +74,10 @@ def edit_connection(
                     conn["specialization"] = str(specialization)
                 else:
                     conn.pop("specialization", None)
+            if metadata is not _UNSET:
+                # A full replacement of the schema-declared attributes, mirroring the
+                # entity edit API's `properties`. Pass {} to clear them.
+                conn["metadata"] = dict(metadata) if isinstance(metadata, dict) else {}
             found = True
             effective_specialization = str(conn.get("specialization", "") or "")
             break

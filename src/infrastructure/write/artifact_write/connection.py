@@ -146,6 +146,18 @@ def _assert_pair_writable(repo_root: Path, connection_type: str, specialization:
     )
 
 
+def _connection_metadata(specialization: str | None, metadata: dict[str, str] | None) -> dict[str, str]:
+    """One per-connection metadata block from the two inputs that feed it. ``specialization``
+    is authoritative for its own key — it selects which schema applies, so it is never
+    something the schema-declared attributes can overwrite."""
+    block = dict(metadata) if metadata else {}
+    if specialization:
+        block["specialization"] = specialization
+    else:
+        block.pop("specialization", None)
+    return block
+
+
 def _resolve_outgoing_path(
     registry: ArtifactRegistry,
     source_entity: str,
@@ -176,6 +188,7 @@ def _build_content(
     src_multiplicity: str | None = None,
     tgt_multiplicity: str | None = None,
     specialization: str | None = None,
+    metadata: dict[str, str] | None = None,
 ) -> str:
     if outgoing_path.exists():
         existing = outgoing_path.read_text(encoding="utf-8")
@@ -206,7 +219,7 @@ def _build_content(
             src_multiplicity=src_multiplicity or "",
             tgt_multiplicity=tgt_multiplicity or "",
             description=(description or "").strip(),
-            metadata={"specialization": specialization} if specialization else {},
+            metadata=_connection_metadata(specialization, metadata),
         )
         return existing.rstrip("\n") + "\n\n" + format_connection_declaration(decl) + "\n"
 
@@ -221,6 +234,8 @@ def _build_content(
         conn_dict["tgt_multiplicity"] = tgt_multiplicity
     if specialization:
         conn_dict["specialization"] = specialization
+    if metadata:
+        conn_dict["metadata"] = dict(metadata)
     return format_outgoing_markdown(
         source_entity=source_entity,
         version=version,
@@ -309,9 +324,15 @@ def add_connection(
     src_multiplicity: str | None = None,
     tgt_multiplicity: str | None = None,
     specialization: str | None = None,
+    metadata: dict[str, str] | None = None,
     extra_known_ids: frozenset[str] = frozenset(),
 ) -> WriteResult:
-    """Add a connection to the source entity's .outgoing.md file."""
+    """Add a connection to the source entity's .outgoing.md file.
+
+    ``metadata`` carries the per-connection attributes declared by the connection type's
+    effective metadata schema (base ⊕ specialization ⊕ bound profiles). ``specialization``
+    stays its own argument because it selects WHICH schema applies.
+    """
     assert_engagement_write_root(repo_root)
     _validate_inputs(registry, connection_type, source_entity, target_entity, extra_known_ids)
     _assert_pair_writable(repo_root, connection_type, specialization)
@@ -342,6 +363,7 @@ def add_connection(
         src_multiplicity=src_multiplicity,
         tgt_multiplicity=tgt_multiplicity,
         specialization=specialization,
+        metadata=metadata,
     )
 
     if dry_run:

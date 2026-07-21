@@ -1,10 +1,28 @@
 import { Schema } from 'effect'
+import { EntityAttributeDescriptorSchema } from './entities'
 
 export const PermittedConnectionsByPeerSchema = Schema.Struct({
   outgoing: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
   incoming: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
   symmetric: Schema.Record({ key: Schema.String, value: Schema.Array(Schema.String) }),
 })
+
+/**
+ * The effective merged metadata schema a (connection-type, specialization) pair authors
+ * against. Connections have no schema endpoint of their own — unlike entities, which fetch
+ * theirs from /api/entity-schemata — so it rides along in the guidance payload. Absent when
+ * the backend resolved no repository root.
+ */
+export const ConnectionMetadataSchemaSchema = Schema.Struct({
+  schema: Schema.NullOr(Schema.Unknown),
+  properties: Schema.Array(Schema.String),
+  required: Schema.Array(Schema.String),
+  // Same descriptor shape the entity schema endpoint serves, so one typed input renders both.
+  descriptors: Schema.Record({ key: Schema.String, value: EntityAttributeDescriptorSchema }),
+  conflicts: Schema.Array(Schema.String),
+  quarantined: Schema.Boolean,
+})
+export type ConnectionMetadataSchema = typeof ConnectionMetadataSchemaSchema.Type
 
 export const SpecializationGuidanceSchema = Schema.Struct({
   slug: Schema.String,
@@ -16,6 +34,7 @@ export const SpecializationGuidanceSchema = Schema.Struct({
     icon: Schema.optional(Schema.String),
     color: Schema.optional(Schema.String),
   })),
+  metadata_schema: Schema.optional(ConnectionMetadataSchemaSchema),
 })
 export type SpecializationGuidance = typeof SpecializationGuidanceSchema.Type
 
@@ -42,6 +61,7 @@ export type EntityTypeGuidance = typeof EntityTypeGuidanceSchema.Type
 export const ConnectionTypeGuidanceSchema = Schema.Struct({
   name: Schema.String,
   specializations: Schema.Array(SpecializationGuidanceSchema),
+  metadata_schema: Schema.optional(ConnectionMetadataSchemaSchema),
 })
 export type ConnectionTypeGuidance = typeof ConnectionTypeGuidanceSchema.Type
 

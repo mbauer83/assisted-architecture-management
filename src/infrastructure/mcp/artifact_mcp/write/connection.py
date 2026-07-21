@@ -33,6 +33,7 @@ def _add_connection_impl(
     provisional_ids: frozenset[str],
     clear_repo_caches=None,
     specialization: str | None = None,
+    metadata: dict[str, str] | None = None,
 ) -> dict[str, object]:
     """Internal implementation shared by the MCP tool and bulk_write."""
     scope: Literal["engagement", "both"] = "engagement" if repo_root else "both"
@@ -112,6 +113,7 @@ def _add_connection_impl(
         src_multiplicity=src_multiplicity,
         tgt_multiplicity=tgt_multiplicity,
         specialization=specialization,
+        metadata=metadata,
         version=version,
         status=status,
         last_updated=None,
@@ -140,6 +142,7 @@ def artifact_add_connection(
     src_multiplicity: str | None = None,
     tgt_multiplicity: str | None = None,
     specialization: str | None = None,
+    metadata: dict[str, str] | None = None,
     version: str = "0.1.0",
     status: str = "draft",
     from_diagram_element: dict[str, object] | None = None,
@@ -203,6 +206,7 @@ def artifact_add_connection(
         src_multiplicity=src_multiplicity,
         tgt_multiplicity=tgt_multiplicity,
         specialization=specialization,
+        metadata=metadata,
         version=version,
         status=status,
         dry_run=dry_run,

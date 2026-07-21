@@ -58,18 +58,42 @@ def isolated_catalogs(engagement_root: Path) -> RuntimeCatalogs:
 
 class TestEntityTypeAndDomainFilters:
     def test_entity_type_filter_matches_domain_function(
-        self, client: TestClient, isolated_catalogs: RuntimeCatalogs,
+        self, client: TestClient, isolated_catalogs: RuntimeCatalogs, engagement_root: Path,
     ) -> None:
         resp = client.get("/api/authoring-guidance", params={"entity_type": "requirement"})
         assert resp.status_code == 200
-        assert resp.json() == get_type_guidance(filter=["requirement"], catalogs=isolated_catalogs)
+        assert resp.json() == get_type_guidance(
+            filter=["requirement"], catalogs=isolated_catalogs, repo_root=engagement_root
+        )
 
     def test_domain_filter_matches_domain_function(
-        self, client: TestClient, isolated_catalogs: RuntimeCatalogs,
+        self, client: TestClient, isolated_catalogs: RuntimeCatalogs, engagement_root: Path,
     ) -> None:
         resp = client.get("/api/authoring-guidance", params={"domain": "motivation"})
         assert resp.status_code == 200
-        assert resp.json() == get_type_guidance(filter=["motivation"], catalogs=isolated_catalogs)
+        assert resp.json() == get_type_guidance(
+            filter=["motivation"], catalogs=isolated_catalogs, repo_root=engagement_root
+        )
+
+    def test_connection_types_carry_the_effective_metadata_schema(
+        self, client: TestClient, engagement_root: Path
+    ) -> None:
+        """WU-W3: connections have no schema endpoint of their own, so the guidance payload
+        carries the effective merged metadata schema each pair authors against."""
+        from src.application.artifact_schema import clear_schema_cache
+
+        schemata = engagement_root / ".arch-repo" / "schemata"
+        schemata.mkdir(parents=True, exist_ok=True)
+        (schemata / "connection-metadata.archimate-assignment.schema.json").write_text(
+            '{"properties": {"cadence": {"type": "string"}}}', encoding="utf-8"
+        )
+        clear_schema_cache()
+        body = client.get("/api/authoring-guidance", params={"entity_type": "requirement"}).json()
+        assignment = next(e for e in body["connection_types"] if e["name"] == "archimate-assignment")
+        assert assignment["metadata_schema"]["properties"] == ["cadence"]
+        assert assignment["metadata_schema"]["quarantined"] is False
+        # Every declared specialization carries its own merged schema, not just the type.
+        assert all("metadata_schema" in s for s in assignment["specializations"])
 
     def test_no_params_returns_all_entity_types(self, client: TestClient) -> None:
         resp = client.get("/api/authoring-guidance")

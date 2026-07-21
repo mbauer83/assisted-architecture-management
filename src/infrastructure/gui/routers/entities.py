@@ -176,34 +176,6 @@ def read_entity_context(id: str) -> EntityContextReadModel:
     return context
 
 
-def _attribute_descriptors(schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Extract per-attribute UI descriptors (type, enum, default, constraints) from a JSON Schema."""
-    props: dict[str, Any] = schema.get("properties", {}) or {}
-    out: dict[str, dict[str, Any]] = {}
-    for name, prop_schema in props.items():
-        if not isinstance(prop_schema, dict):
-            continue
-        schema_type = prop_schema.get("type", "string")
-        descriptor: dict[str, Any] = {"type": schema_type}
-        if "enum" in prop_schema:
-            descriptor["enum"] = [str(v) for v in prop_schema["enum"]]
-        if "default" in prop_schema:
-            raw = prop_schema["default"]
-            if isinstance(raw, bool):
-                descriptor["default"] = "true" if raw else "false"
-            elif raw is not None:
-                descriptor["default"] = str(raw)
-        constraints: dict[str, Any] = {}
-        for key in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
-                    "minLength", "maxLength", "pattern"):
-            if key in prop_schema:
-                constraints[key] = prop_schema[key]
-        if constraints:
-            descriptor["constraints"] = constraints
-        out[name] = descriptor
-    return out
-
-
 @router.get("/api/entity-schemata")
 def get_entity_schemata(artifact_type: str, specialization: str = "") -> dict[str, Any]:
     """Effective attribute schema for an entity type, merged with the selected
@@ -213,6 +185,7 @@ def get_entity_schemata(artifact_type: str, specialization: str = "") -> dict[st
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
     from src.application.artifact_schema import (
+        attribute_descriptors,
         compute_effective_attribute_schema,
         schema_all_properties,
         schema_required_properties,
@@ -248,7 +221,7 @@ def get_entity_schemata(artifact_type: str, specialization: str = "") -> dict[st
         "schema": schema,
         "properties": schema_all_properties(schema),
         "required": schema_required_properties(schema),
-        "descriptors": _attribute_descriptors(schema),
+        "descriptors": attribute_descriptors(schema),
         "conflicts": conflicts,
         "quarantined": quarantined,
     }

@@ -13,8 +13,13 @@ import type { AuthoringGuidance, OntologyPair, WriteResult } from '../../domain'
 import type { RepoError } from '../../ports/ModelRepository'
 import { useQuery } from '../composables/useQuery'
 import { useMutation } from '../composables/useMutation'
-import { specializationOptionsForConnectionType, specializationOptionLabel } from '../lib/specializationOptions'
+import {
+  connectionMetadataSchema, specializationOptionsForConnectionType, specializationOptionLabel,
+} from '../lib/specializationOptions'
+import type { SchemaQuarantine } from '../lib/schemaQuarantine'
 import EntitySearchInput from './EntitySearchInput.vue'
+import SchemaQuarantineBanner from './SchemaQuarantineBanner.vue'
+import TypedPropertyInput from './TypedPropertyInput.vue'
 
 const props = defineProps<{
   entityId: string
@@ -46,7 +51,41 @@ const specOptions = computed(() =>
   specializationOptionsForConnectionType(props.guidance, connTypeSelected.value),
 )
 
+// The effective metadata schema for the selected (type, specialization) pair, and the rows
+// the operator fills in. Rows are rebuilt whenever the pair changes: a different pair is a
+// different schema, so carrying values across would carry attributes the new pair may not
+// declare. Defaults come from the schema, exactly as on the entity create form.
+const metadataSchema = computed(() =>
+  connectionMetadataSchema(props.guidance, connTypeSelected.value, specSelected.value),
+)
+const metadataValues = ref<Record<string, string>>({})
+
+const rebuildMetadataRows = () => {
+  const info = metadataSchema.value
+  const next: Record<string, string> = {}
+  for (const key of info?.properties ?? []) next[key] = info?.descriptors[key]?.default ?? ''
+  metadataValues.value = next
+}
+
+watch(metadataSchema, rebuildMetadataRows, { immediate: true })
 watch(connTypeSelected, () => { specSelected.value = '' })
+
+const metadataQuarantine = computed(
+  (): SchemaQuarantine => ({
+    quarantined: metadataSchema.value?.quarantined ?? false,
+    conflicts: metadataSchema.value?.conflicts ?? [],
+  }),
+)
+
+const metadataRequiredMissing = computed(() =>
+  (metadataSchema.value?.required ?? []).some((key) => !metadataValues.value[key]?.trim()),
+)
+
+/** Only non-empty values are sent: an untouched optional attribute is absent, not blank. */
+const metadataBody = computed((): Record<string, string> | undefined => {
+  const filled = Object.entries(metadataValues.value).filter(([, value]) => value.trim() !== '')
+  return filled.length ? Object.fromEntries(filled) : undefined
+})
 
 const MULTIPLICITY_RE = /^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$/
 const multError = (v: string) => v.trim() && !MULTIPLICITY_RE.test(v.trim()) ? 'Use: n, n..m, n..*, or *' : ''
@@ -69,6 +108,16 @@ watch(() => pairQuery.data.value, (pair) => {
   const types = connTypeOptions.value
   if (types.length === 1) connTypeSelected.value = types[0]
   else if (props.direction === 'symmetric') connTypeSelected.value = 'archimate-association'
+})
+
+const addBlocked = computed(() =>
+  !selectedTarget.value || !connTypeSelected.value || !!srcMultError.value || !!tgtMultError.value
+  || addMutation.running.value || metadataQuarantine.value.quarantined || metadataRequiredMissing.value,
+)
+
+const addBlockedTitle = computed(() => {
+  if (metadataQuarantine.value.quarantined) return 'Resolve the schema conflict shown above before adding'
+  return metadataRequiredMissing.value ? 'Fill in all required metadata attributes first' : undefined
 })
 
 const addError = computed(() =>
@@ -97,6 +146,7 @@ const confirmAdd = () => {
     src_multiplicity: srcMultInput.value.trim() || undefined,
     tgt_multiplicity: tgtMultInput.value.trim() || undefined,
     specialization: specSelected.value || undefined,
+    metadata: metadataBody.value,
     dry_run: false,
   })).then((exit) => Exit.match(exit, {
     onSuccess: (r) => { if (r.wrote) emit('added') },
@@ -156,6 +206,28 @@ const confirmAdd = () => {
         </option>
       </select>
     </div>
+    <SchemaQuarantineBanner
+      :quarantine="metadataQuarantine"
+      :artifact-type="connTypeSelected"
+      :specialization="specSelected"
+    />
+    <div
+      v-for="key in metadataSchema?.properties ?? []"
+      :key="key"
+      class="add-row add-row--meta"
+    >
+      <label class="meta-label">
+        {{ key }}<span
+          v-if="metadataSchema?.required.includes(key)"
+          class="meta-required"
+        > *</span>
+      </label>
+      <TypedPropertyInput
+        v-model="metadataValues[key]"
+        :descriptor="metadataSchema?.descriptors[key] ?? { type: 'string' }"
+        :required="metadataSchema?.required.includes(key)"
+      />
+    </div>
     <div class="add-row">
       <EntitySearchInput
         :artifact-type="typeKey"
@@ -211,7 +283,8 @@ const confirmAdd = () => {
       </button>
       <button
         class="add-confirm-btn"
-        :disabled="!selectedTarget || !connTypeSelected || !!srcMultError || !!tgtMultError || addMutation.running.value"
+        :disabled="addBlocked"
+        :title="addBlockedTitle"
         @click="confirmAdd"
       >
         Add
@@ -228,6 +301,9 @@ const confirmAdd = () => {
 
 <style scoped>
 .state-msg { color: #6b7280; padding: 4px 0; font-size: 13px; }
+.add-row--meta { display: flex; gap: 8px; align-items: flex-start; }
+.meta-label { flex: 0 0 130px; font-size: 12px; font-weight: 500; color: #374151; padding-top: 7px; }
+.meta-required { color: #dc2626; }
 .state-msg--error { color: #dc2626; }
 .mult-label { font-size: 11px; color: #6b7280; white-space: nowrap; }
 .mult-input {

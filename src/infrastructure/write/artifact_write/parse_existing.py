@@ -250,9 +250,15 @@ def _declaration_to_dict(decl: ConnectionDeclaration) -> dict[str, object]:
     """Convert a parsed declaration to the legacy connections-dict shape.
 
     Keys: connection_type, target_entity, description. src_multiplicity,
-    tgt_multiplicity, and specialization are included only when present so that
-    round-trip reformatting preserves them exactly — specialization comes from the
-    per-connection metadata block, never from ``description``.
+    tgt_multiplicity, metadata, and specialization are included only when present so that
+    round-trip reformatting preserves them exactly.
+
+    ``metadata`` carries the WHOLE per-connection metadata block. Keeping only the
+    specialization out of it (as this used to) silently dropped every other declared
+    attribute on any edit that reformatted the file — invisible data loss, and exactly the
+    content a specialization-scoped metadata schema exists to describe. ``specialization``
+    stays a separate key because the edit API sets and clears it by name; it is the
+    authority for that one field when the file is written back.
     """
     conn: dict[str, object] = {
         "connection_type": decl.conn_type,
@@ -265,6 +271,8 @@ def _declaration_to_dict(decl: ConnectionDeclaration) -> dict[str, object]:
         conn["tgt_multiplicity"] = decl.tgt_multiplicity
     if decl.associated_entities:
         conn["associated_entities"] = list(decl.associated_entities)
+    if decl.metadata:
+        conn["metadata"] = dict(decl.metadata)
     specialization = decl.metadata.get("specialization")
     if isinstance(specialization, str) and specialization:
         conn["specialization"] = specialization

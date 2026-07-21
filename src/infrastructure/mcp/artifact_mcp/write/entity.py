@@ -23,12 +23,16 @@ def artifact_authoring_guidance(
     target: str | None = None,
 ) -> dict[str, object]:
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+    from src.infrastructure.mcp.artifact_mcp.context import resolve_repo_root  # noqa: PLC0415
 
     return artifact_write_ops.get_type_guidance(
         filter=filter,
         diagram_type=diagram_type,
         target=target,
         catalogs=build_runtime_catalogs(get_module_registry()),
+        # REST/MCP parity: the connection metadata schemata are per-repo files, so both
+        # transports must resolve a root or neither can carry them.
+        repo_root=resolve_repo_root(repo_root=None, repo_preset=None),
     )
 
 

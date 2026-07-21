@@ -132,6 +132,8 @@ def format_outgoing_markdown(
       - ``tgt_multiplicity``: target-end multiplicity (optional, same format)
       - ``specialization``: a specialization slug (optional) — persisted in the
         per-connection metadata block, never folded into ``description``
+      - ``metadata``: the rest of the per-connection metadata block (optional), carried
+        through verbatim so a reformat never drops schema-declared attributes
 
     Header format:  ### conn-type [src_mult] → [tgt_mult] target_id
     Both multiplicity parts are omitted when absent.  Multiplicities are not
@@ -148,8 +150,15 @@ def format_outgoing_markdown(
     sections: list[str] = ["<!-- §connections -->"]
     for conn in connections:
         assoc_ids = conn.get("associated_entities")
+        raw_metadata = conn.get("metadata")
+        metadata: dict[str, Any] = dict(raw_metadata) if isinstance(raw_metadata, dict) else {}
+        # ``specialization`` is authoritative as its own key: the edit API sets and clears
+        # it by name, so it overrides (or removes) whatever the carried block held.
         specialization = conn.get("specialization")
-        metadata: dict[str, Any] = {"specialization": str(specialization)} if specialization else {}
+        if specialization:
+            metadata["specialization"] = str(specialization)
+        else:
+            metadata.pop("specialization", None)
         decl = ConnectionDeclaration(
             conn_type=str(conn["connection_type"]),
             target_id=str(conn["target_entity"]),

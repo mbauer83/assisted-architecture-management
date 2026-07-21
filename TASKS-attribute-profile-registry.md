@@ -346,12 +346,48 @@ classifier, quarantine machinery, and reconciliation step.
 - Gates: backend 6323 passed / 5 skipped; ruff + zuban clean.
 
 ### WU-W3 — Surfaces (needs W1)
-- [ ] Effective merged connection-metadata schema in the authoring-guidance
+- [x] Effective merged connection-metadata schema in the authoring-guidance
       payload (REST + MCP parity).
-- [ ] GUI renders it through the existing `TypedPropertyInput` — the connection
+- [x] GUI renders it through the existing `TypedPropertyInput` — the connection
       specialization picker already exists
       (`specializationOptionsForConnectionType`). No new GUI concept.
-- [ ] Tests: Vitest for the connection metadata editor.
+- [x] Tests: Vitest for the connection metadata editor.
+
+#### WU-W3 PROGRESS (2026-07-22)
+- Payload: `_connection_metadata_guidance.py` builds the `connection_types` block; each
+  entry and each of its specializations carries `metadata_schema` =
+  `{schema, properties, required, descriptors, conflicts, quarantined}`. `get_type_guidance`
+  takes a new `repo_root` (schemata are per-repo files); REST passes
+  `s.maybe_engagement_root()` and MCP passes `resolve_repo_root(...)`, so neither transport
+  offers a shape the other lacks. Without a root the payload is guidance only, as before.
+- `attribute_descriptors` moved from `routers/entities.py` to `artifact_schema.py`: the
+  entity endpoint and the connection guidance now serve ONE descriptor shape, so a single
+  `TypedPropertyInput` renders either without knowing which side it came from.
+- GUI: `ConnectionAddForm` renders the pair's typed metadata fields, reuses
+  `SchemaQuarantineBanner`, and disables Add on quarantine or a missing required attribute.
+  New selector `connectionMetadataSchema()` picks specialization → type-level → null.
+
+#### DEFECT FOUND AND FIXED during W3 (2026-07-22)
+The plan assumed the GUI could simply "render the merged schema"; the code could not carry
+what it rendered. Two gaps at the same layer:
+1. `_declaration_to_dict` lifted ONLY `specialization` out of the parsed metadata block, and
+   `format_outgoing_markdown` rebuilt the block from that key alone — so any edit that
+   reformatted an `.outgoing.md` file silently DROPPED every other metadata attribute.
+   Invisible data loss, and precisely the content a metadata schema exists to describe. The
+   dict now carries the whole block as `metadata`, with `specialization` still authoritative
+   for its own key (the edit API sets and clears it by name).
+2. The write API had no way to SET those attributes. `metadata` is now plumbed through
+   `add_connection` / `edit_connection` (replacement semantics, mirroring the entity edit
+   API's `properties`; `{}` clears), the REST bodies, and the MCP tools.
+Recorded rather than worked around: rendering a schema whose attributes no write path could
+persist would have been a facade.
+- Tests: `tests/tools/test_connection_metadata_round_trip.py` (formatting + write path +
+  the drop-on-unrelated-edit regression); the guidance-payload assertion in
+  `test_gui_router_authoring_guidance.py`; vitest
+  `ui/lib/__tests__/connectionMetadataSchema.test.ts`.
+- **Restart-gated**: `artifact_add_connection` / `artifact_edit_connection` gained a
+  `metadata` parameter — an MCP *surface* change, so a Claude session restart is required
+  before it can be exercised through MCP. Queued for the WU-X1 restart.
 
 ## Stream T — Docs and self-model
 

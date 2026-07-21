@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends
 
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
+from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._entity_filter import parse_csv_filter
 from src.infrastructure.write import artifact_write_ops
 
@@ -33,4 +34,8 @@ def read_authoring_guidance(
         diagram_type=diagram_type,
         target=target,
         catalogs=catalogs,
+        # Connection metadata schemata are per-repo files; without the root the payload
+        # could only carry guidance, and the connection editor would have no schema to
+        # render (the entity side gets its own from /api/entity-schemata).
+        repo_root=s.maybe_engagement_root(),
     )

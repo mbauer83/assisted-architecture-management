@@ -1,4 +1,4 @@
-import type { AuthoringGuidance, SpecializationGuidance } from '../../domain'
+import type { AuthoringGuidance, ConnectionMetadataSchema, SpecializationGuidance } from '../../domain'
 
 /**
  * Available specializations for one entity type, sourced from the `entity_types[].specializations`
@@ -28,6 +28,24 @@ export function specializationOptionsForConnectionType(
   if (!guidance?.connection_types) return []
   const entry = guidance.connection_types.find((e) => e.name === connectionType)
   return entry?.specializations ?? []
+}
+
+/**
+ * The effective metadata schema for one (connection type, specialization) pair. Falls back
+ * to the connection type's own schema when no specialization is selected, and to `null`
+ * when the payload carries none (an older backend, or one with no repository root) — the
+ * caller then renders no typed fields rather than inventing an empty schema.
+ */
+export function connectionMetadataSchema(
+  guidance: AuthoringGuidance | null,
+  connectionType: string,
+  specializationSlug: string,
+): ConnectionMetadataSchema | null {
+  const entry = guidance?.connection_types?.find((e) => e.name === connectionType)
+  if (!entry) return null
+  if (!specializationSlug) return entry.metadata_schema ?? null
+  const spec = entry.specializations.find((s) => s.slug === specializationSlug)
+  return spec?.metadata_schema ?? entry.metadata_schema ?? null
 }
 
 /** Display label for a specialization option, e.g. for a `<select>`'s option text. */

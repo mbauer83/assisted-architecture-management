@@ -15,13 +15,18 @@ Progressive discovery:
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from src.application.guidance_composition import GuidanceContextView
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.domain.allowed_bindings import serialize_allowed_bindings
 from src.domain.module_types import ConnectionTypeName, EntityTypeName
 from src.domain.ontology_protocol import DiagramTypeWriteGuidance
-from src.domain.specializations import SpecializationCatalog, SpecializationInfo
+from src.domain.specializations import SpecializationCatalog
+from src.infrastructure.write.artifact_write._connection_metadata_guidance import (
+    connection_type_guidance,
+    serialize_specialization,
+)
 
 
 def pair_connection_guidance(source_type: str, target_type: str) -> dict[str, object]:
@@ -94,6 +99,7 @@ def get_type_guidance(
     diagram_type: str | None = None,
     target: str | None = None,
     catalogs: RuntimeCatalogs | None = None,
+    repo_root: Path | None = None,
 ) -> dict[str, object]:
     """Return focused modeling guidelines for the requested entity types, domains, or diagram type.
 
@@ -117,6 +123,11 @@ def get_type_guidance(
     (entity ``entity_types[].specializations`` and connection ``connection_types``); callers with
     an injected ``RuntimeCatalogs`` (REST) pass it, callers without one (MCP) omit it and a
     process-wide default is built lazily.
+
+    ``repo_root`` is what makes schemas resolvable — they are per-repo files. With it, each
+    connection type and each of its specializations also carries the effective merged
+    metadata schema it authors against (and whether the pair is quarantined). Without it the
+    payload is guidance only, exactly as before.
     """
     cats = catalogs if catalogs is not None else _default_catalogs()
     result: dict[str, object] = {}
@@ -151,7 +162,12 @@ def get_type_guidance(
     if filter is not None or diagram_type is None:
         entity_section = _entity_type_guidance(filter, cats.specializations, cats.guidance_context)
         result.update(entity_section)
-        result["connection_types"] = _connection_type_guidance(cats.specializations)
+        result["connection_types"] = connection_type_guidance(
+            cats.specializations,
+            profile_registry=cats.profiles,
+            repo_root=repo_root,
+            connection_type_names=tuple(sorted(str(n) for n in _registry().all_connection_types())),
+        )
 
     return result
 
@@ -234,39 +250,6 @@ def _serialize_own_entity_type(oe) -> dict[str, object]:  # type: ignore[no-unty
     return entry
 
 
-def _serialize_specialization(info: SpecializationInfo) -> dict[str, object]:
-    entry: dict[str, object] = {
-        "slug": info.slug,
-        "name": info.name,
-        "description": info.description,
-        "create_when": info.create_when,
-        "never_create_when": info.never_create_when,
-    }
-    if info.notation.icon or info.notation.color:
-        notation = {k: v for k, v in (("icon", info.notation.icon), ("color", info.notation.color)) if v}
-        entry["notation"] = notation
-    return entry
-
-
-def _connection_type_guidance(specialization_catalog: SpecializationCatalog) -> list[dict[str, object]]:
-    """Per-connection-type specialization enumeration, restricted to types that have any —
-
-    unlike entity types (each already gets its own guidance entry, so an empty
-    ``specializations`` list costs nothing extra), connection types have no other guidance
-    entry here; listing every known connection type regardless of specialization would add a
-    long, mostly-empty block to every guidance response."""
-    entries: list[dict[str, object]] = []
-    for name in sorted(_registry().all_connection_types()):
-        specializations = specialization_catalog.for_type("connection", str(name))
-        if not specializations:
-            continue
-        entries.append({
-            "name": str(name),
-            "specializations": [_serialize_specialization(s) for s in specializations],
-        })
-    return entries
-
-
 def _entity_type_guidance(
     filter: list[str] | None,  # noqa: A002
     specialization_catalog: SpecializationCatalog,
@@ -327,7 +310,7 @@ def _entity_type_guidance(
         entry["never_create_when"] = info.never_create_when
         entry["permitted_connections"] = connections
         entry["specializations"] = [
-            _serialize_specialization(s) for s in specialization_catalog.for_type("entity", info.artifact_type)
+            serialize_specialization(s) for s in specialization_catalog.for_type("entity", info.artifact_type)
         ]
         context = guidance_context.context_for(info.artifact_type)
         if context:
