@@ -4,13 +4,16 @@ Each repository may carry a `.arch-repo/schemata/` directory of JSON Schema file
 or constrain the global ontology for that repo.
 
 ```
-.arch-repo/schemata/
-  attributes.{entity-type}.schema.json                    # base attribute schema per entity type
-  attributes.{entity-type}.{specialization-slug}.schema.json  # attached to one specialization
-  frontmatter.entity.schema.json                          # constraints on entity frontmatter
-  frontmatter.outgoing.schema.json                        # constraints on connection (outgoing) frontmatter
-  frontmatter.diagram.schema.json                         # constraints on diagram frontmatter
-  connection-metadata.{connection-type}.schema.json       # per-connection metadata block, per type
+.arch-repo/
+  profiles.yaml                                           # named, reusable attribute profiles (optional)
+  schemata/
+    attributes.{entity-type}.schema.json                    # base attribute schema per entity type
+    attributes.{entity-type}.{specialization-slug}.schema.json  # attached to one entity specialization
+    frontmatter.entity.schema.json                          # constraints on entity frontmatter
+    frontmatter.outgoing.schema.json                        # constraints on connection (outgoing) frontmatter
+    frontmatter.diagram.schema.json                         # constraints on diagram frontmatter
+    connection-metadata.{connection-type}.schema.json       # per-connection metadata block, per type
+    connection-metadata.{connection-type}.{specialization-slug}.schema.json  # attached to one connection specialization
 ```
 
 &nbsp;
@@ -46,39 +49,104 @@ tighten constraints, and the verifier checks every write against them.
 
 &nbsp;
 
-## Profiles are one-to-one with their specialization
+## How a specialization contributes attributes
 
-A `ProfileDefinition` is a compiled, typed attribute set — slug, name, applicable entity
-types, and attributes each with a `required | recommended | optional` level and an optional
-default. A profile is **never independently reusable or named by reference**: it is either
-the *default* (base-type) profile for unspecialized elements — today's on-disk
-`attributes.{type}.schema.json`, unchanged — or it belongs to exactly one specialization,
-compiled from that specialization's own declaration. Existence-dependence settles the
-direction: a profile can't exist without its specialization, so specialization *contains*
-profile, not the other way around and not a peer/associated pair (an earlier design had a
-separate, named `.arch-repo/profiles.yaml` reusable across specializations; it was replaced
-once this asymmetry was recognized).
+A specialization (see [Ontology modules](ontology-modules.md#specializations)) contributes
+attribute constraints through any combination of three mechanisms:
 
-A specialization (see [Ontology modules](ontology-modules.md#specializations)) attaches
-attribute constraints via either of two mechanisms — both already 1:1 with that
-specialization by construction:
-
-- **Inline** `attributes: {}` on the specialization's own declaration, compiled to an
-  anonymous profile.
+- **Inline** `attributes: {}` on the specialization's own declaration.
 - **A dedicated attachment file**, `attributes.{entity-type}.{specialization-slug}.schema.json`
   — a standalone JSON Schema, filename-scoped to that one slug.
+- **Named-profile bindings** — `profiles: [name, ...]` referencing reusable profiles
+  declared in `profiles.yaml` (below). Unlike the first two, a named profile is shared:
+  the same profile can be bound by several specializations, so cross-cutting attribute sets
+  (a shared `ai-provenance` block, an `ownership` block) are declared once.
 
-Each compiles to a JSON Schema fragment (`required` for `required`-level attributes, the
-extension keyword `x-recommended` for `recommended`-level ones — JSON Schema has no native
-"recommended", so the verifier checks it explicitly rather than relying on `jsonschema`
-itself).
+Each mechanism compiles to a JSON Schema fragment (`required` for `required`-level
+attributes, the extension keyword `x-recommended` for `recommended`-level ones — JSON Schema
+has no native "recommended", so the verifier checks it explicitly rather than relying on
+`jsonschema` itself).
 
-An entity's **effective attribute schema** is the base-type schema merged with its own
-specialization's contribution (an entity carries at most one specialization). A property
-redefined incompatibly between the two (same name, different `type`) is a blocking error;
-any other redefinition (e.g. a different `default`) resolves last-writer-wins. An
+&nbsp;
+
+## Named attribute profiles
+
+`.arch-repo/profiles.yaml` declares reusable profiles a specialization can bind by name.
+The file carries a format version and each profile carries a content version:
+
+```yaml
+profile_schema: 1              # declaration format version (a typed error if unrecognised)
+profiles:
+  ai-provenance:
+    version: 1                 # content version — bumped when the profile's attributes change
+    attributes:
+      Model Provider: { type: string, level: required }
+      Training Cutoff: { type: string, level: optional }
+```
+
+A specialization binds one or more by name, in declaration order:
+
+```yaml
+specializations:
+  entity:
+    application-component:
+      - slug: ai-inference-service
+        profiles: [ai-provenance]
+        attributes:                # its own inline attributes still apply, and win last
+          Endpoint: { type: string, level: required }
+```
+
+The shipped ontology module may also ship a registry; a repo-level profile of the same name
+overrides the shipped one. Binding a name that no registry defines is a **structural
+(Class A) error** — see [failure semantics](#failure-semantics).
+
+Connection specializations bind profiles by the identical mechanism (`specializations:` →
+`connection:` block), and their per-connection metadata resolves through the same pipeline.
+
+&nbsp;
+
+## Effective schema and resolution order
+
+An element's **effective attribute schema** is its fragments merged in a fixed,
+deterministic order (a connection's effective metadata schema resolves identically):
+
+1. the base-type schema (`attributes.{type}.schema.json` / `connection-metadata.{type}.schema.json`);
+2. each applied specialization's **bound named profiles**, in declaration order;
+3. each applied specialization's **own** profile last (inline `attributes:` then its
+   attachment file) — so the specific always wins over a shared profile it composes.
+
+A property redefined incompatibly across fragments (same name, different `type`) is a
+conflict; any other redefinition (e.g. a different `default`) resolves last-writer-wins. An
 attachment file whose `{specialization-slug}` segment names no specialization declared for
-that entity type is a verifier warning (orphaned attachment) rather than silently ignored.
+that type is a verifier warning (orphaned attachment) rather than silently ignored.
+
+&nbsp;
+
+## Failure semantics
+
+A conflict's blast radius decides how it fails:
+
+- **Class A — structural.** A binding to a profile name no registry defines leaves the
+  registry itself ill-defined. On an engagement repo this **aborts startup** (the model
+  cannot be trusted to resolve at all); on the enterprise repo it is a warning. Fix the
+  binding, then restart.
+- **Class B — scoped (quarantine).** Two fragments disagree on an attribute's `type`, so
+  one `(type, specialization)` pair has no unambiguous effective schema. The rest of the
+  model stays well-defined, so the failure is confined to that pair: reads continue, but a
+  create or edit onto it is **refused at the write boundary** — every transport (GUI, REST,
+  MCP) funnels through the same gate, and the verifier reports the conflict as a blocking
+  error (`E043` for entities, `E045` for connections). The authoring GUI shows a banner
+  naming the conflict and disables submit; the connection editor does the same. Quarantine
+  is computed on demand and never persisted, so it self-clears the moment the conflicting
+  profiles or bindings are reconciled.
+
+`arch-repair` reports each quarantining conflict and proposes concrete resolutions — rename
+the attribute, align its type, or unbind one contributing profile — as manual instructions.
+It never rewrites operator-authored content automatically.
+
+The rationale for this classification, and why quarantine is enforced at a single write
+boundary rather than persisted, is recorded in [ADR: Profile failure
+semantics](../../engagements/ENG-ARCH-REPO/architecture-repository/docs/adr/platform-core/ADR@1784674023.8alNxn.profile-failure-semantics-blast-radius-classification-and-single-boundary-quarantine.md).
 
 &nbsp;
 
@@ -86,11 +154,15 @@ that entity type is a verifier warning (orphaned attachment) rather than silentl
 
 `connection-metadata.{connection-type}.schema.json` constrains the per-connection metadata
 block — the fenced YAML block immediately under a connection's `### ` heading in an
-`.outgoing.md` file, distinct from the file's shared frontmatter. Today the only field
-written there is `specialization` (see [Ontology
-modules](ontology-modules.md#specializations)); the convention is open to future
-per-connection metadata, validated the same way. Like the other schemata here, this one is
-opt-in per connection type — absent a schema file, the metadata block validates freely.
+`.outgoing.md` file, distinct from the file's shared frontmatter. Besides `specialization`
+(see [Ontology modules](ontology-modules.md#specializations)), the block holds whatever
+attributes the connection type's effective metadata schema declares, authored through the
+same typed fields the entity forms use. A connection specialization attaches its own
+attributes exactly as an entity one does —
+`connection-metadata.{connection-type}.{specialization-slug}.schema.json`, plus inline
+`attributes:` and named-profile bindings — and resolves through the same order and the same
+quarantine rules. Like the other schemata here, this one is opt-in per connection type —
+absent any schema, the metadata block validates freely.
 
 &nbsp;
 

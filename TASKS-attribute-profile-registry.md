@@ -198,8 +198,8 @@ never hardcode `archimate_4`.
 ### WU-Q4 — Stream Q boundary
 - [x] Full backend gates green (see the commit's gate line). No entity is written against an
       ambiguous schema through create or edit (REST/MCP share that path).
-- [ ] ADR for the failure-semantics design (owner-requested) — authored with Stream T
-      self-model (task tracked).
+- [x] ADR for the failure-semantics design (owner-requested) — authored with Stream T
+      self-model as `ADR@1784674023.8alNxn` (see WU-T2 progress); `artifact_verify` clean.
 
 ## Stream R — Reconciliation
 
@@ -415,13 +415,43 @@ persist would have been a facade.
 ## Stream T — Docs and self-model
 
 ### WU-T1 — Reference documentation
-- [ ] Profile authoring, binding, versioning, resolution order, and the failure
+- [x] Profile authoring, binding, versioning, resolution order, and the failure
       semantics — the quarantine behaviour especially, since an operator who
       meets one must be able to act on it.
 
+#### WU-T1 PROGRESS (2026-07-22)
+- `docs/05-extensibility/schemata-and-profiles.md` rewritten: the stale "profiles are
+  one-to-one with their specialization / never a named registry" section is replaced with
+  "How a specialization contributes attributes" (inline, attachment, named-profile
+  bindings), a "Named attribute profiles" section documenting `.arch-repo/profiles.yaml`
+  (format + content versions, binding syntax, shipped-vs-repo override), an "Effective
+  schema and resolution order" section (base → bound profiles → own, in order), and a
+  "Failure semantics" section covering Class A startup abort and Class B quarantine with
+  the operator-facing behaviour (banner, disabled submit, E043/E045, arch-repair
+  proposals). The file tree, connection-attachment convention, and the connection metadata
+  section were updated to match the shipped code.
+- `docs/architecture/decisions.md` gains a row linking the new ADR.
+
 ### WU-T2 — Self-model sync
-- [ ] Model the profile-registry capability in ENG-ARCH-REPO: guidance-first,
+- [x] Model the profile-registry capability in ENG-ARCH-REPO: guidance-first,
       descriptions over new entities.
+
+#### WU-T2 PROGRESS (2026-07-22)
+- **ADR authored** (WU-Q4's last box): `ADR@1784674023.8alNxn` "Profile Failure Semantics;
+  Blast-Radius Classification and Single-Boundary Quarantine" under `docs/adr/platform-core`
+  via `artifact_create_document` (dry-run first). Records Class A structural vs Class B
+  scoped, engagement-hard/enterprise-soft, single-write-boundary enforcement (P8), and
+  no-persisted-quarantine, linking the Model Verifier, Architecture Backend, and the
+  One-Unified-Backend ADR. `artifact_verify` clean.
+- **Descriptions over entities** (motivation-entity discipline): no new entities. The two
+  existing `Specialization Profile` entities (`BOB@1783870955.TpnjS9` conceptual,
+  `DOB@1783870958.1-9hJv` technical) explicitly encoded the SUPERSEDED "one-to-one /
+  never a named registry" design; both summaries were rewritten via `artifact_edit_entity`
+  to describe the three contribution mechanisms, `.arch-repo/profiles.yaml` with its two
+  version tags, shipped-vs-repo override, and the resolution order. Repo-wide
+  `artifact_verify` (engagement): 73/73 valid, 0 errors (3 pre-existing GAR→enterprise
+  warnings, unrelated).
+- Gates: backend 6341 passed / 5 skipped; ruff + zuban clean.
 
 ## Stream V — Multiple specializations per concept (P9)
 

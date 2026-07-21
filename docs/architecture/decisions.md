@@ -19,6 +19,7 @@ below.
 | [SQLite read model with Copy-on-Write](../../engagements/ENG-ARCH-REPO/architecture-repository/docs/adr/platform-core/ADR@1783406825.9bDM6y.read-model-on-a-single-sqlite-backend-with-copy-on-write-concurrency.md) | FTS5 + recursive CTEs; lock-free reader snapshots; DuckDB rejected over full-rebuild FTS |
 | [Unified backend authority](../../engagements/ENG-ARCH-REPO/architecture-repository/docs/adr/platform-core/ADR@1783406851.pGCuZn.one-unified-backend-authority-every-write-through-the-same-verified-pipeline.md) | One long-running backend; GUI/REST/CLI/MCP are thin surfaces; every write through the same verified pipeline |
 | [MCP surface topology](../../engagements/ENG-ARCH-REPO/architecture-repository/docs/adr/platform-core/ADR@1783406863.eEC2t0.mcp-surface-topology-split-read-write-servers-gated-assurance-servers-responsibility-decomposed-tools.md) | Servers split at capability/gating boundaries only; tools decomposed by responsibility with accurate safety annotations |
+| [Profile failure semantics](../../engagements/ENG-ARCH-REPO/architecture-repository/docs/adr/platform-core/ADR@1784674023.8alNxn.profile-failure-semantics-blast-radius-classification-and-single-boundary-quarantine.md) | Conflicts classified by blast radius — structural (startup abort) vs scoped (on-demand quarantine at one write boundary), never persisted |
 
 Each ADR names the alternatives it rejected and links the requirements, principles, and
 components it governs. The [dependency policy](dependency-policy.md) and
