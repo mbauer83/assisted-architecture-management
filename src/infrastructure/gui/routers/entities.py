@@ -225,6 +225,12 @@ def get_entity_schemata(artifact_type: str, specialization: str = "") -> dict[st
         specialization_catalog=_catalogs().specializations,
         profile_registry=_catalogs().profiles,
     )
+    # `quarantined` is a derived read of the SAME conflicts channel (not a parallel one):
+    # a non-empty conflict set means this (type, specialization) pair is Class B quarantined,
+    # so the write boundary (WU-Q3) will refuse a create/edit for it. The GUI reads this to
+    # show a banner and disable submit (WU-S2); the flag only explains a refusal the backend
+    # already guarantees (PLAN §3 P8).
+    quarantined = bool(conflicts)
     if schema is None:
         return {
             "artifact_type": artifact_type,
@@ -234,6 +240,7 @@ def get_entity_schemata(artifact_type: str, specialization: str = "") -> dict[st
             "required": [],
             "descriptors": {},
             "conflicts": conflicts,
+            "quarantined": quarantined,
         }
     return {
         "artifact_type": artifact_type,
@@ -243,6 +250,7 @@ def get_entity_schemata(artifact_type: str, specialization: str = "") -> dict[st
         "required": schema_required_properties(schema),
         "descriptors": _attribute_descriptors(schema),
         "conflicts": conflicts,
+        "quarantined": quarantined,
     }
 
 

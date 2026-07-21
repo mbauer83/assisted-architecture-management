@@ -107,3 +107,29 @@ class TestEntitySchemataEndpoint:
         assert body["schema"] is None
         assert body["properties"] == []
         assert body["descriptors"] == {}
+
+    def test_clean_pair_is_not_quarantined(self, client, engagement_root: Path) -> None:
+        _write_schema(
+            engagement_root, "attributes.collaboration.schema.json", {"properties": {"scope": {"type": "string"}}}
+        )
+        body = client.get("/api/entity-schemata", params={"artifact_type": "collaboration"}).json()
+        assert body["conflicts"] == []
+        assert body["quarantined"] is False
+
+    def test_conflicting_attachment_marks_the_pair_quarantined(self, client, engagement_root: Path) -> None:
+        # WU-S1: a base↔specialization type conflict surfaces as quarantined on the SAME
+        # conflicts channel — the flag the GUI banner + disabled submit read (WU-S2).
+        _write_schema(
+            engagement_root, "attributes.collaboration.schema.json", {"properties": {"scope": {"type": "string"}}}
+        )
+        _write_schema(
+            engagement_root,
+            "attributes.collaboration.business-collaboration.schema.json",
+            {"properties": {"scope": {"type": "integer"}}},
+        )
+        body = client.get(
+            "/api/entity-schemata",
+            params={"artifact_type": "collaboration", "specialization": "business-collaboration"},
+        ).json()
+        assert body["quarantined"] is True
+        assert any("scope" in message for message in body["conflicts"])

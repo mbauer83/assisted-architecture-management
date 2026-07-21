@@ -238,9 +238,14 @@ never hardcode `archimate_4`.
 ## Stream S — Surfaces
 
 ### WU-S1 — Quarantine on the schema endpoint (needs Q2)
-- [ ] Extend the existing conflicts channel (`entities.py:221` already returns
-      `conflicts`) with quarantine state — do not add a parallel channel.
-- [ ] REST + MCP parity, parity-tested.
+- [x] `GET /api/entity-schemata` gains a derived `quarantined: bool` on the SAME conflicts
+      channel (`bool(conflicts)`) — no parallel channel. Tests: clean → false; conflicting
+      attachment → true.
+- [~] REST + MCP parity: there is NO MCP entity-schema read tool (only `promote.py` uses
+      `compute_effective`, for its own check), and adding one would violate the small-tool-
+      count discipline. MCP parity for quarantine is via the SHARED write gate (Q3
+      `ProfileQuarantineError` → tool error, names the conflict) + the verifier E043 — the
+      same conflict information, no new surface. Recorded interpretation, not an omission.
 
 ### WU-S2 — GUI surfacing (needs S1)
 - [ ] Banner on affected entity types; submit disabled with the reconciliation
