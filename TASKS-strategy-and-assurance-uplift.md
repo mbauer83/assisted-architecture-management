@@ -8,12 +8,67 @@ normative. Every stream-boundary gate names its required upstream WUs, local
 tests, cross-stream contract tests, model/documentation deltas, and migration
 evidence for any persisted surface it changed.
 
+## ⚠ READ FIRST — Reconciled state (2026-07-21) and sequencing
+
+**Checkbox state in this file lags reality in three WUs.** Do not derive remaining
+work from unticked boxes alone; use the table below, which was produced by
+enumerating *every* stream and reconciling each against the dated prose entries
+and against the code.
+
+**How to enumerate this ledger correctly.** Count first, enumerate second,
+reconcile the two — never conclude "what remains" from a truncated search:
+
+```
+grep -c '^- \[ \]' TASKS-strategy-and-assurance-uplift.md   # open  (50 at reconciliation)
+grep -c '^- \[x\]' TASKS-strategy-and-assurance-uplift.md   # done  (83 at reconciliation)
+grep -n  '^## Stream\|^### WU' TASKS-strategy-and-assurance-uplift.md   # all 8 streams / 33 WUs
+```
+
+If your per-stream enumeration does not sum to the totals, your enumeration is
+incomplete. (A prior session missed Stream R entirely by capping a grep with
+`head -20` and then reporting an unbounded conclusion from it.)
+
+| WU | Open boxes | Reconciled true state |
+|---|---|---|
+| D1 — Guidance format v2 | 7 | **GENUINELY OPEN.** Its guidance-cache upgrade *step* landed separately (`GuidanceCacheFormatStep`, registered); the format-v2 feature itself is not started. |
+| E1 — Documentation content | 2 | **GENUINELY OPEN.** May start anytime. |
+| E2 — Deterministic screenshots | 3 | **GENUINELY OPEN.** Gated on the UI surfaces it captures. |
+| G1 — Trace evaluator etc. | 8 | **STALE — substantially complete.** Evidenced by G2's live validation: the shipped `motivation-coverage` viewpoint executed live returning 91 gap rows / 0 warnings, which exercises the grammar, result union, evaluator, and post-projection pipeline. Individual sub-items (enum-set parameter type, §10.7 format impact) were not separately re-verified. |
+| G2 — Shipped viewpoint, docs, self-model, boundary | 6 | **STALE except one item.** Live-validated 2026-07-21; self-model saved (engagement commit `4f5a22e1`); frontend boundary gate green. The deferred **full backend suite is now satisfied** — 6124 passed / 5 skipped, 2026-07-21. **REMAINING: the crit-21b e2e G-S3 GUI walk** (Playwright; needs the running GUI dev server). |
+| R1/R2/R3 — Viewpoint reference integrity | 9 | **GENUINELY OPEN — never started.** The largest untouched stream. Independent of G; owner-approved 2026-07-20. Deferred previously because I-R1 execution-honesty wiring is integration-heavy and should not land unverified. |
+| U0a — Upgrade foundation | 4 | **STALE.** U0a itself is COMPLETE (2026-07-19). All four open boxes are co-landing hooks, and all four are verified registered: `SignalsRefreshRunSchemaStep`, `GuidanceCacheFormatStep`, `ViewpointDeclarationScanStep`, `DefaultSchemataEnsureStep`. |
+| U0b — Previous-release, partial-failure, Docker | 11 | **GENUINELY OPEN.** Last in stream. |
+
+**Genuinely remaining:** D1 (7), E1 (2), E2 (3), G2's e2e walk (1), Stream R (9),
+U0b (11) — plus the security-signals backlog items 2–7 at the end of this file.
+
+### Cross-plan sequencing (owner-agreed 2026-07-21)
+
+Three plans are in flight. Recommended order, with the reason each step sits
+where it does:
+
+1. **Security-signals backlog 2–7** (this ledger) — in-flight, bounded; item 5
+   fixes a view that currently 404s.
+2. **Stream R** (this ledger) — instrumentation *before* ontology surfaces move.
+   R detects broken viewpoint references to specialization slugs and attribute
+   paths, which are exactly what steps 3–4 change; without it that breakage is
+   silent (I-R1: "a broken query returning zero gaps must never read as a clean
+   bill of health"). Needs its own focused session.
+3. **`PLAN-attribute-profile-registry.md`** — Streams P, Q (+R1 together), S, W,
+   then R2, T. Highest risk; wants a clean tree.
+4. **Profile registry Stream V** — multiple specializations per concept.
+5. **OpenAPI** (modeling/querying endpoints first) — steps 3–4 change entity and
+   connection payload shapes, so publishing the contract earlier would document
+   a shape about to break.
+6. **`PLAN-aibom-model-derived.md`** — hard-depends on named profiles.
+
 ## Resume protocol
 
 1. This ledger is a **dependency graph, not a serial list**. Streams A, B, C, D, E
    proceed independently; within a stream, WUs land in the listed order. Pick the
    first unticked WU of whichever stream you are working; record which stream a
    session works in the progress log.
+   **Read the reconciled-state table above before deriving remaining work.**
 2. Re-verify each WU's stated code/model facts before changing anything; if the
    code or model contradicts the WU, **stop and record the discrepancy** here.
 3. **Gates strategy:** per WU run the WU's *targeted* tests only. At each **part
@@ -812,15 +867,15 @@ so a broken query is indistinguishable from a legitimately empty result.
       reports/logs; backup + operator recovery documented per target kind.
 
 ### Surface migrations (co-land with their owning WUs; tracked here)
-- [ ] C0: `signal_schema_meta` version tables (both layouts, version 0→1,
+- [x] C0: `signal_schema_meta` version tables (both layouts, version 0→1,
       step `signals-0001-run-aggregate`) + quarantine per the §9.2 appendix
       (exact DDL, reason precedence, PK/payload encodings, same-transaction,
       rerun-safe, admin surface incl. public file); settings alias rewrite via
       the `deployment_settings` target.
-- [ ] D1: guidance-cache header/sidecar transformation per §9.2 with synthetic
+- [x] D1: guidance-cache header/sidecar transformation per §9.2 with synthetic
       before/after fixtures ahead of the licensed-extract checkpoint.
-- [ ] G1: viewpoint declaration format detector + fixtures (§10.7).
-- [ ] A0/D2: default-schema ensure steps registered as upgrade detectors.
+- [x] G1: viewpoint declaration format detector + fixtures (§10.7).
+- [x] A0/D2: default-schema ensure steps registered as upgrade detectors.
 
 ### WU-U0b — Previous-release, partial-failure, Docker integration (last in stream)
 - [ ] Previous-release fixture workspace (tier repos, v1 cache + sidecar,
@@ -2816,6 +2871,29 @@ only existing nodes cannot measure a missing one".
   status even though 423/403/409 are routinely returned. FastAPI already serves /openapi.json
   + /docs dynamically, so the gap is schema fidelity, not exposure. Proposal recorded in the
   answer to the owner; NOT yet a work unit.
+
+- 2026-07-21 · LEDGER RECONCILIATION + CROSS-PLAN SEQUENCING · see the READ FIRST section at
+  the top of this file, which is now authoritative for "what remains".
+  · METHOD: enumerated all 8 streams / 33 WUs programmatically and reconciled the per-WU
+    counts against the file totals (50 open / 83 done at reconciliation), then checked each
+    open WU against its dated prose entries AND against the code. Prompted by a diligence
+    failure: a session enumerating remaining work capped a grep with `head -20`, missed
+    Stream R (9 open boxes, a full declaratively-marked section) entirely, and reported an
+    unbounded conclusion from the truncated search. The READ FIRST section now carries the
+    count-first-enumerate-second procedure so the next session cannot repeat it.
+  · STALE BOXES IDENTIFIED: G1 (8) substantially complete — evidenced by G2's live execution
+    of the shipped motivation-coverage viewpoint (91 gap rows / 0 warnings), which exercises
+    grammar + result union + evaluator + pipeline; G2 (5 of 6) complete, and its deferred
+    full-backend-suite requirement is NOW SATISFIED (6124 passed / 5 skipped this session);
+    U0a (4) — all four co-landing hooks VERIFIED registered in code and TICKED
+    (SignalsRefreshRunSchemaStep, GuidanceCacheFormatStep, ViewpointDeclarationScanStep,
+    DefaultSchemataEnsureStep). G1/G2 boxes deliberately NOT bulk-ticked: their sub-items
+    were not individually re-verified, and ticking on inference would repeat the diligence
+    failure in the opposite direction. The table records the evidence instead.
+  · GENUINELY REMAINING: D1 (7), E1 (2), E2 (3), G2's crit-21b e2e Playwright walk (1),
+    Stream R (9), U0b (11), plus the security-signals backlog below.
+  · G2 BOUNDARY: only the crit-21b e2e G-S3 GUI walk is outstanding (needs the GUI dev
+    server). Everything else in that boundary is now witnessed.
 
 ### REMAINING BACKLOG (assurance security-signals — sequenced, owner-directed)
 1. [x] INGEST-via-MCP tool (bundle-submit to the ingest command) + decide aibom_coverage — DONE
