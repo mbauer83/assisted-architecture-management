@@ -3,6 +3,11 @@
 Execution ledger for `PLAN-aibom-model-derived.md`. The plan is normative; this
 file tracks execution and records what was verified.
 
+**Dependency:** WU-A2 onward needs named reusable profiles from
+`PLAN-attribute-profile-registry.md` (its Streams P and Q). Starting AIBOM first
+would mean writing nine near-duplicate schema files and refactoring them away
+immediately. WU-A1 (specializations) has no such dependency and can proceed.
+
 ## Resume protocol
 
 1. Read `PLAN-aibom-model-derived.md` §4 (locked decisions) and §5 (mapping
@@ -28,8 +33,8 @@ file tracks execution and records what was verified.
   `assurance_mark_ai_component` name. Confirm the cross-server move. OPEN.
 - **Q3 — SPDX 3.0 AI Profile as a second emitter.** Out of scope for this plan;
   confirm "later" vs "never". OPEN.
-- **Q4 — Stream ordering against the rename sweep and OpenAPI work.**
-  Recommended: rename sweep → OpenAPI → AIBOM. OPEN.
+- **Q4 — Stream ordering.** Recommended: rename sweep → profile registry →
+  OpenAPI → AIBOM. OPEN.
 
 ## Stream A — Ontology foundation
 
@@ -43,19 +48,23 @@ file tracks execution and records what was verified.
 - [ ] Tests: the module loader exposes every new specialization; the guidance
       layer surfaces them for authoring.
 
-### WU-A2 — Composed default schemata (needs A1)
-- [ ] New `src/domain/repo_default_aibom_schemata.py`. Compose the nine profiles
-      from shared named fragments in Python (PLAN §4 D3), emitting fully
-      self-contained `attributes.{type}.{slug}.schema.json` payloads.
+### WU-A2 — Shared and specific profiles (needs A1, and the profile registry's WU-P2)
+- [ ] Declare shared named profiles (provenance, licensing, supplier) once and
+      bind them to the AI specializations (PLAN §4 D3).
+- [ ] Per-specialization profiles for what genuinely differs only.
+- [ ] **Declare no attribute the base type already provides** (D3a) — base-type
+      inheritance already works. `componentData.classification` /
+      `sensitiveData` derive from the existing base `Sensitivity` attribute and
+      its specified TLP mapping; do not add a parallel AI sensitivity field.
 - [ ] Attribute set per PLAN §3, Title Case (D8), flat scalars + string arrays
       only (D4). Required/recommended levels set deliberately — required means
       *the AIBOM is invalid without it*, not merely *nice to have*.
-- [ ] Register in `DEFAULT_SCHEMATA` (`repo_default_schemata.py`), keeping that
-      module within the source-length policy — split as
+- [ ] Register shipped defaults in `DEFAULT_SCHEMATA`, keeping that module
+      within the source-length policy — split as
       `repo_default_assurance_schemata.py` already does if needed.
-- [ ] Tests: every payload is valid JSON Schema; every declared specialization
-      has exactly one schema file and vice versa (no orphans — the condition
-      verifier rule W044 checks live).
+- [ ] Tests: every payload is valid JSON Schema; no orphan attachment schemata
+      (verifier rule W044); a specialization's effective schema contains its
+      base-type attributes without redeclaring them.
 
 ### WU-A3 — Derivation-role vocabulary and bindings (needs A1)
 - [ ] Declare the closed role vocabulary (PLAN §5) and the default

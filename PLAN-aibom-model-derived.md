@@ -43,7 +43,8 @@ Measured against the codebase, not assumed.
 | Mechanism | Location | Verdict |
 |---|---|---|
 | Specializations (slug + name per base type) | `src/ontologies/archimate_4/specializations.yaml` | Reuse as-is |
-| Attribute profiles, 1:1 with specialization (D13) | `src/domain/profiles.py` | Reuse as-is |
+| Attribute profiles | `src/domain/profiles.py` | Reuse; extended by the profile-registry plan |
+| Base-type attribute **inheritance** into specializations | `artifact_schema.py:147-149` | Already works — do not rebuild (see D3a) |
 | Specialization-scoped schema files, **full JSON Schema** | `.arch-repo/schemata/attributes.{type}.{slug}.schema.json` | Reuse — supports arrays with `items` |
 | Base-type schema files | `.arch-repo/schemata/attributes.{type}.schema.json` | Reuse |
 | Shipped defaults + non-destructive upgrade | `DEFAULT_SCHEMATA`, `DefaultSchemataEnsureStep` | **Upgrade path already solved** |
@@ -128,14 +129,27 @@ served capability (service), a deployed artefact (component), and passive data
 (data-object). Collapsing them onto one base type would discard information we
 already have.
 
-**D3 — Profile duplication is solved at the ontology-authoring layer, not by
-weakening D13.** D13 (profile ↔ specialization is 1:1, no shared registry) is a
-deliberate architectural decision and this plan does not reopen it. The nine
-specializations above share substantial attribute sets (provenance, licensing,
-supplier). We therefore compose the *shipped defaults* from named attribute
-fragments in Python (`repo_default_aibom_schemata.py`), emitting nine fully
-self-contained schema files. The on-disk artefact stays 1:1 and independently
-customisable; the duplication lives only in the generator, where it is cheap.
+**D3 — Shared attributes come from named reusable profiles.** The nine
+specializations share substantial attribute sets (provenance, licensing,
+supplier). These are declared once as named profiles and bound to the
+specializations that need them, per `PLAN-attribute-profile-registry.md` —
+which supersedes the earlier 1:1-only constraint by making reusable profiles an
+opt-in alongside it. Each AI specialization additionally carries its own profile
+for what genuinely differs (a dataset's classification is not a model's
+architecture family).
+
+**This plan therefore depends on the profile registry** (that plan's Stream P
+and Q). Attempting AIBOM first would mean generating nine near-duplicate schema
+files and refactoring them away immediately afterwards.
+
+**D3a — Do not redeclare inherited attributes.** Base-type attributes are
+already inherited: `compute_effective_attribute_schema` loads the base-type
+schema as the first merge fragment, so an `ai-dataset` data-object already
+receives `Sensitivity`, `Provenance`, and the rest from `data-object`. AIBOM
+profiles declare only what the base type does not already provide. In
+particular, `componentData.classification` / `sensitiveData` derive from the
+**existing** base `Sensitivity` attribute (whose TLP mapping is already
+specified) rather than from a new AI-specific field.
 
 **D4 — Flat + list attributes only; no nested objects in profiles.**
 `TypedPropertyInput.vue` supports string/boolean/number/integer/array/enum. The
@@ -300,7 +314,9 @@ the move; it is the principled placement but it crosses a server boundary.
 filings where CycloneDX is favoured for CI/CD. Out of scope here. Worth a second
 emitter later, or explicitly never?
 
-**Q4 — Ordering.** This stream needs ontology changes. The pending rename sweep
-and the OpenAPI schema work both touch overlapping surfaces. Recommended order:
-rename sweep → OpenAPI → AIBOM, so AIBOM's new REST surface is authored under
-the finished schema discipline rather than retrofitted.
+**Q4 — Ordering.** This stream needs ontology changes and now depends on the
+profile registry (D3). The pending rename sweep and the OpenAPI schema work both
+touch overlapping surfaces. Recommended order: rename sweep → profile registry →
+OpenAPI → AIBOM, so AIBOM is built on reusable profiles and its REST surface is
+authored under the finished schema discipline, rather than retrofitted into
+both.
