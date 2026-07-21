@@ -115,6 +115,7 @@ def admin_edit_entity(
     content = format_entity_markdown(
         artifact_id=artifact_id, artifact_type=artifact_type, name=merged.name, version=merged.version,
         status=merged.status, last_updated=today_iso(), keywords=merged.keywords, summary=merged.summary,
+        specializations=merged.specializations,
         properties=merged.properties, attribute_types=merged.attribute_types, notes=merged.notes,
         display_section_id=parsed.display_section_id, display_content=display_content, repo_root=repo_root,
     )

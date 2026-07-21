@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
 
@@ -6,6 +7,23 @@ from src.config.workspace_paths import infer_repo_scope
 
 def today_iso() -> str:
     return date.today().isoformat()
+
+
+def normalize_specializations(
+    specialization: str | None, specializations: Sequence[str] | None
+) -> tuple[str, ...]:
+    """The applied-specialization set a write path should use, from its two inputs.
+
+    ``specializations`` (the list, from a multi-select client) wins when given; otherwise
+    the single ``specialization`` scalar is lifted to a one-element set (every existing
+    caller and the single-value REST/MCP field). Order preserved, blanks and duplicates
+    dropped. A concept may carry several (ArchiMate §15.2)."""
+    raw = list(specializations) if specializations else ([specialization] if specialization else [])
+    seen: dict[str, None] = {}
+    for item in raw:
+        if item and item not in seen:
+            seen[item] = None
+    return tuple(seen)
 
 
 def assert_engagement_write_root(repo_root: Path) -> None:

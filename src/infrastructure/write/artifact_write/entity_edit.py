@@ -92,7 +92,7 @@ def _render_entity(
         status=merged.status,
         last_updated=today_iso(),
         keywords=merged.keywords,
-        specialization=merged.specialization,
+        specializations=merged.specializations,
         summary=merged.summary,
         properties=merged.properties,
         attribute_types=merged.attribute_types,
@@ -130,6 +130,7 @@ def edit_entity(
     notes: object = _UNSET,
     keywords: object = _UNSET,
     specialization: object = _UNSET,
+    specializations: object = _UNSET,
     version: str | None = None,
     status: str | None = None,
     group: str | None = None,
@@ -159,15 +160,16 @@ def edit_entity(
         status=status,
         keywords=keywords,
         specialization=specialization,
+        specializations=specializations,
         summary=summary,
         properties=properties,
         attribute_types=attribute_types,
         notes=notes,
     )
-    # Gate on the EFFECTIVE (post-merge) specialization: an edit that moves an entity onto a
-    # quarantined profile pair must be refused just like a create (WU-Q3).
+    # Gate on the EFFECTIVE (post-merge) specialization set: an edit that moves an entity
+    # onto a quarantined profile pair must be refused just like a create (WU-Q3).
     assert_not_quarantined(
-        repo_root, "entity", artifact_type, [str(merged.specialization or "")],
+        repo_root, "entity", artifact_type, list(merged.specializations) or [""],
         catalogs=build_runtime_catalogs(get_module_registry()),
     )
     effective_artifact_id, target_entity_file = _resolve_target_identity(

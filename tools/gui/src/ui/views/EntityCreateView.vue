@@ -39,7 +39,8 @@ const status = ref('draft')
 const version = ref('0.1.0')
 const properties = ref<{ key: string; value: string; adHocType: AdHocType }[]>([])
 const notes = ref('')
-const specialization = ref('')
+// A concept may carry several specializations (§15.2); the schema merges all of them.
+const specializations = ref<string[]>([])
 const typeGuidance = ref<AuthoringGuidance | null>(null)
 const specializationOptions = computed(() =>
   specializationOptionsForEntityType(typeGuidance.value, artifactType.value),
@@ -97,9 +98,9 @@ const loadEffectiveSchema = (type: string, spec: string, preserveRows: boolean) 
 let specializationResetByTypeChange = false
 
 watch(artifactType, (newType) => {
-  if (specialization.value !== '') {
+  if (specializations.value.length) {
     specializationResetByTypeChange = true
-    specialization.value = ''
+    specializations.value = []
   }
   typeGuidance.value = null
   if (!newType) {
@@ -120,17 +121,17 @@ watch(artifactType, (newType) => {
     })
 })
 
-watch(specialization, (newSpec, oldSpec) => {
+watch(specializations, () => {
   if (specializationResetByTypeChange) {
     specializationResetByTypeChange = false
     return
   }
-  if (newSpec === oldSpec || !artifactType.value) return
-  // The effective schema changes with the specialization; re-preview before create.
+  if (!artifactType.value) return
+  // The effective schema changes with the specialization set; re-preview before create.
   preview.value = null
   previewClean.value = false
-  loadEffectiveSchema(artifactType.value, newSpec, true)
-})
+  loadEffectiveSchema(artifactType.value, specializations.value.join(','), true)
+}, { deep: true })
 
 watch(name, () => {
   // Reset preview state when name changes - forces user to re-preview
@@ -167,7 +168,7 @@ const buildBody = (dryRun: boolean) => {
     properties: Object.keys(props).length ? props : undefined,
     attribute_types: Object.keys(adhocTypes).length ? adhocTypes : undefined,
     notes: notes.value || undefined,
-    specialization: specialization.value || undefined,
+    specializations: specializations.value.length ? specializations.value : undefined,
     dry_run: dryRun,
   }
 }
@@ -271,14 +272,15 @@ const doCreate = () => {
           v-if="specializationOptions.length"
           class="form-row"
         >
-          <label class="form-label">Specialization <span class="form-hint">(optional)</span></label>
+          <label class="form-label">
+            Specializations <span class="form-hint">(optional; ⌘/Ctrl-click for several)</span>
+          </label>
           <select
-            v-model="specialization"
+            v-model="specializations"
             class="form-select"
+            multiple
+            size="4"
           >
-            <option value="">
-              None
-            </option>
             <option
               v-for="spec in specializationOptions"
               :key="spec.slug"
@@ -292,7 +294,7 @@ const doCreate = () => {
         <SchemaQuarantineBanner
           :quarantine="quarantine"
           :artifact-type="artifactType"
-          :specialization="specialization"
+          :specialization="specializations.join(', ')"
         />
 
         <div class="form-row">

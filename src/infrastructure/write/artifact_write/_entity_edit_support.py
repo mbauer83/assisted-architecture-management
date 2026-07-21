@@ -13,12 +13,34 @@ from typing import Any
 
 from src.application.repo_path_helpers import all_model_roots
 
+from .boundary import normalize_specializations
 from .coerce import as_optional_str, as_optional_str_dict, as_optional_str_list, as_optional_typed_dict
 from .parse_existing import ParsedEntity
 
 # Sentinel to distinguish "not provided" from explicit None. Re-exported by
 # entity_edit so existing callers keep importing it from there.
 _UNSET = object()
+
+
+def _fm_specializations(value: object) -> tuple[str, ...]:
+    """The current applied set from a frontmatter ``specialization`` value (scalar, list, or
+    absent) — the read mirror of what the writer serialises."""
+    if isinstance(value, list):
+        return normalize_specializations(None, [str(v) for v in value])
+    return normalize_specializations(str(value) if isinstance(value, str) else None, None)
+
+
+def _merge_specializations(current: object, specialization: object, specializations: object) -> tuple[str, ...]:
+    """The post-edit applied set. An explicit update (either the scalar ``specialization`` or
+    the list ``specializations``) REPLACES the current set; ``_UNSET`` on both keeps it.
+    Passing ``""``/``[]`` clears it, exactly as the single-value edit already cleared one."""
+    if specializations is not _UNSET:
+        raw = specializations if isinstance(specializations, list) else []
+        return normalize_specializations(None, [str(v) for v in raw])
+    if specialization is not _UNSET:
+        scalar = str(specialization) if isinstance(specialization, str) else None
+        return normalize_specializations(scalar, None)
+    return _fm_specializations(current)
 
 
 @dataclass(frozen=True)
@@ -29,7 +51,7 @@ class MergedFields:
     version: str
     status: str
     keywords: list[str] | None
-    specialization: str | None
+    specializations: tuple[str, ...]
     summary: str | None
     properties: dict[str, Any] | None
     attribute_types: dict[str, str] | None
@@ -44,6 +66,7 @@ def merge_fields(
     status: str | None,
     keywords: object,
     specialization: object = _UNSET,
+    specializations: object = _UNSET,
     summary: object,
     properties: object,
     attribute_types: object,
@@ -56,9 +79,7 @@ def merge_fields(
         version=version if version is not None else str(fm.get("version", "0.1.0")),
         status=status if status is not None else str(fm.get("status", "draft")),
         keywords=as_optional_str_list(keywords if keywords is not _UNSET else fm.get("keywords")),
-        specialization=as_optional_str(
-            specialization if specialization is not _UNSET else fm.get("specialization")
-        ),
+        specializations=_merge_specializations(fm.get("specialization"), specialization, specializations),
         summary=as_optional_str(summary) if summary is not _UNSET else parsed.summary,
         properties=(
             as_optional_typed_dict(properties) if properties is not _UNSET else (parsed.properties or None)

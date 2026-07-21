@@ -344,7 +344,7 @@ class TestCheckPromotionSchemaCompatibility:
         registry = MagicMock()
         registry.repo_roots = [eng, ent]
         repo = MagicMock()
-        repo.get_entity.return_value = MagicMock(artifact_type="requirement", specialization="constraint")
+        repo.get_entity.return_value = MagicMock(artifact_type="requirement", specializations=("constraint",))
         repo.get_document = lambda did: None
         catalogs = MagicMock()
         catalogs.specializations.get.return_value = _spec_info()
@@ -491,8 +491,8 @@ class TestSpecializationErrorsCoversConnections:
         eng.mkdir()
         ent.mkdir()
         repo = MagicMock()
-        repo.get_entity.return_value = MagicMock(artifact_type="requirement", specialization="")
-        repo.get_connection.return_value = MagicMock(conn_type="archimate-association", specialization="")
+        repo.get_entity.return_value = MagicMock(artifact_type="requirement", specializations=())
+        repo.get_connection.return_value = MagicMock(conn_type="archimate-association", specializations=())
         errors = _specialization_errors(eng, ent, ["REQ@1"], ["CONN@1"], repo, MagicMock())
         assert errors == []
 
@@ -506,7 +506,7 @@ class TestSpecializationErrorsCoversConnections:
         repo = MagicMock()
         repo.get_entity.return_value = None
         repo.get_connection.return_value = MagicMock(
-            conn_type="archimate-assignment", specialization="responsibility-assignment"
+            conn_type="archimate-assignment", specializations=("responsibility-assignment",)
         )
         catalogs = MagicMock()
         catalogs.specializations.get.return_value = _spec_info(

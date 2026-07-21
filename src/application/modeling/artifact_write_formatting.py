@@ -1,4 +1,5 @@
 import re
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,34 @@ from src.application.artifact_schema import (
 )
 from src.domain.connection_declaration import ConnectionDeclaration, format_connection_declaration
 from src.domain.property_value import encode as _encode_cell
+
+
+def _specialization_frontmatter_value(
+    specialization: str | None, specializations: Sequence[str] | None
+) -> str | list[str] | None:
+    """The value to write for the ``specialization`` frontmatter key, or ``None`` to omit it.
+
+    A single specialization is written as a SCALAR — so existing one-specialization files
+    stay byte-identical and no repo is churned — and several as a list (§15.2). The list, if
+    given, is authoritative; otherwise the scalar is used. Blanks and duplicates are dropped.
+    """
+    raw = list(specializations) if specializations else ([specialization] if specialization else [])
+    seen: dict[str, None] = {}
+    for item in raw:
+        if item and item not in seen:
+            seen[item] = None
+    applied = list(seen)
+    if not applied:
+        return None
+    return applied[0] if len(applied) == 1 else applied
+
+
+def _as_str_list(value: object) -> list[str]:
+    """A connection's ``specialization`` conn-dict value as a list, accepting a scalar
+    (one element) or an already-list value."""
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    return [str(value)] if value else []
 
 
 def _dump_yaml_text(data: object) -> str:
@@ -30,6 +59,7 @@ def format_entity_markdown(
     last_updated: str,
     keywords: list[str] | None = None,
     specialization: str | None = None,
+    specializations: Sequence[str] | None = None,
     summary: str | None,
     properties: dict[str, Any] | None,
     attribute_types: dict[str, str] | None = None,
@@ -54,8 +84,9 @@ def format_entity_markdown(
     }
     if keywords:
         frontmatter["keywords"] = keywords
-    if specialization:
-        frontmatter["specialization"] = specialization
+    applied = _specialization_frontmatter_value(specialization, specializations)
+    if applied is not None:
+        frontmatter["specialization"] = applied
     if attribute_types:
         frontmatter["attribute-types"] = attribute_types
     frontmatter["last-updated"] = last_updated
@@ -153,10 +184,11 @@ def format_outgoing_markdown(
         raw_metadata = conn.get("metadata")
         metadata: dict[str, Any] = dict(raw_metadata) if isinstance(raw_metadata, dict) else {}
         # ``specialization`` is authoritative as its own key: the edit API sets and clears
-        # it by name, so it overrides (or removes) whatever the carried block held.
-        specialization = conn.get("specialization")
-        if specialization:
-            metadata["specialization"] = str(specialization)
+        # it by name, so it overrides (or removes) whatever the carried block held. One is
+        # written as a scalar (byte-identical to existing files), several as a list (§15.2).
+        applied = _specialization_frontmatter_value(None, _as_str_list(conn.get("specialization")))
+        if applied is not None:
+            metadata["specialization"] = applied
         else:
             metadata.pop("specialization", None)
         decl = ConnectionDeclaration(

@@ -28,6 +28,7 @@ from src.domain.connection_declaration import (
     parse_connection_declarations,
     parse_connection_header,
 )
+from src.domain.specialization_values import applied_specialization_slugs
 from src.domain.specializations import SpecializationCatalog
 
 _MULTIPLICITY_RE = re.compile(r"^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$")
@@ -144,9 +145,8 @@ def _check_connection_block(
         result.issues.append(Issue(Severity.WARNING, "W120", f"Duplicate connection: '{conn_key}'", loc))
     seen_connections.add(conn_key)
 
-    specialization = str(decl.metadata.get("specialization") or "")
-    if specialization:
-        _check_connection_specialization(specialization, conn_type, catalogs.specializations, result, loc)
+    for slug in applied_specialization_slugs(decl.metadata.get("specialization")):
+        _check_connection_specialization(slug, conn_type, catalogs.specializations, result, loc)
 
     if decl.metadata and repo_root is not None:
         check_connection_metadata_schema(

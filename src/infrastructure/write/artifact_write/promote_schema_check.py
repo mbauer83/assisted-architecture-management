@@ -173,24 +173,27 @@ def _specialization_errors(
     errors: list[str] = []
     for eid in entity_ids:
         rec = repo.get_entity(eid)
-        if rec is None or not rec.specialization:
+        if rec is None:
             continue
-        errors.extend(
-            _specialization_dependency_errors(
-                "entity", rec.artifact_type, rec.specialization, f"entity {eid}",
-                eng_root=eng_root, ent_root=ent_root, catalogs=catalogs,
+        # Each applied specialization is a separate schema dependency across the tier boundary.
+        for slug in rec.specializations:
+            errors.extend(
+                _specialization_dependency_errors(
+                    "entity", rec.artifact_type, slug, f"entity {eid}",
+                    eng_root=eng_root, ent_root=ent_root, catalogs=catalogs,
+                )
             )
-        )
     for cid in connection_ids:
         conn = repo.get_connection(cid)
-        if conn is None or not conn.specialization:
+        if conn is None:
             continue
-        errors.extend(
-            _specialization_dependency_errors(
-                "connection", conn.conn_type, conn.specialization, f"connection {cid}",
-                eng_root=eng_root, ent_root=ent_root, catalogs=catalogs,
+        for slug in conn.specializations:
+            errors.extend(
+                _specialization_dependency_errors(
+                    "connection", conn.conn_type, slug, f"connection {cid}",
+                    eng_root=eng_root, ent_root=ent_root, catalogs=catalogs,
+                )
             )
-        )
     return errors
 
 

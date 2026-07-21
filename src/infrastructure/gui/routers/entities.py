@@ -179,8 +179,11 @@ def read_entity_context(id: str) -> EntityContextReadModel:
 @router.get("/api/entity-schemata")
 def get_entity_schemata(artifact_type: str, specialization: str = "") -> dict[str, Any]:
     """Effective attribute schema for an entity type, merged with the selected
-    specialization's contributed attributes — the same schema the verifier
-    validates against, so the authoring form and verification can never drift."""
+    specialization(s)' contributed attributes — the same schema the verifier validates
+    against, so the authoring form and verification can never drift.
+
+    ``specialization`` accepts one slug or a comma-separated list (§15.2 multiple
+    specializations); the merge is over the whole applied set, in order."""
     repo_root = s.maybe_engagement_root()
     if repo_root is None:
         raise HTTPException(500, "Repository not initialized")
@@ -191,10 +194,11 @@ def get_entity_schemata(artifact_type: str, specialization: str = "") -> dict[st
         schema_required_properties,
     )
 
+    applied = [slug.strip() for slug in specialization.split(",") if slug.strip()]
     schema, conflicts = compute_effective_attribute_schema(
         repo_root,
         artifact_type,
-        [specialization],
+        applied or [""],
         specialization_catalog=_catalogs().specializations,
         profile_registry=_catalogs().profiles,
     )
@@ -236,6 +240,7 @@ class CreateEntityBody(BaseModel):
     notes: str | None = None
     keywords: list[str] | None = None
     specialization: str | None = None
+    specializations: list[str] | None = None
     version: str = "0.1.0"
     status: str = "draft"
     dry_run: bool = True
@@ -250,6 +255,7 @@ class EditEntityBody(BaseModel):
     notes: str | None = None
     keywords: list[str] | None = None
     specialization: str | None = None
+    specializations: list[str] | None = None
     version: str | None = None
     status: str | None = None
     dry_run: bool = True
@@ -281,6 +287,7 @@ def create_entity(body: CreateEntityBody) -> dict[str, Any]:
             notes=body.notes,
             keywords=body.keywords,
             specialization=body.specialization,
+            specializations=body.specializations,
             artifact_id=None,
             version=body.version,
             status=body.status,
@@ -314,6 +321,7 @@ def edit_entity(body: EditEntityBody) -> dict[str, Any]:
             notes=body.notes if "notes" in provided else _UNSET,
             keywords=body.keywords if "keywords" in provided else _UNSET,
             specialization=body.specialization if "specialization" in provided else _UNSET,
+            specializations=body.specializations if "specializations" in provided else _UNSET,
             version=body.version,
             status=body.status,
             dry_run=body.dry_run,

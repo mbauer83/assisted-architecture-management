@@ -59,6 +59,7 @@ export const EntityDetailSchema = Schema.Struct({
   properties: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
   notes: Schema.optional(Schema.String),
   specialization: Schema.optional(Schema.String),
+  specializations: Schema.optional(Schema.Array(Schema.String)),
   is_global: Schema.optional(Schema.Boolean),
   host_diagram_id: Schema.optional(Schema.String),
   conn_in: Schema.optional(Schema.Number),

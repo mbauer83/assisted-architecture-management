@@ -67,6 +67,7 @@ def artifact_edit_entity(
     notes: str | None = None,
     keywords: list[str] | None = None,
     specialization: str | None = None,
+    specializations: list[str] | None = None,
     version: str | None = None,
     status: str | None = None,
     group: str | None = None,
@@ -83,6 +84,7 @@ def artifact_edit_entity(
             ("name", name), ("summary", summary), ("properties", properties),
             ("attribute_types", attribute_types),
             ("notes", notes), ("keywords", keywords), ("specialization", specialization),
+            ("specializations", specializations),
             ("version", version), ("status", status), ("group", group),
         ) if v is not None
     }
@@ -112,6 +114,7 @@ def artifact_edit_connection(
     src_multiplicity: str | None = None,
     tgt_multiplicity: str | None = None,
     specialization: str | None = None,
+    specializations: list[str] | None = None,
     metadata: dict[str, str] | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
@@ -155,6 +158,7 @@ def artifact_edit_connection(
             src_multiplicity=src_multiplicity if src_multiplicity is not None else _UNSET,
             tgt_multiplicity=tgt_multiplicity if tgt_multiplicity is not None else _UNSET,
             specialization=specialization if specialization is not None else _UNSET,
+            specializations=specializations if specializations is not None else _UNSET,
             metadata=metadata if metadata is not None else _UNSET,
             dry_run=dry_run,
         )

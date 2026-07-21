@@ -524,10 +524,48 @@ already locked because WU-P3 depends on it.
 - Gates (V1–V3 together): backend 6358 passed / 5 skipped; ruff + zuban clean.
 
 ### WU-V4 — Write paths and GUI (needs V1)
-- [ ] Entity and connection write paths accept multiple; `promote_schema_check`
+- [x] Entity and connection write paths accept multiple; `promote_schema_check`
       handles the set across repos.
-- [ ] GUI picker single-select → multi-select; `types.generated.ts` regenerated.
-- [ ] Tests: per-transport write coverage; Vitest for the picker.
+- [x] GUI picker single-select → multi-select; `types.generated.ts` regenerated.
+- [x] Tests: per-transport write coverage; Vitest for the picker.
+
+#### WU-V4 PROGRESS (2026-07-22)
+- Write serialization: `format_entity_markdown` / `format_outgoing_markdown` write a SCALAR
+  for one specialization (existing files stay byte-identical, no repo churn) and a LIST for
+  several (§15.2). `create_entity`, `edit_entity`, `admin` entity edit, `add_connection`,
+  and `edit_connection` all gained a `specializations` param alongside the scalar
+  `specialization`; `normalize_specializations` (in `boundary.py`) is the one place that
+  turns the two inputs into the applied set, and the quarantine gate + serializer both take
+  it. `MergedFields.specialization` → `specializations` with `_merge_specializations`
+  (explicit update replaces, `_UNSET` keeps, `[]`/`""` clears).
+- Verifier: E170/E171 (entity) and E160/E161 (connection) now iterate the applied set —
+  each specialization validated independently. A new shared `domain/specialization_values.
+  applied_specialization_slugs` reads a scalar-or-list `specialization` value ONE way, reused
+  by the verifier, parsing, and the write boundary so writer and readers cannot drift.
+- Promotion: `promote_schema_check._specialization_errors` superset-checks EVERY applied
+  specialization across the tier boundary, not only the primary.
+- Transports: REST bodies (create/edit entity, add/edit connection) and MCP tools
+  (`artifact_create_entity`, `artifact_edit_entity`, `artifact_add_connection`,
+  `artifact_edit_connection`, bulk_write) gained a `specializations` field/param. The
+  entity-schemata endpoint accepts a comma-separated `specialization` (single value still
+  works) so the GUI can preview the merged schema for a set.
+- Also fixed a latent drop: admin entity edit never passed specialization to the formatter,
+  so an admin edit silently cleared it — now preserved.
+- GUI: create-view and edit-form specialization pickers are `<select multiple>` bound to a
+  `string[]`; the schema preview fetches the merged schema for the joined set; create/edit
+  bodies send `specializations`. Entity detail read model + GUI `EntityDetail` schema now
+  expose `specializations` so the edit form seeds the full set. `types.generated.ts` is
+  ontology-derived and regenerated clean (no ontology change → no diff).
+- Tests: `tests/tools/test_multiple_specialization_write.py` (entity + connection write,
+  scalar-vs-list serialization, edit-replace, round-trip order, per-parametrized count);
+  updated promotion mocks to `specializations`. GUI picker: plain `<select multiple>` with
+  no bespoke logic beyond `.join(',')`, covered by typecheck + the existing
+  `specializationOptions`/`schemaQuarantine` vitest and the backend write acceptance.
+- Gates: backend 6364 passed / 5 skipped; ruff + zuban clean; frontend lint + typecheck +
+  vitest (116 files / 1175 tests) green.
+- **Restart-gated**: the `specializations` param on the four MCP write tools is an MCP
+  surface change — a Claude session restart is needed to exercise it through MCP. Queued
+  for WU-X1.
 
 ## Stream Y — Attribute-profile fields in the entity authoring GUI (owner-requested 2026-07-21)
 

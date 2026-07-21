@@ -43,7 +43,8 @@ export function useEntityEditForm(options: {
   const editStatus = ref('')
   const editProperties = ref<{ key: string; value: string; adHocType: AdHocType }[]>([])
   const editNotes = ref('')
-  const editSpecialization = ref('')
+  // A concept may carry several specializations (§15.2); the schema merges all of them.
+  const editSpecializations = ref<string[]>([])
   const editTypeGuidance = ref<AuthoringGuidance | null>(null)
   const editBusy = ref(false)
   const editError = ref<string | null>(null)
@@ -103,16 +104,16 @@ export function useEntityEditForm(options: {
   // that seed must not re-trigger the watcher's reload.
   let specializationSeededByStartEdit = false
 
-  watch(editSpecialization, (newSpec, oldSpec) => {
+  watch(editSpecializations, () => {
     if (specializationSeededByStartEdit) {
       specializationSeededByStartEdit = false
       return
     }
-    if (!editing.value || newSpec === oldSpec) return
+    if (!editing.value) return
     const d = detail.value
     if (!d) return
-    loadEffectiveSchema(d.artifact_type, newSpec)
-  })
+    loadEffectiveSchema(d.artifact_type, editSpecializations.value.join(','))
+  }, { deep: true })
 
   const startEdit = (): void => {
     const d = detail.value
@@ -122,9 +123,10 @@ export function useEntityEditForm(options: {
     editKeywords.value = (d.keywords ?? []).join(', ')
     editStatus.value = d.status
     editNotes.value = d.notes ?? ''
-    if (editSpecialization.value !== (d.specialization ?? '')) {
+    const current = d.specializations ?? (d.specialization ? [d.specialization] : [])
+    if (editSpecializations.value.join(',') !== current.join(',')) {
       specializationSeededByStartEdit = true
-      editSpecialization.value = d.specialization ?? ''
+      editSpecializations.value = [...current]
     }
     editTypeGuidance.value = null
     void Effect.runPromise(svc.getAuthoringGuidance({ entityTypes: [d.artifact_type] }))
@@ -147,7 +149,7 @@ export function useEntityEditForm(options: {
     editPreview.value = null
     editError.value = null
     editing.value = true
-    loadEffectiveSchema(d.artifact_type, d.specialization ?? '')
+    loadEffectiveSchema(d.artifact_type, editSpecializations.value.join(','))
   }
 
   const cancelEdit = (): void => {
@@ -185,7 +187,7 @@ export function useEntityEditForm(options: {
       properties: props,
       attribute_types: Object.keys(adhocTypes).length ? adhocTypes : undefined,
       notes: editNotes.value || undefined,
-      specialization: editSpecialization.value || undefined,
+      specializations: editSpecializations.value.length ? editSpecializations.value : undefined,
       dry_run: dryRun,
     }
   }
@@ -250,7 +252,7 @@ export function useEntityEditForm(options: {
     editStatus,
     editProperties,
     editNotes,
-    editSpecialization,
+    editSpecializations,
     editTypeGuidance,
     editArtifactType,
     editSpecializationOptions,

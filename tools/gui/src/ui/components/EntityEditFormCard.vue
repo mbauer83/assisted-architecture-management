@@ -49,14 +49,15 @@ const edit = inject(entityEditFormKey)!
       v-if="edit.editSpecializationOptions.length"
       class="form-row"
     >
-      <label class="form-label">Specialization <span class="form-hint">(optional)</span></label>
+      <label class="form-label">
+        Specializations <span class="form-hint">(optional; ⌘/Ctrl-click for several)</span>
+      </label>
       <select
-        v-model="edit.editSpecialization"
+        v-model="edit.editSpecializations"
         class="edit-select"
+        multiple
+        size="4"
       >
-        <option value="">
-          None
-        </option>
         <option
           v-for="spec in edit.editSpecializationOptions"
           :key="spec.slug"
@@ -183,7 +184,7 @@ const edit = inject(entityEditFormKey)!
     <SchemaQuarantineBanner
       :quarantine="edit.editQuarantine"
       :artifact-type="edit.editArtifactType"
-      :specialization="edit.editSpecialization"
+      :specialization="edit.editSpecializations.join(', ')"
     />
 
     <div

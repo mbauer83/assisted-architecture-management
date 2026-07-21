@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +18,7 @@ from ._artifact_deduplication import (
     get_repository,
     validate_entity_unique,
 )
-from .boundary import assert_engagement_write_root, today_iso
+from .boundary import assert_engagement_write_root, normalize_specializations, today_iso
 from .types import WriteResult
 from .verify import verify_content_in_temp_path
 
@@ -72,6 +72,7 @@ def create_entity(
     notes: str | None,
     keywords: list[str] | None = None,
     specialization: str | None = None,
+    specializations: Sequence[str] | None = None,
     artifact_id: str | None,
     version: str,
     status: str,
@@ -90,7 +91,8 @@ def create_entity(
             "Use ensure_global_artifact_reference (MCP) or "
             "POST /api/global-entity-reference (GUI) instead."
         )
-    assert_not_quarantined(repo_root, "entity", artifact_type, [specialization or ""], catalogs=catalogs)
+    applied = normalize_specializations(specialization, specializations)
+    assert_not_quarantined(repo_root, "entity", artifact_type, list(applied) or [""], catalogs=catalogs)
 
     info = get_module_registry().find_entity_type(EntityTypeName(artifact_type))
     if info is None:
@@ -161,7 +163,7 @@ def create_entity(
         status=status,
         last_updated=last,
         keywords=keywords,
-        specialization=specialization,
+        specializations=applied,
         summary=summary,
         properties=properties,
         attribute_types=attribute_types,

@@ -147,13 +147,15 @@ export interface ModelRepository {
   readonly createEntity: (body: {
     artifact_type: string; name: string; summary?: string;
     properties?: Record<string, string>; attribute_types?: Record<string, string>;
-    notes?: string; keywords?: string[]; specialization?: string; version?: string; status?: string;
+    notes?: string; keywords?: string[]; specialization?: string; specializations?: string[];
+    version?: string; status?: string;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly editEntity: (body: {
     artifact_id: string; name?: string; summary?: string;
     properties?: Record<string, string>; attribute_types?: Record<string, string>;
-    notes?: string; keywords?: string[]; specialization?: string; version?: string; status?: string;
+    notes?: string; keywords?: string[]; specialization?: string; specializations?: string[];
+    version?: string; status?: string;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly deleteEntity: (body: {

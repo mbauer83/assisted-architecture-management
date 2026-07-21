@@ -1,18 +1,33 @@
 """Connection editing and removal operations."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from src.application.modeling.artifact_write import format_outgoing_markdown
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.domain.artifact_id import stable_id
 
-from .boundary import assert_engagement_write_root, today_iso
+from .boundary import assert_engagement_write_root, normalize_specializations, today_iso
 from .coerce import as_optional_str_list
 from .connection import _assert_pair_writable, _resolve_outgoing_path, _rollback, verification_to_conn_dict
 from .types import WriteResult
 
 _UNSET = object()
+
+
+def _as_list(value: object) -> list[str]:
+    return [str(v) for v in value] if isinstance(value, list) else []
+
+
+def _set_specialization(conn: dict[str, object], applied: Sequence[str]) -> None:
+    """Write the applied specialization set onto a parsed connection dict: a scalar for one
+    (byte-identical to existing files), a list for several (§15.2), removed for none."""
+    if len(applied) == 1:
+        conn["specialization"] = applied[0]
+    elif applied:
+        conn["specialization"] = list(applied)
+    else:
+        conn.pop("specialization", None)
 
 
 def edit_connection(
@@ -28,6 +43,7 @@ def edit_connection(
     src_multiplicity: str | None | object = _UNSET,
     tgt_multiplicity: str | None | object = _UNSET,
     specialization: str | None | object = _UNSET,
+    specializations: Sequence[str] | None | object = _UNSET,
     metadata: dict[str, str] | None | object = _UNSET,
     dry_run: bool,
 ) -> WriteResult:
@@ -69,25 +85,27 @@ def edit_connection(
                     conn["tgt_multiplicity"] = str(tgt_multiplicity)
                 else:
                     conn.pop("tgt_multiplicity", None)
-            if specialization is not _UNSET:
-                if specialization:
-                    conn["specialization"] = str(specialization)
-                else:
-                    conn.pop("specialization", None)
+            if specializations is not _UNSET:
+                _set_specialization(conn, normalize_specializations(None, _as_list(specializations)))
+            elif specialization is not _UNSET:
+                scalar = str(specialization) if isinstance(specialization, str) else None
+                _set_specialization(conn, normalize_specializations(scalar, None))
             if metadata is not _UNSET:
                 # A full replacement of the schema-declared attributes, mirroring the
                 # entity edit API's `properties`. Pass {} to clear them.
                 conn["metadata"] = dict(metadata) if isinstance(metadata, dict) else {}
             found = True
-            effective_specialization = str(conn.get("specialization", "") or "")
+            effective = normalize_specializations(None, _as_list(conn.get("specialization")))
+            if not effective and isinstance(conn.get("specialization"), str):
+                effective = normalize_specializations(str(conn.get("specialization")), None)
             break
 
     if not found:
         raise ValueError(f"Connection '{connection_type} -> {target_entity}' not found in {outgoing_path.name}")
 
-    # Gate on the EFFECTIVE (post-merge) specialization: an edit that moves a connection
+    # Gate on the EFFECTIVE (post-merge) specialization set: an edit that moves a connection
     # onto a quarantined pair must be refused just like an add (WU-Q3).
-    _assert_pair_writable(repo_root, connection_type, effective_specialization)
+    _assert_pair_writable(repo_root, connection_type, None, effective)
 
     content = format_outgoing_markdown(
         source_entity=source_entity,

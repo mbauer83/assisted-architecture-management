@@ -1,5 +1,5 @@
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from functools import lru_cache
 from pathlib import Path
 
@@ -10,7 +10,7 @@ from src.domain.artifact_id import stable_id
 from src.domain.connection_declaration import ConnectionDeclaration, format_connection_declaration
 from src.domain.module_types import ConnectionTypeName, ElementClassName
 
-from .boundary import assert_engagement_write_root, today_iso
+from .boundary import assert_engagement_write_root, normalize_specializations, today_iso
 from .types import WriteResult
 
 
@@ -133,26 +133,36 @@ def _validate_inputs(
             )
 
 
-def _assert_pair_writable(repo_root: Path, connection_type: str, specialization: str | None) -> None:
+def _assert_pair_writable(
+    repo_root: Path, connection_type: str, specialization: str | None,
+    specializations: Sequence[str] | None = None,
+) -> None:
     """The connection side of the WU-Q3 write gate: refuse a write onto a quarantined
     ``(connection-type, specialization)`` pair, exactly as the entity paths do. Kept at the
     write boundary both transports funnel through, so REST and MCP cannot diverge."""
     from src.application.profile_quarantine import assert_not_quarantined  # noqa: PLC0415
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
+    applied = normalize_specializations(specialization, specializations)
     assert_not_quarantined(
-        repo_root, "connection", connection_type, [specialization or ""],
+        repo_root, "connection", connection_type, list(applied) or [""],
         catalogs=build_runtime_catalogs(get_module_registry()),
     )
 
 
-def _connection_metadata(specialization: str | None, metadata: dict[str, str] | None) -> dict[str, str]:
-    """One per-connection metadata block from the two inputs that feed it. ``specialization``
-    is authoritative for its own key — it selects which schema applies, so it is never
-    something the schema-declared attributes can overwrite."""
-    block = dict(metadata) if metadata else {}
-    if specialization:
-        block["specialization"] = specialization
+def _connection_metadata(
+    specialization: str | None, metadata: dict[str, str] | None, specializations: Sequence[str] | None = None
+) -> dict[str, object]:
+    """One per-connection metadata block from the inputs that feed it. ``specialization`` is
+    authoritative for its own key — it selects which schema applies, so it is never something
+    the schema-declared attributes can overwrite. A single specialization is written as a
+    scalar (byte-identical to existing files), several as a list (§15.2)."""
+    block: dict[str, object] = dict(metadata) if metadata else {}
+    applied = normalize_specializations(specialization, specializations)
+    if len(applied) == 1:
+        block["specialization"] = applied[0]
+    elif applied:
+        block["specialization"] = list(applied)
     else:
         block.pop("specialization", None)
     return block
@@ -188,8 +198,10 @@ def _build_content(
     src_multiplicity: str | None = None,
     tgt_multiplicity: str | None = None,
     specialization: str | None = None,
+    specializations: Sequence[str] | None = None,
     metadata: dict[str, str] | None = None,
 ) -> str:
+    applied = normalize_specializations(specialization, specializations)
     if outgoing_path.exists():
         existing = outgoing_path.read_text(encoding="utf-8")
         # Duplicate check ignores multiplicities — same (conn_type, target) pair is a duplicate
@@ -219,7 +231,7 @@ def _build_content(
             src_multiplicity=src_multiplicity or "",
             tgt_multiplicity=tgt_multiplicity or "",
             description=(description or "").strip(),
-            metadata=_connection_metadata(specialization, metadata),
+            metadata=_connection_metadata(None, metadata, applied),
         )
         return existing.rstrip("\n") + "\n\n" + format_connection_declaration(decl) + "\n"
 
@@ -232,8 +244,10 @@ def _build_content(
         conn_dict["src_multiplicity"] = src_multiplicity
     if tgt_multiplicity:
         conn_dict["tgt_multiplicity"] = tgt_multiplicity
-    if specialization:
-        conn_dict["specialization"] = specialization
+    if len(applied) == 1:
+        conn_dict["specialization"] = applied[0]
+    elif applied:
+        conn_dict["specialization"] = list(applied)
     if metadata:
         conn_dict["metadata"] = dict(metadata)
     return format_outgoing_markdown(
@@ -324,18 +338,20 @@ def add_connection(
     src_multiplicity: str | None = None,
     tgt_multiplicity: str | None = None,
     specialization: str | None = None,
+    specializations: Sequence[str] | None = None,
     metadata: dict[str, str] | None = None,
     extra_known_ids: frozenset[str] = frozenset(),
 ) -> WriteResult:
     """Add a connection to the source entity's .outgoing.md file.
 
     ``metadata`` carries the per-connection attributes declared by the connection type's
-    effective metadata schema (base ⊕ specialization ⊕ bound profiles). ``specialization``
-    stays its own argument because it selects WHICH schema applies.
+    effective metadata schema (base ⊕ specialization ⊕ bound profiles). ``specialization`` /
+    ``specializations`` stay their own arguments because they select WHICH schema applies; a
+    concept may carry several (§15.2).
     """
     assert_engagement_write_root(repo_root)
     _validate_inputs(registry, connection_type, source_entity, target_entity, extra_known_ids)
-    _assert_pair_writable(repo_root, connection_type, specialization)
+    _assert_pair_writable(repo_root, connection_type, specialization, specializations)
     source_entity = _canonical_entity_id(registry, source_entity, extra_known_ids)
     target_entity = _canonical_entity_id(registry, target_entity, extra_known_ids)
 
@@ -363,6 +379,7 @@ def add_connection(
         src_multiplicity=src_multiplicity,
         tgt_multiplicity=tgt_multiplicity,
         specialization=specialization,
+        specializations=specializations,
         metadata=metadata,
     )
 
