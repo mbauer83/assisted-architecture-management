@@ -8,6 +8,7 @@ Commands:
   backup                Copy the encrypted DB to a timestamped backup file
   export                Export all assurance data to a JSON file (plaintext)
   import                Restore a JSON bundle into the store (inverse of export)
+  seed                  Load a demo/bootstrap bundle, optionally with live signals
   rotate-key            Generate new encryption key and re-encrypt the store
   export-key            Print recovery key from the OS keychain
   verify                Backend-aware chain integrity check (private-git: no key required)
@@ -42,6 +43,7 @@ from src.infrastructure.cli._assurance_commands import (
     cmd_verify,
     cmd_verify_chain,
 )
+from src.infrastructure.cli._seed_commands import DEFAULT_SEED_FILENAME, cmd_seed
 
 
 def main() -> None:
@@ -111,6 +113,20 @@ def main() -> None:
         help="Clear existing assurance data first (idempotent re-seed) instead of merging",
     )
 
+    p_seed = sub.add_parser(
+        "seed", help="Load a demo/bootstrap assurance bundle (idempotent re-seed)")
+    p_seed.add_argument(
+        "--input", metavar="PATH",
+        help=f"Seed bundle (default: ./{DEFAULT_SEED_FILENAME})")
+    p_seed.add_argument(
+        "--with-signals", action="store_true", dest="with_signals",
+        help="Also ingest live security signals for the anchors the bundle declares "
+             "in its 'signal_anchors' list (generates SBOMs and queries OSV)")
+    p_seed.add_argument(
+        "--keep-existing", action="store_true", dest="keep_existing",
+        help="Merge into existing assurance data instead of replacing it")
+    p_seed.add_argument("--osv-base-url", dest="osv_base_url", default=None)
+
     sub.add_parser("rotate-key", help="Generate new encryption key and re-encrypt the store")
     sub.add_parser("export-key", help="Print recovery key from the OS keychain")
     sub.add_parser("verify", help="Backend-aware chain integrity check (private-git: no key required)")
@@ -135,7 +151,7 @@ def main() -> None:
     dispatch = {
         "init": cmd_init, "status": cmd_status, "use-backend": cmd_use_backend,
         "unlock": cmd_unlock, "lock": cmd_lock, "backup": cmd_backup, "export": cmd_export,
-        "import": cmd_import,
+        "import": cmd_import, "seed": cmd_seed,
         "rotate-key": cmd_rotate_key, "export-key": cmd_export_key,
         "verify": cmd_verify, "verify-chain": cmd_verify_chain,
         "pocketbase-init": cmd_pocketbase_init, "pocketbase-status": cmd_pocketbase_status,

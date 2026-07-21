@@ -600,5 +600,17 @@
       "ref_type": "evidenced-by-artifact",
       "resolved_at": null
     }
+  ],
+  "signal_anchors": [
+    {
+      "anchor_entity_id": "APP@1777293133.OYEmP1",
+      "target": "python",
+      "label": "Architecture Backend"
+    },
+    {
+      "anchor_entity_id": "APP@1776149382.lmO0mp",
+      "target": "npm",
+      "label": "GUI Authoring Tool"
+    }
   ]
 }
