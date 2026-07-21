@@ -3,6 +3,7 @@
 Tools registered on arch-assurance-read:
   assurance_list_bom_components  — components of the anchor's ACTIVE signal snapshot
   assurance_list_vulnerabilities — vulnerability findings of the active snapshot
+  assurance_vulnerability_impact — REVERSE lookup: which entities one vulnerability affects
   assurance_security_stats       — signal-snapshot aggregate counts
   assurance_security_metrics     — posture metrics from the active signal snapshot + VEX
   assurance_scan_ai_candidates   — heuristic AI-BOM candidate scan
@@ -70,6 +71,39 @@ def register_security_read_tools(server: FastMCP) -> None:
         findings, withheld = list_active_findings(
             anchor_entity_id, snapshot_store=snapshot_store, policy=_policy(), purl=purl, component_id=component_id)
         return {"findings": findings, "count": len(findings), "withheld": withheld}
+
+    @server.tool(
+        name="assurance_vulnerability_impact",
+        description=(
+            "Find every architecture entity currently affected by ONE vulnerability — the "
+            "reverse of the per-anchor listings. Accepts any identifier the vulnerability is "
+            "known by (CVE, GHSA, PYSEC, or the canonical id): they resolve to one canonical "
+            "identity, so the answer does not depend on which feed's id you hold, and the "
+            "aliases are returned so you can see the others. "
+            "Reads ACTIVE snapshots only — a superseded scan is history, not current exposure. "
+            "Each affected entity lists the components through which it is affected, with "
+            "severity, directness, and any current VEX disposition; a suppressed finding is "
+            "REPORTED with its disposition rather than dropped, so a consciously-assessed "
+            "entity is distinguishable from one that was never scanned (open_entity_count "
+            "counts only the unsuppressed). Exposure-filtered before aggregation. "
+            "An identifier this store has never seen is reported as not found, which is "
+            "different from a known vulnerability that currently affects nothing. "
+            "Requires the assurance store to be unlocked."
+        ),
+    )
+    def assurance_vulnerability_impact(identifier: str) -> dict[str, object]:
+        from src.infrastructure.assurance.signal_impact import (  # noqa: PLC0415
+            find_vulnerability_impact,
+        )
+
+        if not ctx.is_available():
+            return ctx.locked_response()
+        snapshot_store = ctx.snapshot_store
+        vex_store = ctx.vex_store
+        if snapshot_store is None or vex_store is None:
+            return {"found": False, "affected": [], "reason": "no co-located signals store"}
+        return find_vulnerability_impact(
+            identifier, impact_store=snapshot_store, vex_store=vex_store, policy=_policy())
 
     @server.tool(
         name="assurance_security_stats",

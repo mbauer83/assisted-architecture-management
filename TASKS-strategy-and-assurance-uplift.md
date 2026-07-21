@@ -3143,7 +3143,13 @@ only existing nodes cannot measure a missing one".
        the removed REST endpoints → 404) to VIEW the active snapshot; drop the aibom-coverage panel bits.
 6. [ ] Docs: reference/cli-and-backend + configuration for the removed import/list endpoints + the
        new snapshot list endpoints; regenerate MCP docs after the ingest-MCP tool + rename.
-7. [ ] RESTART-GATED live re-verify: restored MCP/REST tools, TLP visibility_limited flag, metrics.
+7. [~] RESTART-GATED live re-verify — signals surfaces DONE 2026-07-21 on the restarted
+       backend + session: anchor normalization (full slugged id now resolves), renamed stats
+       keys, directness ({"direct": 4, "transitive": 20}), `assurance_delete_security_snapshot`
+       (removed the junk APP@live-check-collapse anchor; verified both real anchors, 30
+       canonical vulns, 77 aliases and the 17-node model all survived), and
+       `assurance_vulnerability_impact` (five identifier forms agree). REMAINING: the GUI
+       surfaces, which backlog 5 builds.
 8. [x] **Snapshot deletion** — DONE 2026-07-21. `assurance_delete_security_snapshot` (MCP) +
        `POST /api/assurance/security-snapshot-delete` (REST), both on ONE shared boundary
        (`signal_deletion.py`) mirroring the ingest pattern, so the two transports differ only
@@ -3178,13 +3184,31 @@ only existing nodes cannot measure a missing one".
        the new code left it 6 lines over, because the earlier anchor-key work had already
        consumed the headroom. Say the word and I will revert the second extraction and
        instead record a baseline exemption.
-9. [ ] **Vulnerability → affected entities** (owner-requested 2026-07-21) — find and present
-       every entity affected by a given vulnerability. This is the REVERSE of the current
-       read model: today everything is keyed anchor→snapshot→components→findings, so the
-       only way to answer "who is affected by CVE-X" is to scan every active snapshot.
-       Needs: a canonical-vulnerability-keyed query (the canonical id already exists and
-       already merges aliases, so CVE/GHSA/PYSEC all resolve to one identity — that is the
-       right key), returning the affected anchors with their component and severity context;
-       exposure filtering applied BEFORE aggregation, as everywhere else; and a presentation
-       surface (MCP tool + REST endpoint + a GUI view reachable from a finding). Relates to
-       backlog 5's component-vulnerability details view — same data, opposite direction.
+9. [x] **Vulnerability → affected entities** — DONE 2026-07-21.
+       `assurance_vulnerability_impact` (MCP) + `GET /api/assurance/vulnerability-impact`
+       (REST), on one shared projection (`signal_impact.py`) with a parity test, matching the
+       ingest/deletion pattern.
+       KEYED ON THE CANONICAL VULNERABILITY ID, which is what makes the question well-defined:
+       a caller holding the GHSA id must not get an empty answer because the scanner reported
+       the CVE. Any alias resolves, case-insensitively, and the full alias set is returned.
+       ONE JOIN, not a per-snapshot scan: the forward read model is anchor→snapshot→findings,
+       so answering this by iterating every active snapshot would be O(snapshots × findings)
+       round trips for something the findings index answers in one pass
+       (`_vulnerability_impact_ops.py`).
+       DECISIONS:
+       · ACTIVE snapshots only — a superseded scan is history; reporting an entity as
+         currently affected on a stale scan would be wrong (the anchor may have upgraded).
+       · VEX is REPORTED, not silently applied. A `not_affected` entity is still listed with
+         its disposition; dropping it would make a consciously-assessed entity
+         indistinguishable from one never scanned. `open_entity_count` counts the unsuppressed,
+         and a suppressed finding never sets max severity/CVSS.
+       · Exposure filtered BEFORE aggregation (finding tlp AND component tlp — a finding is
+         hidden when its component is), so a hidden record cannot influence a visible maximum.
+       · Unknown identifier → 404 `unknown_vulnerability`, deliberately distinct from a known
+         vulnerability affecting nothing (200, empty list).
+       20 tests: identity resolution, scope, exposure-before-aggregation, VEX reporting,
+       transports, parity.
+       LIVE-VERIFIED against the seeded store: CVE-2026-53540 / GHSA-V9PG-7XVM-68HF /
+       PYSEC-2026-3040 / lower-cased / the canonical VID all resolve to VID@0aa0acbdace7deab
+       and the same affected entity (APP@1777293133.OYEmP1 via python-multipart@0.0.26,
+       classified `transitive`); an unknown CVE reports not-found.

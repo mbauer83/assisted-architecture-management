@@ -60,6 +60,7 @@ agent cannot, for example, mark a safety constraint as `accept`-risk-treated.
 | Store administration | `assurance_list_nodes` | Read-only | List assurance entities (losses, hazards, UCAs, constraints, etc.). |
 | Store administration | `assurance_read_node` | Read-only | Read a single assurance entity by node_id. |
 | Store administration | `assurance_list_edges` | Read-only | List assurance connections. |
+| Other | `assurance_vulnerability_impact` | Read-only | Find every architecture entity currently affected by ONE vulnerability — the reverse of the per-anchor listings. |
 <!-- mcp-tools:end assurance-read -->
 
 ## `arch-assurance-write`

@@ -310,3 +310,32 @@ def delete_security_snapshot(body: DeleteSnapshotBody) -> JSONResponse:
         content=payload,
         headers={"Cache-Control": _NO_STORE},
     )
+
+
+@signals_router.get("/api/assurance/vulnerability-impact")
+def vulnerability_impact(identifier: str) -> JSONResponse:
+    """Every entity currently affected by one vulnerability, by any of its ids.
+
+    The reverse of the anchor-keyed reads: resolves the identifier through the
+    canonical identity that merges CVE/GHSA/PYSEC aliases, so the answer does not
+    depend on which feed's id the caller happens to hold.
+    """
+    from src.infrastructure.assurance.signal_impact import (  # noqa: PLC0415
+        IMPACT_STATUS_CODES,
+        find_vulnerability_impact,
+    )
+
+    ctx, pol = _policy()
+    if pol.check_locked():
+        return _locked_response()
+    snapshot_store = ctx.snapshot_store
+    vex_store = ctx.vex_store
+    if snapshot_store is None or vex_store is None:
+        return _ok({"found": False, "affected": [], "reason": "no co-located signals store"})
+    payload = find_vulnerability_impact(
+        identifier, impact_store=snapshot_store, vex_store=vex_store, policy=pol)
+    return JSONResponse(
+        status_code=IMPACT_STATUS_CODES[str(payload["status"])],
+        content=payload,
+        headers={"Cache-Control": _NO_STORE},
+    )

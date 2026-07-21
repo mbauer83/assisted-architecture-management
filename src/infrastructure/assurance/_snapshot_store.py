@@ -40,6 +40,11 @@ from src.infrastructure.assurance._snapshot_deletion_ops import (
     delete_all_for_anchor,
     delete_one_snapshot,
 )
+from src.infrastructure.assurance._vulnerability_impact_ops import (
+    list_active_findings_for_vulnerability,
+    list_aliases_for_canonical,
+    resolve_canonical_id,
+)
 from src.infrastructure.assurance._vulnerability_resolution import (
     resolve_canonical_vulnerability,
 )
@@ -261,6 +266,17 @@ class SQLCipherSnapshotStore:
         except Exception:
             conn.rollback()
             raise
+
+    # ── Reverse lookup: one vulnerability → the anchors it affects ────────────
+
+    def resolve_canonical_id(self, identifier: str) -> str | None:
+        return resolve_canonical_id(self, identifier)
+
+    def list_active_findings_for_vulnerability(self, canonical_id: str) -> list[dict[str, Any]]:
+        return list_active_findings_for_vulnerability(self, canonical_id)
+
+    def list_aliases_for_canonical(self, canonical_id: str) -> list[str]:
+        return list_aliases_for_canonical(self, canonical_id)
 
     def delete_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
         """Delete one snapshot and its owned rows; None if absent. Blast radius is
