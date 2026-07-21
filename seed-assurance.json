@@ -1,5 +1,5 @@
 {
-  "export_time": "2026-06-22T07:32:12Z",
+  "export_time": "2026-07-20T05:11:10Z",
   "analyses": [],
   "nodes": [
     {
@@ -13,12 +13,12 @@
       "uca_type": null,
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "Assurance evidence (hazard analyses, attack-surface findings, incident data, risk registers) is read or exfiltrated by a party without authorization. Such disclosure aids an attacker and breaches the confidentiality expected of safety/security work.",
       "created_at": "2026-06-11T12:39:59Z",
       "updated_at": "2026-06-22T07:27:29Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "HAZ@1781181601.2lta.003f49",
@@ -31,12 +31,12 @@
       "uca_type": null,
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "System state: the encrypted store's contents are obtainable as plaintext by a process or actor that has not passed the gated, classification-aware access path (e.g. an open connection or exported key is reachable outside the intended interface).",
       "created_at": "2026-06-11T12:40:01Z",
       "updated_at": "2026-06-22T07:27:40Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "HAZ@1781181604.w69v.e14520",
@@ -49,12 +49,12 @@
       "uca_type": null,
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "System state: the decryption key is available to the backend and the store opens automatically even when no authorized analysis session is active \u2014 for example, persisting unattended across restarts on a shared or compromised host.",
       "created_at": "2026-06-11T12:40:04Z",
       "updated_at": "2026-06-22T07:27:47Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "CSN@1781181619.aao3.b29a6b",
@@ -67,12 +67,12 @@
       "uca_type": null,
       "binding_status": "bound",
       "node_role": "controller",
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "The controller that decides when to open the confidential store and release decrypted content to a requestor, enforcing the classification-aware gate. Bound to the Architecture Backend application component.",
       "created_at": "2026-06-11T12:40:19Z",
       "updated_at": "2026-06-11T12:40:19Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "CSN@1781181620.aqwf.36e22b",
@@ -85,12 +85,12 @@
       "uca_type": null,
       "binding_status": "bound",
       "node_role": "controlled-process",
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "The controlled process: an AES-256 encrypted SQLite store that opens when supplied the key and returns plaintext assurance content. Bound to the Confidential Assurance Store application component.",
       "created_at": "2026-06-11T12:40:20Z",
       "updated_at": "2026-06-11T12:40:20Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "CSN@1781181622.sf29.f7a722",
@@ -103,12 +103,12 @@
       "uca_type": null,
       "binding_status": "bound",
       "node_role": "controlled-process",
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "Holds the decryption key and the setup-confirmed activation gate. Returns the key to the controller on request when activation is set.",
       "created_at": "2026-06-11T12:40:22Z",
       "updated_at": "2026-06-11T12:40:22Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "CAC@1781181624.umvk.63c038",
@@ -121,12 +121,12 @@
       "uca_type": null,
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "The specific control action by which the backend obtains the key from the credential backend and opens the encrypted store for a requestor.",
       "created_at": "2026-06-11T12:40:24Z",
       "updated_at": "2026-06-11T12:40:24Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "UCA@1781181637.olif.4bc98d",
@@ -139,12 +139,12 @@
       "uca_type": "provided",
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "Provided-when-unsafe: the backend releases plaintext content to a requestor whose classification clearance is below the TLP of the requested entries, exposing confidential evidence through the gated path itself.",
       "created_at": "2026-06-11T12:40:37Z",
       "updated_at": "2026-06-22T07:27:48Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "UCA@1781181639.ccn4.f452d7",
@@ -157,12 +157,12 @@
       "uca_type": "wrong-timing",
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "Wrong-timing: the store is opened and content returned before the requestor's clearance and the entry's TLP ceiling have been evaluated, so a check that would have denied access arrives too late.",
       "created_at": "2026-06-11T12:40:39Z",
       "updated_at": "2026-06-22T07:27:49Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "UCA@1781181642.03qv.111d9d",
@@ -175,12 +175,12 @@
       "uca_type": "stopped-too-soon",
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "Applied-too-long: the open/unlocked state is held beyond the authorized session \u2014 persisting unattended across restarts \u2014 so the store is accessible when no analyst is present.",
       "created_at": "2026-06-11T12:40:42Z",
       "updated_at": "2026-06-22T07:27:49Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "LOS@1781181663.yliy.d6e6cf",
@@ -193,12 +193,12 @@
       "uca_type": null,
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "Causal factors (technical + feedback): the clearance/TLP check is evaluated after content is fetched rather than enforced before it, and the default on an ambiguous or incomplete check is to serve rather than deny. An under-cleared requestor, or one whose check has not yet completed, therefore receives plaintext content.",
       "created_at": "2026-06-11T12:41:03Z",
       "updated_at": "2026-06-22T07:27:49Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "LOS@1781181666.ylrr.976e5b",
@@ -211,12 +211,12 @@
       "uca_type": null,
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "Causal factors (feedback + technical): the setup-confirmed activation gate enables auto-unlock indefinitely and lock-state is never re-evaluated against an activation window, so the store re-opens automatically on every restart with no analyst present.",
       "created_at": "2026-06-11T12:41:06Z",
       "updated_at": "2026-06-22T07:27:50Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "ACN@1781181668.5xan.24d7b4",
@@ -229,12 +229,12 @@
       "uca_type": null,
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "Derived from the advisory-gate scenario. The classification check must be enforced before any plaintext leaves the store, and must deny by default when clearance cannot be established.",
       "created_at": "2026-06-11T12:41:08Z",
       "updated_at": "2026-06-11T12:41:08Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "ACN@1781181670.yg1v.bd474b",
@@ -247,12 +247,12 @@
       "uca_type": null,
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "Derived from the persistent-activation scenario. Activation must be bounded (session or explicit window); the backend must not hold the store open across restarts without re-authorization.",
       "created_at": "2026-06-11T12:41:10Z",
       "updated_at": "2026-06-11T12:41:10Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "ACN@1781181672.qgcw.f35e97",
@@ -265,12 +265,12 @@
       "uca_type": null,
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{}",
       "content_text": "Supports detection and after-the-fact accountability for disclosure events, and discharges the regulatory record-keeping obligation. Realized by the hash-chained Assurance Archive.",
       "created_at": "2026-06-11T12:41:12Z",
       "updated_at": "2026-06-11T12:41:12Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "RSK@1781181688.orlu.5746f2",
@@ -283,12 +283,12 @@
       "uca_type": null,
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{\"likelihood\": \"medium\", \"impact\": \"high\", \"treatment\": \"mitigate\", \"owner\": \"Safety / Security Analyst\", \"review_date\": \"2026-12-01\"}",
       "content_text": "Evaluates the plaintext-disclosure hazard. Treatment is mitigate (not accept) \u2014 disclosure of attack-surface evidence is not an acceptable residual for this system. The risk overlay prioritises treatment; it never closes the underlying security constraint.",
       "created_at": "2026-06-11T12:41:28Z",
       "updated_at": "2026-06-22T07:27:50Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     },
     {
       "node_id": "OBL@1781181690.44yz.9e8500",
@@ -301,12 +301,12 @@
       "uca_type": null,
       "binding_status": null,
       "node_role": null,
+      "analysis_id": null,
       "attributes_json": "{\"cites\": \"EU-AI-Act:Art-12\", \"framework\": \"EU AI Act\", \"clause\": \"Article 12 \\u2014 Record-keeping\", \"status\": \"in-progress\"}",
       "content_text": "High-risk AI systems must technically allow for the automatic recording of events (logs) over their lifetime. Discharged here by the append-only, hash-chained Assurance Archive that records every significant assurance operation.",
       "created_at": "2026-06-11T12:41:30Z",
       "updated_at": "2026-06-11T12:41:30Z",
-      "created_by": "",
-      "analysis_id": null
+      "created_by": ""
     }
   ],
   "edges": [
@@ -472,25 +472,25 @@
     },
     {
       "edge_id": "EDG@b123be9f8544",
-      "source_id": "ACN@1781181668.5xan.24d7b4",
-      "target_id": "CSN@1781181619.aao3.b29a6b",
-      "conn_type": "accountable-to",
+      "source_id": "CSN@1781181619.aao3.b29a6b",
+      "target_id": "ACN@1781181668.5xan.24d7b4",
+      "conn_type": "responsible-for",
       "attributes_json": "{}",
       "created_at": "2026-06-11T12:43:15Z"
     },
     {
       "edge_id": "EDG@44211539cff1",
-      "source_id": "ACN@1781181670.yg1v.bd474b",
-      "target_id": "CSN@1781181619.aao3.b29a6b",
-      "conn_type": "accountable-to",
+      "source_id": "CSN@1781181619.aao3.b29a6b",
+      "target_id": "ACN@1781181670.yg1v.bd474b",
+      "conn_type": "responsible-for",
       "attributes_json": "{}",
       "created_at": "2026-06-11T12:43:16Z"
     },
     {
       "edge_id": "EDG@b39362454dfc",
-      "source_id": "ACN@1781181672.qgcw.f35e97",
-      "target_id": "CSN@1781181619.aao3.b29a6b",
-      "conn_type": "accountable-to",
+      "source_id": "CSN@1781181619.aao3.b29a6b",
+      "target_id": "ACN@1781181672.qgcw.f35e97",
+      "conn_type": "responsible-for",
       "attributes_json": "{}",
       "created_at": "2026-06-11T12:43:19Z"
     },
@@ -519,30 +519,6 @@
       "created_at": "2026-06-11T12:43:26Z"
     },
     {
-      "edge_id": "EDG@8b019bf2747f",
-      "source_id": "UCA@1781181637.olif.4bc98d",
-      "target_id": "HAZ@1781181601.2lta.003f49",
-      "conn_type": "violates",
-      "attributes_json": "{}",
-      "created_at": "2026-06-11T12:45:28Z"
-    },
-    {
-      "edge_id": "EDG@f534bd7031e2",
-      "source_id": "UCA@1781181639.ccn4.f452d7",
-      "target_id": "HAZ@1781181601.2lta.003f49",
-      "conn_type": "violates",
-      "attributes_json": "{}",
-      "created_at": "2026-06-11T12:45:30Z"
-    },
-    {
-      "edge_id": "EDG@bca15ccd94e4",
-      "source_id": "UCA@1781181642.03qv.111d9d",
-      "target_id": "HAZ@1781181604.w69v.e14520",
-      "conn_type": "violates",
-      "attributes_json": "{}",
-      "created_at": "2026-06-11T12:45:32Z"
-    },
-    {
       "edge_id": "EDG@f82249d417b2",
       "source_id": "UCA@1781181637.olif.4bc98d",
       "target_id": "ACN@1781181668.5xan.24d7b4",
@@ -568,9 +544,9 @@
     },
     {
       "edge_id": "EDG@e52eeab47387",
-      "source_id": "RSK@1781181688.orlu.5746f2",
-      "target_id": "CSN@1781181619.aao3.b29a6b",
-      "conn_type": "accountable-to",
+      "source_id": "CSN@1781181619.aao3.b29a6b",
+      "target_id": "RSK@1781181688.orlu.5746f2",
+      "conn_type": "accountable-for",
       "attributes_json": "{}",
       "created_at": "2026-06-11T12:45:40Z"
     }
@@ -579,19 +555,19 @@
     {
       "assurance_node_id": "ACN@1781181668.5xan.24d7b4",
       "arch_artifact_id": "REQ@1780655839.IriicS.pluggable-confidential-assurance-storage",
-      "ref_type": "refines",
+      "ref_type": "refines-requirement",
       "resolved_at": null
     },
     {
       "assurance_node_id": "ACN@1781181670.yg1v.bd474b",
       "arch_artifact_id": "REQ@1780655839.IriicS.pluggable-confidential-assurance-storage",
-      "ref_type": "refines",
+      "ref_type": "refines-requirement",
       "resolved_at": null
     },
     {
       "assurance_node_id": "ACN@1781181672.qgcw.f35e97",
       "arch_artifact_id": "REQ@1780655839.ySK1bT.tamper-evident-assurance-records",
-      "ref_type": "refines",
+      "ref_type": "refines-requirement",
       "resolved_at": null
     },
     {
@@ -615,13 +591,13 @@
     {
       "assurance_node_id": "ACN@1781181672.qgcw.f35e97",
       "arch_artifact_id": "APP@1780656431.GnsLC8.assurance-archive",
-      "ref_type": "evidenced-by",
+      "ref_type": "evidenced-by-artifact",
       "resolved_at": null
     },
     {
       "assurance_node_id": "OBL@1781181690.44yz.9e8500",
       "arch_artifact_id": "APP@1780656431.GnsLC8.assurance-archive",
-      "ref_type": "evidenced-by",
+      "ref_type": "evidenced-by-artifact",
       "resolved_at": null
     }
   ]

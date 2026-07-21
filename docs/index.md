@@ -29,6 +29,7 @@ New here? Start with the [Quickstart in the README](../README.md#quickstart), th
 - [Views & exploration](03-modeling/views-and-exploration.md)
 - [Diagramming](03-modeling/diagramming.md)
 - [Viewpoints](03-modeling/viewpoints.md)
+- [Motivation coverage](03-modeling/coverage-semantics.md)
 - [Interfaces & MCP](03-modeling/interfaces-and-mcp.md)
 
 &nbsp;

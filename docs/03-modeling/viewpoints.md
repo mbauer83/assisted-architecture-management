@@ -9,6 +9,10 @@ definition answers it on demand, against whatever the model currently contains.
 This page is the explanation and how-to; the full YAML shape, comparator semantics, and MCP
 tool parameters are in [Viewpoints — schema reference](../reference/viewpoints-schema.md).
 
+For coverage viewpoints specifically — what counts as "covered" when a goal fans out into
+several branches, and why an absent diagnostic observation is not a gap — see
+[Motivation coverage](coverage-semantics.md).
+
 &nbsp;
 
 ## Definitions, applications, and ad-hoc execution

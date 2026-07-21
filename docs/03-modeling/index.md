@@ -20,6 +20,7 @@ GUI, the REST API, the CLI, and the MCP tools.
 | [Views & exploration](views-and-exploration.md) | List view, treemap, grid, full-text search, and graph navigation |
 | [Diagramming](diagramming.md) | ArchiMate, matrix, activity, sequence, C4, and datatype (UML class) diagram families |
 | [Viewpoints](viewpoints.md) | Saved, criteria-based ways of looking at a slice of the model — definitions, applications to existing diagrams, and ad-hoc execution |
+| [Motivation coverage](coverage-semantics.md) | What "covered" means when a goal fans out — branch-complete realization, obligations for absent nodes, and why a diagnostic observation is never a gap |
 | [Impact analysis](impact-analysis.md) | Deriving indirect relationships from real connections — certain vs. potential, impact workflows, materializing a derived relationship |
 | [Interfaces & MCP](interfaces-and-mcp.md) | The MCP read/write tool surface, REST API, and GUI parity |
 

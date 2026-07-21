@@ -88,6 +88,13 @@ viewpoints:
   execution_max_entities: 500              # hard cap on entities in a viewpoint execution result
   execution_default_entity_limit_mcp: 200  # MCP execute default when no limit argument is given
   execution_timeout_seconds: 10
+
+assurance:
+  neighbors_default_max_hops: 1        # hops when a neighbors request names none (hard clamp 4)
+  neighbors_max_hops: 4                # upper bound any request's max_hops is clamped to (hard clamp 4)
+  neighbors_max_nodes: 150             # node budget per traversal response (hard clamp 1000)
+  neighbors_max_edges: 300             # edge budget per traversal response (hard clamp 2000)
+  neighbors_time_budget_seconds: 2.0   # wall-clock budget; exceeding it aborts the whole request
 ```
 
 These apply globally and are read at startup; they are not configurable via
@@ -99,6 +106,10 @@ externalization](../05-extensibility/ontology-modules.md#guidance-externalizatio
 The `storage.assurance` keys are written automatically by
 `arch-assurance init` and `arch-assurance use-backend` — see
 [Assurance: storage & confidentiality](../04-assurance/storage-and-confidentiality.md).
+The `assurance:` traversal budgets bound `GET /api/assurance/neighbors` (the assurance
+graph explorer): the size budgets produce deterministic partial results with frontier
+node ids, while the time budget aborts the whole request with a retryable error; every
+value is hard-clamped in code so misconfiguration can never unbound the traversal.
 
 `modules:` overrides ontology and diagram-type module manifests for the current runtime.
 Each key is a module name and currently supports one override: `enabled: true | false`.

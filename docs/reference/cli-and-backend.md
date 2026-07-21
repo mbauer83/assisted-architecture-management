@@ -76,12 +76,46 @@ backend start).
 | Flag | Effect |
 |---|---|
 | `--repo-root <path>` | Repeatable; one or more repo roots to evaluate/upgrade |
-| `--workspace <path>` | Resolve engagement + enterprise roots from `arch-init` state instead |
+| `--workspace <path>` | Resolve engagement + enterprise roots from `arch-init` state instead (repositories only — never operational targets) |
 | `--commit` | Apply findings (default: dry-run report only) |
 | `--json` | Emit the stable machine-readable report contract instead of human output |
+| `--settings <path>` / `--deployment-root <path>` | Explicit **deployment identity** — additionally discovers the deployment's operational targets (guidance cache, signal stores, the operator-owned settings document) |
+| `--guidance-cache` / `--signals-db` / `--assurance-store` | Override one operational path within that deployment identity |
+| `--exclude-target <kind>` | Operator-run partial commands only — skip one operational target kind; the report then states deployment readiness is NOT certified. Docker startup never excludes a configured active target |
 
 Each repo root is evaluated/applied independently; findings and applied-step
 ids are reported per root plus one aggregate summary for `--workspace` runs.
+
+**Operational targets & deployment identity.** Without `--settings`,
+`--deployment-root`, or the `ARCH_SETTINGS_PATH` process selector, the command
+touches repositories only (a test workspace can never reach your real guidance
+cache or stores). With a deployment identity, the same run also discovers,
+preflights, and migrates operational targets — each as one atomic unit
+(databases in one migration transaction; text files by atomic replace), in a
+deterministic order, with no cross-target atomicity claimed: a failure after an
+earlier target committed exits `20` with an exact partial report, and a re-run
+resumes safely from actual content. Exit codes: dry-run is always `0` (findings,
+blockers, and credential-uninspectable targets are report states); `--commit`
+returns `0` success · `1` repository-internal step errors · `3` unresolved
+blocking migration (nothing written) · `20` partial apply · `21`
+infrastructure/credential failure before any commit. The JSON report is
+additive: `repos` is unchanged; `report_schema_version`, `operational_targets`,
+`deployment_preflight`, and `outcome` are new.
+
+**Backup & recovery per target kind** (before any `--commit` on a deployment):
+
+| Target kind | Backup | Recovery |
+|---|---|---|
+| Repository | Commit or branch the repo (recommended by the CLI) | Re-run `--commit`; steps are idempotent and self-healing |
+| Guidance cache (`~/.config/arch-repo/guidance-cache/` or deployment-scoped) | Copy the directory | Restore the copy, or re-import from the licensed source with `arch-import-guidance` |
+| Public signals SQLite | Copy the `.db` file | Restore the copy and re-run; quarantined legacy rows stay inspectable via the admin surface |
+| SQLCipher assurance store | `arch-assurance backup` (encrypted copy) | Restore the backup; the key stays in the OS keychain/vault — never in reports or logs |
+| Deployment settings document | Copy the YAML file | Restore the copy; rewrites are atomic and byte-preserving outside the changed key |
+
+A locked SQLCipher store whose version cannot be read is a **blocking unresolved
+migration** (exit `3`), never assumed current; provide the credential through
+the non-interactive secret path (OS keychain, or the
+`ARCH_ASSURANCE_MASTER_PASSWORD`-protected vault on headless hosts) and re-run.
 
 `--commit`, in order:
 
