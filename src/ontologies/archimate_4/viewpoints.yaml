@@ -1757,3 +1757,238 @@ viewpoints:
           endpoint_criteria: *id006
           negate: true
       value: critical
+- slug: security-posture
+  version: 1
+  name: Security Posture
+  description: A tool-specific capability, not part of the ArchiMate standard's example
+    viewpoints. Application components colored by the maximum CVSS score of their open
+    vulnerability findings, read from the ACTIVE security refresh run through the
+    signal-metrics capability (exposure-filtered, snapshot-pinned). With the assurance
+    store locked or signals unconfigured the diagram renders with default styling plus
+    an explicit "signals unavailable" note — never with stale or mixed values. Styled
+    output is classification-bearing and ephemeral; persisting it into a git-tracked
+    artifact is refused, and downloads go through the stamped export path only.
+  purpose:
+  - deciding
+  - informing
+  content:
+  - overview
+  stakeholders:
+  - Safety / Security Analysts
+  - Enterprise Architects
+  concerns:
+  - security posture
+  - supply-chain risk
+  selection_mode: query
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+        - application-component
+    derived:
+    - name: max_cvss
+      source: security-signal
+      metric: max_cvss_score
+  presentation:
+    representation: exploration
+    styling_rules:
+    - capability: node_color
+      mode: scale
+      scale_attribute: derived.max_cvss
+      scale_min: 0
+      scale_max: 10
+      scale_tokens:
+      - heat-low
+      - heat-high
+  representation_types:
+  - archimate-layered
+- slug: motivation-coverage
+  version: 1
+  name: Motivation Coverage (branch-complete)
+  description: 'Branch-complete realization over the motivation chain: a goal is covered only
+    when EVERY modeled branch (goal -> outcome -> requirement) terminates in a requirement that
+    something legitimately realizes. Reports full realization rather than existential
+    reachability, so a goal whose second outcome has no requirement is an honest gap instead of
+    a false green. A direct requirement -influence-> goal is a shortcut branch (gap, flagged);
+    a plain association is reported as ambiguous rather than asserted as realization. The
+    behaviour/business/application columns are DIAGNOSTIC observations, never gaps — an
+    application-only requirement passes overall. Complements requirements-coverage-gaps, which
+    answers the narrower question "does this requirement have any incoming realization?".'
+  purpose:
+  - deciding
+  - informing
+  content:
+  - coherence
+  stakeholders:
+  - Enterprise Architects
+  - Business Analysts
+  - Requirements Managers
+  concerns:
+  - motivation coverage
+  - traceability
+  - realization completeness
+  selection_mode: query
+  query:
+    query_schema: 1
+    entity_criteria:
+      kind: group
+      conjunction: and
+      children:
+      - kind: condition
+        attribute: type
+        comparator: in
+        value:
+          from: parameter
+          name: scope
+      - kind: condition
+        attribute: group
+        comparator: in
+        value:
+          from: parameter
+          name: group
+    parameters:
+    - name: scope
+      type: string
+      cardinality: many
+      allowed_values:
+      - goal
+      - outcome
+      - requirement
+      min_items: 1
+      required: false
+      default:
+      - goal
+      - outcome
+      - requirement
+      description: Which motivation row types the coverage table reports on.
+    - name: gaps_only
+      type: boolean
+      required: false
+      default: false
+      description: Keep only rows whose composed verdict is a gap.
+    - name: group
+      type: slug
+      cardinality: many
+      min_items: 1
+      required: false
+      description: Restrict rows to these model groups. Omit to report on every group.
+    trace_patterns:
+    - name: motivation
+      kind: branch-complete-realization
+      applies_to:
+      - goal
+      - outcome
+      branches:
+        goal_to_outcome:
+          kind: stored-edge
+          connection: archimate-realization
+          direction: incoming
+          endpoint:
+            type: outcome
+        outcome_to_requirement:
+          kind: stored-edge
+          connection: archimate-realization
+          direction: incoming
+          endpoint:
+            type: requirement
+      shortcuts:
+      - kind: diagnostic-edge
+        connection: archimate-influence
+        direction: incoming
+        endpoint:
+          type: requirement
+        status: shortcut
+      - kind: diagnostic-edge
+        connection: archimate-association
+        direction: incoming
+        endpoint:
+          type: requirement
+        status: ambiguous_link
+      leaf:
+        kind: none
+    - name: overall_realization
+      kind: branch-complete-realization
+      applies_to:
+      - goal
+      - outcome
+      - requirement
+      branches:
+        ref: motivation
+      leaf:
+        kind: derived-reachability
+        connection: archimate-realization
+        traversal: direct_and_derived
+        max_hops: 4
+        endpoint:
+          registry: permitted-realizers-of-requirement
+    - name: behavior_coverage
+      kind: branch-complete-realization
+      applies_to:
+      - goal
+      - outcome
+      - requirement
+      branches:
+        ref: motivation
+      diagnostic: true
+      leaf:
+        kind: derived-reachability
+        connection: archimate-realization
+        traversal: direct_and_derived
+        max_hops: 4
+        endpoint:
+          domain: common
+          class: behavior-element
+    - name: business_coverage
+      kind: branch-complete-realization
+      applies_to:
+      - goal
+      - outcome
+      - requirement
+      branches:
+        ref: motivation
+      diagnostic: true
+      leaf:
+        kind: derived-reachability
+        connection: archimate-realization
+        traversal: direct_and_derived
+        max_hops: 4
+        endpoint:
+          domain: business
+    - name: application_coverage
+      kind: branch-complete-realization
+      applies_to:
+      - goal
+      - outcome
+      - requirement
+      branches:
+        ref: motivation
+      diagnostic: true
+      leaf:
+        kind: derived-reachability
+        connection: archimate-realization
+        traversal: direct_and_derived
+        max_hops: 4
+        endpoint:
+          domain: application
+  presentation:
+    representation: table
+    target_types:
+    - goal
+    - outcome
+    - requirement
+    columns:
+    - label: Element
+      source: name
+    - label: Type
+      source: type
+    - label: Status
+      source: status
+    - label: Group
+      source: group
+    group_by: type

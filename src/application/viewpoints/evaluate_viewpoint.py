@@ -17,26 +17,18 @@ from src.application.viewpoints.execution_result import (
     Membership,
     ViewpointExecutionResult,
 )
-from src.application.viewpoints.parameter_binding import anchor_entity_ids, bind_parameters
-from src.application.viewpoints.ports import RepositoryReadAccess
+from src.application.viewpoints.ports import RepositoryReadAccess, SignalAttributeCapability
+from src.application.viewpoints.prepare_environment import prepare_query_environment
 from src.application.viewpoints.repository_projection import project_repository
 from src.application.viewpoints.result_aggregation import aggregation_for_result
 from src.application.viewpoints.result_summaries import matrix_axis_ids, ordered_witness_steps_for
+from src.application.viewpoints.trace_execution import evaluate_declared_trace_table
 from src.domain.artifact_types import EntityRecord
 from src.domain.clock import utc_now_iso
 from src.domain.viewpoint_aggregation import AggregateConnection
 from src.domain.viewpoint_anchor_distance import anchor_modeled_distances
-from src.domain.viewpoint_binding_evaluation import (
-    BindingEvaluationInput,
-    evaluate_bindings,
-    evaluate_derived_attributes,
-)
-from src.domain.viewpoint_bindings import DerivedAttribute
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
-from src.domain.viewpoint_derived_attribute_deferral import split_eager_and_deferred_derived_attributes
-from src.domain.viewpoint_evaluation_context import EvaluationEnvironment
 from src.domain.viewpoint_projection import ViewpointProjection, drift_warnings
-from src.domain.viewpoint_scope_query import definition_with_scope_query
 from src.domain.viewpoint_summary import render_query_summary
 from src.domain.viewpoint_target_population import declared_target_types, summarize_target_population
 from src.domain.viewpoints import (
@@ -112,6 +104,7 @@ def project_viewpoint_repository(
     read_access: RepositoryReadAccess,
     registries: RegistrySnapshot,
     parameters: Mapping[str, object] | None = None,
+    signal_capability: SignalAttributeCapability | None = None,
 ) -> ViewpointProjection:
     """GUI-only repository-context ``ViewpointProjection`` carrying
     per-item style tokens — the styled sibling of ``evaluate_viewpoint``'s deliberately
@@ -121,7 +114,9 @@ def project_viewpoint_repository(
     execution result already uses internally.
     """
     definition, _, _ = resolve_viewpoint_definition(slug, query, catalog=catalog)
-    prepared = _prepare_query_environment(definition, parameters, read_access, registries)
+    prepared = prepare_query_environment(
+        definition, parameters, read_access, registries, signal_capability,
+    )
     return project_repository(
         prepared.executable_definition,
         read_access=read_access,
@@ -130,6 +125,9 @@ def project_viewpoint_repository(
         environment=prepared.environment,
         candidate_entity_ids=prepared.entity_candidates,
         deferred_derived=prepared.deferred_derived,
+        deferred_signal=prepared.deferred_signal,
+        signal_capability=signal_capability,
+        signal_warnings=(prepared.signal_warning,) if prepared.signal_warning else (),
     )
 
 
@@ -144,11 +142,14 @@ def evaluate_viewpoint(
     default_limit: int,
     timeout_seconds: float,
     default_legibility_budget: int = 100,
+    signal_capability: SignalAttributeCapability | None = None,
 ) -> ViewpointExecutionResult:
     start = time.monotonic()
 
     definition, slug, version = resolve_viewpoint_definition(request.slug, request.query, catalog=catalog)
-    prepared = _prepare_query_environment(definition, request.parameters, read_access, registries)
+    prepared = prepare_query_environment(
+        definition, request.parameters, read_access, registries, signal_capability,
+    )
     executable_definition, scope_derived = prepared.executable_definition, prepared.scope_derived
 
     requested_limit = request.limit if request.limit is not None else default_limit
@@ -162,6 +163,9 @@ def evaluate_viewpoint(
         environment=prepared.environment,
         candidate_entity_ids=prepared.entity_candidates,
         deferred_derived=prepared.deferred_derived,
+        deferred_signal=prepared.deferred_signal,
+        signal_capability=signal_capability,
+        signal_warnings=(prepared.signal_warning,) if prepared.signal_warning else (),
     )
 
     primary_ids = sorted(
@@ -281,6 +285,10 @@ def evaluate_viewpoint(
 
     query = executable_definition.query
     assert query is not None
+    trace_table = evaluate_declared_trace_table(
+        query, tuple(primary_ids), read_access=read_access, registries=registries,
+        bound_parameters=prepared.environment.parameters, limit=limit,
+    )
     result = ViewpointExecutionResult(
         slug=slug,
         version=version,
@@ -304,6 +312,8 @@ def evaluate_viewpoint(
         anchor_ids=prepared.anchor_ids,
         target_population=target_population,
         aggregation=aggregation,
+        bound_parameters=dict(prepared.environment.parameters),
+        trace_table=trace_table,
         query_summary=(
             f"Selection derived from the viewpoint's concept scope: "
             f"{render_query_summary(query, default_derivation_max_hops=registries.derivation_max_hops)}"
@@ -326,59 +336,3 @@ def evaluate_viewpoint(
         result.duration_ms,
     )
     return result
-
-
-@dataclass(frozen=True)
-class _PreparedQueryEnvironment:
-    executable_definition: ViewpointDefinition
-    scope_derived: bool
-    entity_candidates: frozenset[str]
-    environment: EvaluationEnvironment
-    deferred_derived: tuple[DerivedAttribute, ...]
-    anchor_ids: tuple[str, ...]
-
-
-def _prepare_query_environment(
-    definition: ViewpointDefinition,
-    parameters: Mapping[str, object] | None,
-    read_access: RepositoryReadAccess,
-    registries: RegistrySnapshot,
-) -> _PreparedQueryEnvironment:
-    executable_definition, scope_derived = definition_with_scope_query(definition)
-    assert executable_definition.query is not None
-    query = executable_definition.query
-    entity_ids = _scoped_entity_ids(read_access, query.repo_scope)
-    connection_ids = _scoped_connection_ids(read_access, query.repo_scope)
-    binding_input = BindingEvaluationInput(
-        tuple(sorted(entity_ids)), tuple(sorted(connection_ids)), read_access, registries
-    )
-    resolved_parameters = bind_parameters(query, parameters, read_access)
-    bindings = evaluate_bindings(query.bindings, parameters=resolved_parameters, input=binding_input)
-    eager_derived, deferred_derived = split_eager_and_deferred_derived_attributes(query)
-    environment = evaluate_derived_attributes(
-        eager_derived, tuple(sorted(entity_ids)), input=binding_input, environment=bindings.environment
-    )
-    return _PreparedQueryEnvironment(
-        executable_definition=executable_definition,
-        scope_derived=scope_derived,
-        entity_candidates=frozenset(entity_ids),
-        environment=environment,
-        deferred_derived=deferred_derived,
-        anchor_ids=anchor_entity_ids(query, resolved_parameters),
-    )
-
-
-def _scoped_entity_ids(read_access: RepositoryReadAccess, scope: str) -> set[str]:
-    if scope == "enterprise":
-        return read_access.enterprise_entity_ids()
-    if scope == "engagement":
-        return read_access.engagement_entity_ids()
-    return read_access.entity_ids()
-
-
-def _scoped_connection_ids(read_access: RepositoryReadAccess, scope: str) -> set[str]:
-    if scope == "enterprise":
-        return read_access.enterprise_connection_ids()
-    if scope == "engagement":
-        return read_access.engagement_connection_ids()
-    return read_access.connection_ids()

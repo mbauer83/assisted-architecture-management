@@ -126,6 +126,16 @@ def read_attribute_value(
             return _reserved_entity_field(record, head)
         assert isinstance(record, ConnectionRecord)
         return _reserved_connection_field(record, head)
+    # Entities: the Properties table (decoded into `attributes`) is the user-facing
+    # attribute surface; frontmatter `extra` stays as the fallback.
+    if isinstance(record, EntityRecord) and isinstance(record.attributes, Mapping) and head in record.attributes:
+        value: object = record.attributes[head]
+        for part in rest.split(".") if rest else ():
+            if isinstance(value, Mapping) and part in value:
+                value = value[part]
+            else:
+                return None, False
+        return value, True
     extra: object = record.extra
     if not isinstance(extra, Mapping) or head not in extra:
         return None, False
@@ -266,6 +276,13 @@ def evaluate_attribute_condition(
     connection: ConnectionRecord | None,
     environment: EvaluationEnvironment = EvaluationEnvironment(),
 ) -> EvaluationOutcome:
+    # An unsupplied declared-optional parameter makes this condition assert nothing: it drops
+    # out of its conjunction instead of failing to match (which would silently exclude
+    # everything whenever an optional filter is omitted). Checked before any attribute work —
+    # the condition is inert regardless of what it compares against.
+    if condition.value.kind == "parameter" and condition.value.parameter in environment.inactive_parameters:
+        return EvaluationOutcome(matched=True, inactive=True)
+
     derived_path = condition.attribute.startswith("derived.") and isinstance(record, EntityRecord)
     declared = (
         "derived"

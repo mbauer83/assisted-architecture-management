@@ -15,7 +15,6 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime
 from typing import Literal
 
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
@@ -25,36 +24,11 @@ from src.domain.viewpoint_criteria import ConnectionCriteriaGroup, EntityCriteri
 from src.domain.viewpoint_criteria_evaluation import evaluate_connection_criteria, evaluate_entity_criteria
 from src.domain.viewpoint_evaluation_context import CriteriaReadAccess, EvaluationEnvironment
 from src.domain.viewpoint_projection import StyleRuleOutcome, StyleRuleOutcomeKind
+from src.domain.viewpoint_scale_styling import ScaleBounds, StyleValue, _scale_value
 from src.domain.viewpoints import PresentationSpec, RangeBand, StyleRule
 
 ItemKind = Literal["entity", "connection"]
 Item = EntityRecord | ConnectionRecord
-
-
-@dataclass(frozen=True)
-class ScaleStyleValue:
-    """Adapter-facing scale result: interpolate between tokens at ``position``."""
-
-    position: float
-    tokens: tuple[str, str]
-
-
-StyleValue = str | ScaleStyleValue
-
-
-@dataclass(frozen=True)
-class ScaleBounds:
-    minimum: float
-    maximum: float
-
-
-@dataclass(frozen=True)
-class ScaleLegend:
-    capability: str
-    attribute: str
-    minimum: float
-    maximum: float
-    tokens: tuple[str, str]
 
 
 @dataclass(frozen=True)
@@ -155,116 +129,6 @@ def _range_token(
     if not present:
         return None, frozenset()
     return _band_for(value, rule.range_bands), frozenset()
-
-
-def _number(value: object) -> float | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, datetime):
-        return float(value.date().toordinal())
-    if isinstance(value, date):
-        return float(value.toordinal())
-    if isinstance(value, str):
-        try:
-            return float(value)
-        except ValueError:
-            try:
-                return float(date.fromisoformat(value).toordinal())
-            except ValueError:
-                return None
-    return None
-
-
-def _scale_bound(value: float | str | None) -> float | None:
-    return _number(value) if value is not None else None
-
-
-def calculate_scale_bounds(
-    presentation: PresentationSpec | None,
-    items: tuple[tuple[Item, ItemKind], ...],
-    *,
-    registries: RegistrySnapshot,
-    environment: EvaluationEnvironment,
-) -> tuple[Mapping[int, ScaleBounds], tuple[ScaleLegend, ...], frozenset[str]]:
-    """Calculate deterministic bounds from the complete selected result set."""
-    if presentation is None:
-        return {}, (), frozenset()
-    bounds: dict[int, ScaleBounds] = {}
-    legends: list[ScaleLegend] = []
-    drift: set[str] = set()
-    for index, rule in enumerate(presentation.styling_rules):
-        if rule.disabled or rule.mode != "scale" or rule.scale_attribute is None or len(rule.scale_tokens) != 2:
-            continue
-        values: list[float] = []
-        for item, kind in items:
-            if rule.applies_to and not (rule.applies_to & _item_tags(item, kind)):
-                continue
-            context: CriteriaContext = kind
-            if resolve_attribute_path(rule.scale_attribute, context=context, registries=registries) is None:
-                if not rule.scale_attribute.startswith("derived."):
-                    drift.add(rule.scale_attribute)
-                continue
-            value, present = read_attribute_value(
-                item, rule.scale_attribute, context=context, environment=environment
-            )
-            numeric = _number(value) if present else None
-            if numeric is not None:
-                values.append(numeric)
-        minimum = _scale_bound(rule.scale_min)
-        maximum = _scale_bound(rule.scale_max)
-        if minimum is None and values:
-            minimum = min(values)
-        if maximum is None and values:
-            maximum = max(values)
-        if minimum is None or maximum is None:
-            continue
-        tokens = (rule.scale_tokens[0], rule.scale_tokens[1])
-        bounds[index] = ScaleBounds(minimum=minimum, maximum=maximum)
-        legends.append(
-            ScaleLegend(
-                capability=rule.capability,
-                attribute=rule.scale_attribute,
-                minimum=minimum,
-                maximum=maximum,
-                tokens=tokens,
-            )
-        )
-    return bounds, tuple(legends), frozenset(drift)
-
-
-def _scale_value(
-    rule: StyleRule,
-    index: int,
-    item: Item,
-    context: CriteriaContext,
-    *,
-    registries: RegistrySnapshot,
-    environment: EvaluationEnvironment,
-    bounds: Mapping[int, ScaleBounds],
-) -> ScaleStyleValue | None:
-    if rule.scale_attribute is None or len(rule.scale_tokens) != 2 or index not in bounds:
-        return None
-    # Same schema-drift contract as every other comparator/style path: an attribute path
-    # the registries don't know (and isn't a derived. path, which bypasses schema lookup
-    # by design) is treated as absent, not read straight off raw extra data.
-    if (
-        not rule.scale_attribute.startswith("derived.")
-        and resolve_attribute_path(rule.scale_attribute, context=context, registries=registries) is None
-    ):
-        return None
-    value, present = read_attribute_value(item, rule.scale_attribute, context=context, environment=environment)
-    numeric = _number(value) if present else None
-    if numeric is None:
-        return None
-    scale = bounds[index]
-    # Out-of-range values saturate at the nearest endpoint (standard heat-map behavior)
-    # rather than dropping out of the scale entirely — an item beyond the declared bounds
-    # still reads as "far"/"near", never as unstyled.
-    clamped = min(max(numeric, scale.minimum), scale.maximum)
-    position = 0.0 if scale.maximum == scale.minimum else (clamped - scale.minimum) / (scale.maximum - scale.minimum)
-    return ScaleStyleValue(position=position, tokens=(rule.scale_tokens[0], rule.scale_tokens[1]))
 
 
 def _unresolvable_reference(

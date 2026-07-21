@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from src.application.viewpoints.ports import RepositoryReadAccess
+from src.application.viewpoints.ports import RepositoryReadAccess, SignalAttributeCapability
+from src.application.viewpoints.signal_attributes import fetch_and_merge_signal_attributes
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 from src.domain.concept_scope import ConceptScope
 from src.domain.module_types import EntityTypeName
@@ -28,9 +29,9 @@ from src.domain.viewpoint_projection import (
     drift_warnings,
     rule_outcome_warnings,
 )
+from src.domain.viewpoint_scale_styling import calculate_scale_bounds
 from src.domain.viewpoint_style_evaluation import (
     RuleItemHit,
-    calculate_scale_bounds,
     classify_style_rule_outcomes,
     evaluate_item_style,
 )
@@ -54,6 +55,9 @@ def project_repository(
     environment: EvaluationEnvironment = EvaluationEnvironment(),
     candidate_entity_ids: frozenset[str] | None = None,
     deferred_derived: tuple[DerivedAttribute, ...] = (),
+    deferred_signal: tuple[DerivedAttribute, ...] = (),
+    signal_capability: SignalAttributeCapability | None = None,
+    signal_warnings: tuple[str, ...] = (),
 ) -> ViewpointProjection:
     query = definition.query
     if query is None:
@@ -113,6 +117,18 @@ def project_repository(
             input=deferred_input,
             environment=environment,
         )
+    if deferred_signal:
+        # Presentation-only signal attributes: ONE batched capability call for
+        # the retained population; unavailable merges nothing and surfaces a
+        # warning — snapshot values are never mixed.
+        environment, deferred_signal_warning = fetch_and_merge_signal_attributes(
+            signal_capability,
+            deferred_signal,
+            tuple(entity.artifact_id for entity in entity_records),
+            environment,
+        )
+        if deferred_signal_warning:
+            signal_warnings = (*signal_warnings, deferred_signal_warning)
     styled_items_list: list[tuple[EntityRecord | ConnectionRecord, Literal["entity", "connection"]]] = []
     for entity in entity_records:
         styled_items_list.append((entity, "entity"))
@@ -211,6 +227,7 @@ def project_repository(
             drift_warnings(frozenset(drift))
             + rule_outcome_warnings(rule_outcomes)
             + derivation_truncation_warnings(derivation_truncated)
+            + signal_warnings
         ),
         scale_legends=tuple(
             ScaleLegendData(

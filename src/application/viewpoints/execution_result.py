@@ -6,9 +6,10 @@ no per-transport reshaping.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
+from src.application.viewpoints.trace_pipeline import TraceTable
 from src.domain.viewpoint_aggregation import AggregationSummary
 from src.domain.viewpoint_target_population import TargetPopulationSummary
 from src.domain.viewpoint_witness_steps import WitnessStep
@@ -100,12 +101,20 @@ class ViewpointExecutionResult:
     """Entity ids the execution was anchored on — resolved ``entity-id`` parameter values.
     Presentations use these to mark/center the anchor and derive hop distances."""
     target_population: TargetPopulationSummary | None = None
+    """Classification of the FULL (pre-truncation) result against the definition's
+    declared target population. ``None`` when the target population is UNKNOWN
+    (undeclared query-mode definition, or an ad-hoc query) — headers must then show
+    plain counts and make NO absence claims."""
     aggregation: AggregationSummary | None = None
     """Present when the complete population exceeds the effective legibility budget on a
     graph surface (exploration/diagram): the group/domain/type super-nodes and bundled
     inter-aggregate edges the surface opens with. Always computed over the COMPLETE
     population, independent of the entity limit."""
-    """Classification of the FULL (pre-truncation) result against the definition's
-    declared target population. ``None`` when the target population is UNKNOWN
-    (undeclared query-mode definition, or an ad-hoc query) — headers must then show
-    plain counts and make NO absence claims."""
+    bound_parameters: Mapping[str, object] = field(default_factory=dict)
+    """The CANONICAL parameter values this execution actually ran with — defaults applied and
+    set values normalised. Distinct from what the caller sent: it is what a shared URL must
+    reproduce and what export provenance must record, so neither has to re-derive binding."""
+    trace_table: TraceTable | None = None
+    """Present only for a query that declares ``trace_patterns``: the branch-complete coverage
+    rows (per-pattern PatternResults + composed row verdict), already gaps-filtered/sorted/
+    paged. ``None`` for every ordinary viewpoint — the field is additive and inert otherwise."""

@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from typing import Literal, TypeAlias, cast
 
 from src.domain.viewpoint_condition_validation import CriteriaContext, RegistrySnapshot, resolve_attribute_path
-from src.domain.viewpoint_criteria import AttributeCondition, ConnectionCriteriaGroup, EntityCriteriaGroup
+from src.domain.viewpoint_criteria import (
+    AttributeCondition,
+    ConnectionCriteriaGroup,
+    EntityCriteriaGroup,
+    scalar_kinds_comparable,
+)
 
 ScalarKind = Literal["string", "integer", "number", "date", "boolean", "slug"]
 BindingSelect = Literal["entities", "connections"]
@@ -175,6 +180,11 @@ def assert_types_are_compatible(declared: QueryResultType, inferred: QueryResult
         if not declared_slugs or not inferred_slugs or declared_slugs <= inferred_slugs:
             return
         raise BindingTypeError("binding-type-mismatch", "declared type union is incompatible with inference")
+    if isinstance(declared, ScalarType) and isinstance(inferred, ScalarType):
+        # Same string-like lattice the criteria comparators use: slug refines string.
+        if not scalar_kinds_comparable(declared.kind, inferred.kind):
+            raise BindingTypeError("binding-type-mismatch", "declared and inferred result types differ")
+        return
     if declared != inferred:
         raise BindingTypeError("binding-type-mismatch", "declared and inferred result types differ")
 

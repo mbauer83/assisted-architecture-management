@@ -29,7 +29,21 @@ IncidentTraversal = Literal["direct", "derived", "both"]
 NUMERIC_OPERATORS: frozenset[str] = frozenset({"lt", "lte", "gt", "gte"})
 STRING_PATTERN_OPERATORS: frozenset[str] = frozenset({"like", "ilike"})
 NUMERIC_ATTRIBUTE_TYPES: frozenset[str] = frozenset({"integer", "number", "date"})
-STRING_ATTRIBUTE_TYPES: frozenset[str] = frozenset({"string"})
+# `slug` is a lexical REFINEMENT of `string`, not a separate value space: every slug is a
+# string, and nothing enforces slug form at runtime (scalar binding accepts any ``str``), so
+# the two compare and pattern-match interchangeably. The distinction is kept as an AUTHORING
+# signal — it tells a surface to offer a slug field or a picker instead of free text — never
+# as a comparison barrier. Keeping them incompatible made slug-typed parameters unusable
+# against the reserved `group`/`specialization` paths, which resolve as plain strings.
+# If slug ever gains real lexical validation, enforce it on the VALUE at bind time; do not
+# re-tighten this lattice, or the same dead end returns.
+STRING_LIKE_ATTRIBUTE_TYPES: frozenset[str] = frozenset({"string", "slug"})
+STRING_ATTRIBUTE_TYPES: frozenset[str] = STRING_LIKE_ATTRIBUTE_TYPES
+
+
+def scalar_kinds_comparable(left: str, right: str) -> bool:
+    """Whether two scalar kinds may be compared: identical kinds, or any two string-like ones."""
+    return left == right or (left in STRING_LIKE_ATTRIBUTE_TYPES and right in STRING_LIKE_ATTRIBUTE_TYPES)
 VALID_COMPARATORS: frozenset[str] = (
     frozenset({"eq", "neq", "in", "not_in", "exists", "absent"}) | NUMERIC_OPERATORS | STRING_PATTERN_OPERATORS
 )

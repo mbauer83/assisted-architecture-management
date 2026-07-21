@@ -6,6 +6,7 @@ from collections.abc import Mapping
 
 from src.application.viewpoints.ports import RepositoryReadAccess
 from src.domain.viewpoint_bindings import QueryParameter
+from src.domain.viewpoint_set_parameters import canonicalize_set_value
 from src.domain.viewpoints import ExecutableViewpointQuery
 
 
@@ -35,6 +36,9 @@ def bind_parameters(
                 raise ViewpointParameterError("missing-parameter", name)
             continue
         value = values[name]
+        if parameter.is_set_valued:
+            resolved[name] = _bind_set_value(value, parameter)
+            continue
         if not _matches_parameter(value, parameter):
             raise ViewpointParameterError("parameter-type-mismatch", name)
         if parameter.value_type != "entity-id" or (
@@ -42,6 +46,41 @@ def bind_parameters(
         ):
             resolved[name] = value
     return resolved
+
+
+def _bind_set_value(value: object, parameter: QueryParameter) -> tuple[str, ...]:
+    """Bind + canonicalize a set-valued parameter: reject a scalar, reject members outside a
+    CLOSED vocabulary, and reject a set below the declared ``min_items`` (which subsumes the
+    empty-set case). Duplicates and reorderings collapse to one canonical tuple. An OPEN
+    vocabulary enforces no membership — an unmatched value yields an empty result, never an
+    error, so a saved filter survives model change."""
+    if not isinstance(value, (list, tuple)):
+        raise ViewpointParameterError("parameter-not-a-set", parameter.name)
+    canonical, unknown = canonicalize_set_value(value, parameter.allowed_values)
+    if unknown:
+        raise ViewpointParameterError("set-parameter-unknown-member", parameter.name)
+    if len(canonical) < parameter.min_items:
+        raise ViewpointParameterError("set-parameter-below-min-items", parameter.name)
+    return canonical
+
+
+def inactive_parameter_names(
+    query: ExecutableViewpointQuery, supplied: Mapping[str, object] | None
+) -> frozenset[str]:
+    """Declared parameters that are optional, carry no default, and were NOT supplied — the
+    only case where a referencing condition may drop out of its conjunction.
+
+    Keyed on what the CALLER supplied, deliberately not on what survived binding: an
+    ``entity-id`` that was supplied but resolves to no live entity is dropped by
+    ``bind_parameters`` and would look identical here. That is a BROKEN reference, not an
+    unused filter — letting it drop would silently widen the result and hide the breakage.
+    """
+    provided = set(supplied or {})
+    return frozenset(
+        parameter.name
+        for parameter in query.parameters
+        if not parameter.required and parameter.default is None and parameter.name not in provided
+    )
 
 
 def anchor_entity_ids(query: ExecutableViewpointQuery, resolved: Mapping[str, object]) -> tuple[str, ...]:

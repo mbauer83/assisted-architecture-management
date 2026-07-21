@@ -7,11 +7,13 @@ from typing import cast
 from src.domain.viewpoint_binding_validation import QueryValueTypes
 from src.domain.viewpoint_condition_validation import RegistrySnapshot, issue, resolve_attribute_path
 from src.domain.viewpoint_criteria import (
+    STRING_LIKE_ATTRIBUTE_TYPES,
     AttributeCondition,
     ConnectionCriteriaGroup,
     EntityCriteriaGroup,
     IncidentConnectionCondition,
     ValueRef,
+    scalar_kinds_comparable,
 )
 from src.domain.viewpoint_validation_issue import ViewpointValidationIssue
 from src.domain.viewpoint_value_types import (
@@ -181,22 +183,21 @@ def _validate_reference(
             ]
         return _validate_binding_reference(condition, value, reference_type, path, context, registries)
     if value.kind == "parameter":
-        kind = values.parameters.get(value.parameter or "")
-        if kind is None:
+        parameter = values.parameters.get(value.parameter or "")
+        if parameter is None:
             return [
                 issue(
                     "error", "unknown-parameter", f"{path}/value", "unknown parameter reference", found=value.parameter
                 )
             ]
-        scalar_kind = "string" if kind == "entity-id" else kind
-        return _validate_reference_type(
-            condition,
-            ScalarType(cast(ScalarKind, scalar_kind)),
-            value,
-            path,
-            context,
-            registries,
-        )
+        # A set-valued parameter resolves to an ordered tuple, so its reference type is a LIST
+        # of its element kind — that is what makes it a legal operand of the existing `in`
+        # comparator (the binding set-valued parameters exist for). Scalars stay scalar;
+        # entity-id compares as its string id.
+        kind = parameter.value_type
+        element = ScalarType(cast(ScalarKind, "string" if kind == "entity-id" else kind))
+        parameter_type: QueryResultType = ListType(element) if parameter.is_set_valued else element
+        return _validate_reference_type(condition, parameter_type, value, path, context, registries)
     return []
 
 
@@ -273,7 +274,7 @@ def _validate_reference_type(
     if condition.comparator in ("in", "not_in") and not was_list:
         message = f"{condition.comparator} requires a list reference"
         return [issue("error", "operator-type-mismatch", f"{path}/comparator", message)]
-    if condition.comparator in ("like", "ilike") and reference_type.kind != "string":
+    if condition.comparator in ("like", "ilike") and reference_type.kind not in STRING_LIKE_ATTRIBUTE_TYPES:
         return [
             issue(
                 "error",
@@ -284,7 +285,7 @@ def _validate_reference_type(
                 found=reference_type.kind,
             )
         ]
-    if reference_type.kind != left_kind:
+    if not scalar_kinds_comparable(reference_type.kind, left_kind):
         return [
             issue(
                 "error",

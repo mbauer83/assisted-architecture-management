@@ -12,6 +12,7 @@ from src.domain.viewpoint_criteria_serialization import (
     entity_criteria_group_to_mapping,
     neighbor_inclusion_to_mapping,
 )
+from src.domain.viewpoint_trace_pattern_serialization import trace_patterns_to_list
 from src.domain.viewpoint_value_types import format_result_type
 from src.domain.viewpoints import QUERY_SCHEMA_VERSION, ExecutableViewpointQuery
 
@@ -34,6 +35,8 @@ def query_to_mapping(query: ExecutableViewpointQuery) -> dict[str, Any]:
         result["parameters"] = [_parameter_to_mapping(item) for item in query.parameters]
     if query.derived:
         result["derived"] = [_derived_to_mapping(item) for item in query.derived]
+    if query.trace_patterns.patterns:
+        result["trace_patterns"] = trace_patterns_to_list(query.trace_patterns)
     return result
 
 
@@ -61,10 +64,19 @@ def _binding_to_mapping(binding: QueryBinding) -> dict[str, Any]:
 
 def _parameter_to_mapping(parameter: QueryParameter) -> dict[str, Any]:
     result: dict[str, Any] = {"name": parameter.name, "type": parameter.value_type}
+    if parameter.is_set_valued:
+        result["cardinality"] = parameter.cardinality
+        if parameter.allowed_values:
+            result["allowed_values"] = list(parameter.allowed_values)
+        result["min_items"] = parameter.min_items
     if not parameter.required:
         result["required"] = False
-    if parameter.default is not None:
-        result["default"] = parameter.default
+    default = parameter.default
+    if default is not None:
+        if parameter.is_set_valued and isinstance(default, (list, tuple)):
+            result["default"] = list(default)
+        else:
+            result["default"] = default
     if parameter.description:
         result["description"] = parameter.description
     return result
@@ -72,6 +84,10 @@ def _parameter_to_mapping(parameter: QueryParameter) -> dict[str, Any]:
 
 def _derived_to_mapping(attribute: DerivedAttribute) -> dict[str, Any]:
     result: dict[str, Any] = {"name": attribute.name}
+    if attribute.source == "security-signal":
+        result["source"] = "security-signal"
+        result["metric"] = attribute.metric
+        return result
     if attribute.direction != "either":
         result["direction"] = attribute.direction
     if attribute.traversal != "direct":

@@ -40,15 +40,24 @@ def direction_matches(
 
 
 def _combine(outcomes: tuple[EvaluationOutcome, ...], *, conjunction: str, negate: bool) -> EvaluationOutcome:
+    # Drift is collected from EVERY child, including inactive ones — a term dropping out of
+    # the verdict is no reason to lose a warning gathered while reaching that conclusion.
     drift = frozenset().union(*(outcome.schema_drift for outcome in outcomes)) if outcomes else frozenset()
+    active = tuple(outcome for outcome in outcomes if not outcome.inactive)
+    if outcomes and not active:
+        # Every term rested on an unsupplied optional parameter, so this group asserts nothing
+        # either and drops out of its OWN parent. Collapsing to the identity here instead would
+        # be wrong inside an `or`: the group would read as a failed match and could sink an
+        # enclosing `and`. Inactivity propagates until something active, or the root, decides.
+        return EvaluationOutcome(matched=True, schema_drift=drift, inactive=True)
     if conjunction == "and":
-        matched = all(outcome.matched for outcome in outcomes) if outcomes else True
+        matched = all(outcome.matched for outcome in active) if active else True
     else:
-        matched = any(outcome.matched for outcome in outcomes) if outcomes else False
+        matched = any(outcome.matched for outcome in active) if active else False
     return EvaluationOutcome(
         not matched if negate else matched,
         drift,
-        derived_evidence_hops=None if negate or not matched else _combined_evidence(outcomes, conjunction),
+        derived_evidence_hops=None if negate or not matched else _combined_evidence(active, conjunction),
     )
 
 

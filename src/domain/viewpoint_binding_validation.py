@@ -15,6 +15,7 @@ from src.domain.viewpoint_binding_validation_helpers import (
 )
 from src.domain.viewpoint_bindings import DerivedAttribute, QueryBinding, QueryParameter
 from src.domain.viewpoint_condition_validation import RegistrySnapshot, issue, resolve_attribute_path
+from src.domain.viewpoint_set_parameters import set_parameter_issues
 from src.domain.viewpoint_validation_issue import ViewpointValidationIssue
 from src.domain.viewpoint_value_types import (
     QueryResultType,
@@ -26,7 +27,9 @@ from src.domain.viewpoint_value_types import (
 @dataclass(frozen=True)
 class QueryValueTypes:
     bindings: Mapping[str, QueryResultType]
-    parameters: Mapping[str, str]
+    # The full declaration, not just its type name: a reference's legal comparators depend on
+    # CARDINALITY as well as element kind (a set-valued parameter is a legal `in` operand).
+    parameters: Mapping[str, QueryParameter]
     derived: Mapping[str, str]
 
 
@@ -48,7 +51,7 @@ def validate_query_values(
         check_ergonomics=check_ergonomics,
         cap=max_parameters,
     )
-    parameter_types = {parameter.name: parameter.value_type for parameter in parameters}
+    parameter_types = {parameter.name: parameter for parameter in parameters}
     binding_issues, binding_types = _validate_bindings(
         bindings,
         path=f"{path}/bindings",
@@ -83,7 +86,9 @@ def _validate_parameters(
                 issue("error", "duplicate-parameter-name", f"{item_path}/name", "parameter name must be unique")
             )
         seen.add(parameter.name)
-        if parameter.default is not None and not matches_scalar(parameter.default, parameter.value_type):
+        if parameter.is_set_valued:
+            issues.extend(set_parameter_issues(parameter, item_path))
+        elif parameter.default is not None and not matches_scalar(parameter.default, parameter.value_type):
             issues.append(
                 issue(
                     "error",
@@ -115,7 +120,7 @@ def _validate_bindings(
     registries: RegistrySnapshot,
     check_ergonomics: bool,
     cap: int,
-    parameter_types: Mapping[str, str],
+    parameter_types: Mapping[str, QueryParameter],
 ) -> tuple[list[ViewpointValidationIssue], dict[str, QueryResultType]]:
     issues: list[ViewpointValidationIssue] = []
     declared = {binding.name: binding.result_type for binding in bindings}
@@ -226,7 +231,7 @@ def _validate_derived(
     check_ergonomics: bool,
     cap: int,
     binding_types: Mapping[str, QueryResultType],
-    parameter_types: Mapping[str, str],
+    parameter_types: Mapping[str, QueryParameter],
 ) -> tuple[list[ViewpointValidationIssue], dict[str, str]]:
     issues: list[ViewpointValidationIssue] = []
     types: dict[str, str] = {}
@@ -243,6 +248,11 @@ def _validate_derived(
                 )
             )
         seen.add(attribute.name)
+        if attribute.source == "security-signal":
+            # Externally fetched metric: no graph fields to validate (the parser
+            # already rejects them); values are numeric for scale styling.
+            types[attribute.name] = "number"
+            continue
         if attribute.reduce == "count":
             if attribute.of is not None:
                 issues.append(

@@ -25,6 +25,7 @@ from src.domain.viewpoint_criteria_validation import (
 )
 from src.domain.viewpoint_presentation_validation import validate_presentation
 from src.domain.viewpoint_scope_query import classify_selection_layers
+from src.domain.viewpoint_trace_pattern_validation import validate_trace_pattern_types, validate_trace_patterns
 from src.domain.viewpoint_validation_issue import ValidationMode, ViewpointValidationIssue
 from src.domain.viewpoint_value_reference_validation import validate_query_value_references
 from src.domain.viewpoints import ExecutableViewpointQuery, PresentationSpec, ViewpointCatalog, ViewpointDefinition
@@ -163,6 +164,18 @@ def _validate_query(
     issues.extend(
         validate_connection_selection(
             query.connections, path=f"{path}/connections", registries=registries, check_ergonomics=check_ergonomics
+        )
+    )
+    trace_path = f"{path}/trace_patterns"
+    issues.extend(
+        validate_trace_patterns(query.trace_patterns, path=trace_path, check_ergonomics=check_ergonomics)
+    )
+    issues.extend(
+        validate_trace_pattern_types(
+            query.trace_patterns,
+            known_entity_types=registries.known_entity_types,
+            known_connection_types=registries.known_connection_types,
+            path=trace_path,
         )
     )
     return issues

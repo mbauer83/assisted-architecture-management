@@ -44,6 +44,16 @@ class EvaluationOutcome:
 
     matched: bool
     schema_drift: frozenset[str] = frozenset()
+    inactive: bool = False
+    """True when this (sub)tree asserts NOTHING because it rests on a declared-optional
+    parameter the caller did not supply — a term to be REMOVED from its conjunction rather
+    than a failed match. Removing it reduces the group to its identity (``and`` → match,
+    ``or`` → no-match), which is exactly "this filter was not applied"; treating it as a
+    non-match would instead make an unset optional filter silently exclude everything.
+
+    Reserved for that one legitimate case. A reference that is BROKEN (an unknown type, a
+    deleted entity) must NEVER be inactive: dropping it would silently WIDEN results, hiding
+    the breakage. Broken references keep failing to match and are reported."""
     derived_evidence_hops: int | None = None
     """Set iff this outcome is a match that REQUIRED derived-relationship evidence: the
     minimum witness-chain length among the derived incident matches the verdict rests on.
@@ -60,6 +70,13 @@ class EvaluationEnvironment:
     bindings: Mapping[str, object] = field(default_factory=dict)
     parameters: Mapping[str, object] = field(default_factory=dict)
     derived_values: Mapping[tuple[str, str], object] = field(default_factory=dict)
+    inactive_parameters: frozenset[str] = frozenset()
+    """Names that are DECLARED, optional, and unsupplied for this execution — conditions
+    referencing them evaluate to ``inactive`` and drop out of their conjunction.
+
+    Deliberately a separate set from ``parameters`` rather than a ``None`` value: a name
+    absent from BOTH maps is an unknown reference (an authoring typo), which must keep
+    failing to match instead of silently removing a filter."""
 
 
 @dataclass(frozen=True)

@@ -26,6 +26,7 @@ from src.domain.viewpoint_criteria import (
     EntityCriteriaGroup,
     NeighborInclusion,
 )
+from src.domain.viewpoint_trace_patterns import TracePatternSet
 
 Purpose = Literal["designing", "deciding", "informing"]
 Content = Literal["details", "coherence", "overview"]
@@ -144,6 +145,7 @@ class ExecutableViewpointQuery:
     bindings: tuple[QueryBinding, ...] = ()
     parameters: tuple[QueryParameter, ...] = ()
     derived: tuple[DerivedAttribute, ...] = ()
+    trace_patterns: TracePatternSet = field(default_factory=TracePatternSet)
 
 
 @dataclass(frozen=True)

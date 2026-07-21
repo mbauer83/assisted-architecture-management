@@ -16,6 +16,8 @@ with the (usually much smaller) number of entities that actually end up in the r
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from src.domain.viewpoint_bindings import DerivedAttribute
 from src.domain.viewpoint_criteria import (
     AttributeCondition,
@@ -59,6 +61,19 @@ def derived_attribute_names_referenced_in_criteria(query: ExecutableViewpointQue
     return frozenset(names)
 
 
+@dataclass(frozen=True)
+class DerivedAttributePartition:
+    """Execution plan for a query's derived attributes: eager vs deferred (the
+    criteria-referenced split) crossed with graph vs security-signal (the source
+    split — signal attributes never reach the pure graph evaluator; the
+    application orchestration batch-fetches them instead)."""
+
+    eager_graph: tuple[DerivedAttribute, ...]
+    deferred_graph: tuple[DerivedAttribute, ...]
+    eager_signal: tuple[DerivedAttribute, ...]
+    deferred_signal: tuple[DerivedAttribute, ...]
+
+
 def split_eager_and_deferred_derived_attributes(
     query: ExecutableViewpointQuery,
 ) -> tuple[tuple[DerivedAttribute, ...], tuple[DerivedAttribute, ...]]:
@@ -66,7 +81,28 @@ def split_eager_and_deferred_derived_attributes(
     evaluated over the full scoped candidate set before filtering; `deferred` are not and
     should only ever be evaluated for the entities that end up in the retained population
     (presentation consumes them there)."""
+    partition = partition_derived_attributes(query)
+    return partition.eager_graph, partition.deferred_graph
+
+
+def partition_derived_attributes(query: ExecutableViewpointQuery) -> DerivedAttributePartition:
     referenced = derived_attribute_names_referenced_in_criteria(query)
-    eager = tuple(attribute for attribute in query.derived if attribute.name in referenced)
-    deferred = tuple(attribute for attribute in query.derived if attribute.name not in referenced)
-    return eager, deferred
+    graph = tuple(a for a in query.derived if a.source == "graph")
+    signal = tuple(a for a in query.derived if a.source == "security-signal")
+    return DerivedAttributePartition(
+        eager_graph=tuple(a for a in graph if a.name in referenced),
+        deferred_graph=tuple(a for a in graph if a.name not in referenced),
+        eager_signal=tuple(a for a in signal if a.name in referenced),
+        deferred_signal=tuple(a for a in signal if a.name not in referenced),
+    )
+
+def declares_signal_source(definition: object) -> bool:
+    """Whether a viewpoint definition declares any security-signal derived
+    attribute — the semantic trigger for persistence refusal: output styled by
+    signal values is classification-bearing and ephemeral, so applying such a
+    viewpoint to a git-persisted artifact is refused REGARDLESS of whether
+    values happened to resolve."""
+    query = getattr(definition, "query", None)
+    if query is None:
+        return False
+    return any(attribute.source == "security-signal" for attribute in query.derived)

@@ -9,15 +9,13 @@ from src.domain.artifact_types import EntityRecord
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_evaluation_context import CriteriaReadAccess, EvaluationEnvironment
 from src.domain.viewpoint_presentation_validation import validate_presentation
-from src.domain.viewpoint_style_evaluation import (
-    Item,
-    ItemKind,
+from src.domain.viewpoint_scale_styling import (
     ScaleBounds,
     ScaleStyleValue,
     StyleValue,
     calculate_scale_bounds,
-    evaluate_item_style,
 )
+from src.domain.viewpoint_style_evaluation import Item, ItemKind, evaluate_item_style
 from src.domain.viewpoints import PresentationSpec, StyleRule
 
 
