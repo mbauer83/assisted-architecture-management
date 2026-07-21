@@ -293,7 +293,7 @@ class TestStandardDocTypeSectionLifecycle:
     """Dogfoods the seeded `standard` doc-type exemplar (per-section rules, not document-level)."""
 
     def _seed_standard_schema(self, repo: Path) -> None:
-        from src.infrastructure.workspace._repo_default_schemata import BASE_DOCUMENT_SCHEMAS
+        from src.domain.repo_default_schemata import BASE_DOCUMENT_SCHEMAS
 
         _write(
             repo / ".arch-repo" / "documents" / "standard.json",

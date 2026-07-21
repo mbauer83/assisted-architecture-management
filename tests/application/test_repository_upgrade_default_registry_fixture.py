@@ -80,6 +80,7 @@ def test_default_registry_reports_every_applicable_finding(tmp_path: Path) -> No
         "specialization-declaration-scan",
         "viewpoint-declaration-scan",
         "schema-file-scan",
+        "default-schemata-ensure",
         "group-meta-ontology-archimate-4-rename",
     }
     assert report.has_errors is False

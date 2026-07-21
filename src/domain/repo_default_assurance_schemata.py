@@ -1,6 +1,6 @@
 """Default assurance attribute schemata for repo scaffolding.
 
-Split out of `_repo_default_schemata.py` purely to stay under the source-length policy —
+Split out of `repo_default_schemata.py` purely to stay under the source-length policy —
 merged into `DEFAULT_SCHEMATA` there. Migrated off the dormant
 `OntologyModule.attribute_profiles` surface (removed; it had no live consumer besides these
 scaffolding defaults, per the WU-D7 call-path verification).

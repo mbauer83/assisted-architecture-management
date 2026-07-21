@@ -19,7 +19,6 @@ from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.gui.routers import state as gui_state
 from src.infrastructure.gui.routers.authoring_guidance import router as authoring_guidance_router
-from src.infrastructure.gui.routers.viewpoint_authoring import router as viewpoint_authoring_router
 from src.infrastructure.viewpoint_declarations import load_effective_viewpoint_catalog
 from src.infrastructure.write.artifact_write.type_guidance import get_type_guidance
 
@@ -41,7 +40,6 @@ def client(engagement_root: Path) -> TestClient:
     app = FastAPI()
     install_module_registry(app)
     app.include_router(authoring_guidance_router)
-    app.include_router(viewpoint_authoring_router)
     return TestClient(app)
 
 
@@ -115,26 +113,6 @@ class TestPairLegality:
         resp = client.get("/api/authoring-guidance", params={"target": "goal"})
         assert resp.status_code == 200
         assert "error" in resp.json()
-
-
-class TestViewpointFreshness:
-    """A viewpoint definition created through the GUI authoring endpoint must appear in
-    guidance's own `viewpoints` list on the very next request — no restart. `catalogs`
-    previously came from the app-state-cached `runtime_catalogs_dependency`, frozen at
-    process startup, so a definition written moments earlier was invisible here (though
-    already visible to `/api/viewpoints`) until the process restarted — the exact
-    staleness class `execute_viewpoint`/friends already had fixed in
-    `viewpoints.py` (see `test_viewpoint_execute_after_create.py`), just never applied here."""
-
-    def test_a_freshly_created_definition_appears_in_guidance_without_a_restart(self, client: TestClient) -> None:
-        definition = {"slug": "just-created-guidance", "version": 1, "name": "Just Created"}
-        create_resp = client.post("/api/viewpoints", json={"definition": definition, "dry_run": False})
-        assert create_resp.json()["ok"] is True, create_resp.json()
-
-        resp = client.get("/api/authoring-guidance")
-        assert resp.status_code == 200
-        slugs = {v["slug"] for v in resp.json()["viewpoints"]}
-        assert "just-created-guidance" in slugs
 
 
 class TestInternalTypesExcluded:

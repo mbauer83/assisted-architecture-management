@@ -94,7 +94,7 @@ def test_filter_nodes_secret_names_absent() -> None:
 _EDGES = [
     {"edge_id": "E1", "source_id": "N1", "target_id": "N2", "conn_type": "leads-to"},
     {"edge_id": "E2", "source_id": "N1", "target_id": "N3", "conn_type": "leads-to"},
-    {"edge_id": "E3", "source_id": "N2", "target_id": "N3", "conn_type": "violates"},
+    {"edge_id": "E3", "source_id": "N2", "target_id": "N3", "conn_type": "leads-to"},
 ]
 
 

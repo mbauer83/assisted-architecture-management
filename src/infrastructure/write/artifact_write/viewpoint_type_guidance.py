@@ -1,14 +1,13 @@
-"""Viewpoint enumeration + scope summary for ``artifact_authoring_guidance``.
+"""Compact viewpoint scope summary shared by viewpoint listing surfaces.
 
-Split out of ``type_guidance.py`` to keep that file within the LoC policy — this is a
-self-contained concern (purely descriptive viewpoint metadata) with no call-graph
-coupling to the entity/diagram-type guidance functions it lives alongside there.
+Viewpoint discovery/enumeration is served by ``artifact_query_viewpoint`` (action='list')
+and the ``/api/viewpoints`` route — NOT by entity/diagram-type authoring guidance, which is
+a separate concern. This module holds only the scope summariser those listing surfaces reuse.
 """
 
 from __future__ import annotations
 
 from src.domain.concept_scope import ConceptScope
-from src.domain.viewpoints import ViewpointCatalog, ViewpointDefinition
 
 
 def summarize_scope(scope: ConceptScope) -> dict[str, object]:
@@ -33,23 +32,3 @@ def summarize_scope(scope: ConceptScope) -> dict[str, object]:
     if scope.excluded_connection_types:
         summary["excluded_connection_types"] = sorted(str(t) for t in scope.excluded_connection_types)
     return summary
-
-
-def _serialize_viewpoint(v: ViewpointDefinition) -> dict[str, object]:
-    return {
-        "slug": v.slug,
-        "version": v.version,
-        "name": v.name,
-        "description": v.description,
-        "purpose": list(v.purpose),
-        "content": list(v.content),
-        "scope": summarize_scope(v.scope),
-    }
-
-
-def viewpoint_guidance(catalog: ViewpointCatalog) -> list[dict[str, object]]:
-    """Enumerate the effective merged viewpoint catalog so an agent can discover applicable
-    viewpoints from the same guidance call it already makes for entity/diagram-type guidance —
-    purely descriptive metadata plus a scope summary; query/presentation content is not
-    surfaced here (that is `artifact_query_viewpoint list`'s job)."""
-    return [_serialize_viewpoint(v) for v in sorted(catalog.entries, key=lambda v: v.slug)]

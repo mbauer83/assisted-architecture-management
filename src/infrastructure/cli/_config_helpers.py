@@ -14,14 +14,17 @@ def write_storage_config(
     signals_backend: str,
     archive_backend: str | None = None,
 ) -> None:
-    """Write storage.assurance settings to config/settings.yaml.
+    """Write storage.assurance settings to the active settings document
+    (honors `ARCH_SETTINGS_PATH`; falls back to config/settings.yaml).
 
     archive_backend is only written when explicitly supplied so that callers
     that don't set it leave existing config untouched.
     """
     import yaml  # noqa: PLC0415
 
-    config_path = _workspace_root() / "config" / "settings.yaml"
+    from src.config.settings import settings_document_path  # noqa: PLC0415
+
+    config_path = settings_document_path()
     data: dict[str, object]
     if config_path.exists():
         data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}

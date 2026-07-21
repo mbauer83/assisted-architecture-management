@@ -35,7 +35,7 @@ ARCHIMATE_CONNECTION_TYPES = (
 )
 
 ALL_CONNECTION_TYPES = (
-    "accountable-to",
+    "accountable-for",
     "activity-data-association",
     "activity-decision",
     "activity-message-flow",
@@ -54,10 +54,8 @@ ALL_CONNECTION_TYPES = (
     "archimate-specialization",
     "archimate-triggering",
     "assesses",
-    "binds-to",
     "by-controller",
     "c4-uses",
-    "cites",
     "complies-with",
     "concerns",
     "derives",
@@ -79,8 +77,7 @@ ALL_CONNECTION_TYPES = (
     "issues",
     "leads-to",
     "refines",
-    "responsible-of",
-    "satisfied-by",
+    "responsible-for",
     "satisfy",
     "seq-from",
     "seq-to",
@@ -103,7 +100,6 @@ ALL_CONNECTION_TYPES = (
     "usecase-extend",
     "usecase-generalization",
     "usecase-include",
-    "violates",
 )
 
 C4_ACCEPTS_CONNECTION_TYPES = (
@@ -345,6 +341,7 @@ EXPECTED_ENTITY_TYPES = {
         "driver",
         "equipment",
         "event",
+        "evidence",
         "facility",
         "function",
         "global-artifact-reference",

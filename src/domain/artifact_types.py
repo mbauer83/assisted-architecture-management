@@ -56,6 +56,10 @@ class EntityRecord:
     """None for model entities; the owning diagram's artifact_id for diagram-only entities."""
     group: str = "uncategorized"
     specialization: str = ""
+    attributes: Mapping[str, object] = field(default_factory=dict)
+    """Typed values decoded from the entity's Properties table (the user-facing
+    attribute surface). Distinct from `extra`, which carries frontmatter fields —
+    attribute reads consult this first, then fall back to `extra`."""
 
     def __str__(self) -> str:
         return (

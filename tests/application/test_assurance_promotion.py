@@ -37,8 +37,8 @@ class TestPromotionPreflightSafe:
         store = _make_store(
             nodes=[{"node_id": "C1", "node_type": "assurance-constraint", "concern_class": "safety"}],
             edges=[
-                {"source_id": "C1", "conn_type": "accountable-to"},
-                {"source_id": "C1", "conn_type": "evidenced-by"},
+                {"target_id": "C1", "source_id": "OWNER", "conn_type": "responsible-for"},
+                {"source_id": "C1", "target_id": "EV1", "conn_type": "evidenced-by"},
             ],
         )
         result = promotion_preflight(store)
@@ -53,7 +53,7 @@ class TestPromotionPreflightBlocking:
                 "node_id": "C1", "node_type": "assurance-constraint",
                 "concern_class": "safety", "name": "No Owner",
             }],
-            edges=[{"source_id": "C1", "conn_type": "evidenced-by"}],
+            edges=[{"source_id": "C1", "target_id": "EV1", "conn_type": "evidenced-by"}],
         )
         result = promotion_preflight(store)
         assert result["promote_safe"] is False
@@ -66,7 +66,7 @@ class TestPromotionPreflightBlocking:
                 "node_id": "C2", "node_type": "assurance-constraint",
                 "concern_class": "security", "name": "No Evidence",
             }],
-            edges=[{"source_id": "C2", "conn_type": "accountable-to"}],
+            edges=[{"target_id": "C2", "source_id": "OWNER", "conn_type": "responsible-for"}],
         )
         result = promotion_preflight(store)
         assert result["promote_safe"] is False

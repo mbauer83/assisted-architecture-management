@@ -100,13 +100,20 @@ def _build_test_mcp() -> FastMCP:
     def returns_str() -> str:
         return "plain string"
 
+    @m.tool(name="takes_params")
+    def takes_params(only_filter: str | None = None) -> dict:
+        return {"only_filter": only_filter}
+
     install_call_tool_normalizer(m)
     return m
 
 
-def _invoke(m: FastMCP, tool_name: str):
+def _invoke(m: FastMCP, tool_name: str, arguments: dict | None = None):
     handler = m._mcp_server.request_handlers[CallToolRequest]
-    req = CallToolRequest(method="tools/call", params=CallToolRequestParams(name=tool_name, arguments={}))
+    req = CallToolRequest(
+        method="tools/call",
+        params=CallToolRequestParams(name=tool_name, arguments=arguments or {}),
+    )
     return asyncio.run(handler(req)).root
 
 
@@ -149,3 +156,39 @@ class TestNormalizerEndToEnd:
 
         srv = mcp_artifact_server.mcp_read._mcp_server
         assert CallToolRequest in srv.request_handlers
+
+
+class TestUnknownParameterRejection:
+    """An unrecognized parameter must fail loud (not be silently dropped, which would let the
+    tool run with defaults and return a confidently wrong result)."""
+
+    def test_known_parameter_is_accepted(self):
+        result = _invoke(_build_test_mcp(), "takes_params", {"only_filter": "x"})
+        assert not result.isError
+        assert yaml.safe_load(result.content[0].text) == {"only_filter": "x"}
+
+    def test_no_arguments_is_accepted(self):
+        result = _invoke(_build_test_mcp(), "takes_params", {})
+        assert not result.isError
+
+    def test_unknown_parameter_errors(self):
+        result = _invoke(_build_test_mcp(), "takes_params", {"topic": "x"})
+        assert result.isError
+        text = next(c.text for c in result.content if isinstance(c, TextContent))
+        assert "Unknown parameter" in text
+        assert "topic" in text
+
+    def test_error_lists_accepted_parameters(self):
+        result = _invoke(_build_test_mcp(), "takes_params", {"topic": "x"})
+        text = next(c.text for c in result.content if isinstance(c, TextContent))
+        assert "only_filter" in text
+
+    def test_unknown_parameter_alongside_valid_one_still_errors(self):
+        result = _invoke(_build_test_mcp(), "takes_params", {"only_filter": "x", "tpoic": "y"})
+        assert result.isError
+        text = next(c.text for c in result.content if isinstance(c, TextContent))
+        assert "tpoic" in text
+
+    def test_extra_arg_to_zero_param_tool_errors(self):
+        result = _invoke(_build_test_mcp(), "returns_dict", {"surprise": 1})
+        assert result.isError

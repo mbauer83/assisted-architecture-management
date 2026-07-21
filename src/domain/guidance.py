@@ -18,6 +18,11 @@ from typing import Literal
 
 ConceptKind = Literal["entity", "connection"]
 
+# v1 slot keys, reserved: a broader guidance level whose id happened to match one of these
+# would be read as a v1 type slot, not a context map. Level ids are singular level names
+# (``domain``), so this only guards against an accidental collision.
+_V1_SLOT_KEYS = frozenset({"entity_types", "connection_types"})
+
 
 @dataclass(frozen=True)
 class GuidanceKey:
@@ -27,6 +32,17 @@ class GuidanceKey:
     concept_kind: ConceptKind
     type_name: str
     specialization: str | None = None
+
+
+@dataclass(frozen=True)
+class GuidanceContextKey:
+    """Identifies one broader-level context slot: a module's guidance level and a node in it
+    (e.g. the ``domain`` level's ``motivation`` node). Leaf-level guidance uses :class:`GuidanceKey`.
+    """
+
+    module_alias: str
+    level_id: str
+    node_id: str
 
 
 @dataclass(frozen=True)
@@ -47,30 +63,41 @@ class GuidanceOverlay:
     """
 
     entries: Mapping[GuidanceKey, GuidanceEntry] = field(default_factory=dict)
+    context_entries: Mapping[GuidanceContextKey, str] = field(default_factory=dict)
 
     def is_empty(self) -> bool:
-        return not self.entries
+        return not self.entries and not self.context_entries
 
     def get(self, key: GuidanceKey) -> GuidanceEntry | None:
         return self.entries.get(key)
+
+    def context_for(self, key: GuidanceContextKey) -> str | None:
+        return self.context_entries.get(key)
 
 
 _CONCEPT_SECTIONS: dict[str, ConceptKind] = {"entity_types": "entity", "connection_types": "connection"}
 
 
 def guidance_overlay_from_mapping(data: Mapping[str, object]) -> GuidanceOverlay:
-    """Parse one already-YAML-loaded guidance-cache file (v1 schema) into an overlay.
+    """Parse one already-YAML-loaded guidance-cache file into an overlay.
 
-    Schema: ``meta_ontologies.<alias>.{entity_types,connection_types}.<type>`` carrying
-    ``create_when``/``never_create_when`` at the base level and, optionally, the same pair
-    per entry under ``specializations.<slug>``. A type entry with only a ``specializations``
-    block and no base ``create_when``/``never_create_when`` (the reserved, not-yet-populated
-    connection-type base case per D3) does not produce a base-level key — an absent base key
-    means "fall back to module-inline text", not "override with empty text". Malformed or
-    missing structure is tolerated by omission; schema/key validation against the registry is
-    the import CLI's job (WU-B4), not this pure parser's.
+    Two kinds of content under ``meta_ontologies.<alias>``:
+
+    * **Type slots** — ``{entity_types,connection_types}.<type>`` carrying ``create_when``/
+      ``never_create_when`` at the base level and, optionally, the same pair per
+      ``specializations.<slug>``. An absent base key means "fall back to module-inline text",
+      not "override with empty text".
+    * **Broader-level context** — every *other* top-level map (e.g. ``domain:``) is a guidance
+      level keyed by its own id, holding ``<node>: {context: ...}``. The level/node keys were
+      already validated against the module's hierarchy at import (``--strict``), so the runtime
+      cache is clean; this parser reads them without needing the hierarchy (which is derived
+      from the very module being built — a cycle it must not depend on). Composition along the
+      ancestry path happens later, at serving time.
+
+    Malformed/missing structure is tolerated by omission.
     """
     entries: dict[GuidanceKey, GuidanceEntry] = {}
+    context_entries: dict[GuidanceContextKey, str] = {}
     meta_ontologies = data.get("meta_ontologies")
     if not isinstance(meta_ontologies, Mapping):
         return GuidanceOverlay()
@@ -85,7 +112,24 @@ def guidance_overlay_from_mapping(data: Mapping[str, object]) -> GuidanceOverlay
                 if not isinstance(type_name, str) or not isinstance(type_data, Mapping):
                     continue
                 entries.update(_entries_for_type(alias, kind, type_name, type_data))
-    return GuidanceOverlay(entries)
+        context_entries.update(_context_entries_for_alias(alias, module_data))
+    return GuidanceOverlay(entries, context_entries)
+
+
+def _context_entries_for_alias(alias: str, module_data: Mapping[str, object]) -> dict[GuidanceContextKey, str]:
+    """Read every broader-level ``<node>: {context: ...}`` map (any top-level key that is not a
+    type slot) from one alias's document. The key is the guidance level id."""
+    out: dict[GuidanceContextKey, str] = {}
+    for level_id, section in module_data.items():
+        if not isinstance(level_id, str) or level_id in _V1_SLOT_KEYS or not isinstance(section, Mapping):
+            continue
+        for node_id, node_data in section.items():
+            if not isinstance(node_id, str) or not isinstance(node_data, Mapping):
+                continue
+            context = node_data.get("context")
+            if isinstance(context, str) and context.strip():
+                out[GuidanceContextKey(alias, level_id, node_id)] = context.strip()
+    return out
 
 
 def _entry_from_mapping(data: Mapping[str, object]) -> GuidanceEntry:

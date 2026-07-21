@@ -221,6 +221,7 @@ def parse_entity(
     spec_raw = frontmatter.get("specialization")
     specialization = spec_raw if isinstance(spec_raw, str) else ""
 
+    content_text = extract_section(content, "content")
     return EntityRecord(
         artifact_id=str(frontmatter.get("artifact-id", entity_id_from_path(path))),
         artifact_type=str(frontmatter.get("artifact-type", "")),
@@ -233,11 +234,27 @@ def parse_entity(
         specialization=specialization,
         path=path,
         extra={key: value for key, value in frontmatter.items() if key not in STANDARD_ENTITY_FIELDS},
-        content_text=extract_section(content, "content"),
+        content_text=content_text,
         display_blocks=display_blocks,
         display_label=display_label,
         display_alias=display_alias,
+        attributes=_decode_attributes(content_text, frontmatter),
     )
+
+
+def _decode_attributes(content_text: str, frontmatter: dict) -> dict[str, Any]:
+    """Decode the Properties table into typed values so attribute reads (viewpoint
+    conditions, scale styling) see what the entity actually declares. Ad-hoc types
+    come from the `attribute-types` frontmatter map; undeclared cells decode
+    leniently (numeric consumers coerce numeric strings)."""
+    raw_props = parse_entity_content_sections(content_text)["properties"]
+    if not raw_props:
+        return {}
+    attr_types_raw = frontmatter.get("attribute-types")
+    attribute_types = (
+        {str(k): str(v) for k, v in attr_types_raw.items()} if isinstance(attr_types_raw, dict) else {}
+    )
+    return decode_entity_properties(raw_props, {}, attribute_types)
 
 
 def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:

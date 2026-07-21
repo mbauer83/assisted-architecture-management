@@ -69,6 +69,34 @@ def test_fires_on_invalid_purpose_enum(tmp_path: Path) -> None:
     assert finding.finding_id.startswith("malformed-viewpoints:")
 
 
+_MALFORMED_TRACE = """\
+viewpoints:
+  - slug: coverage
+    name: Coverage
+    purpose: informing
+    content: overview
+    query:
+      query_schema: 1
+      trace_patterns:
+        - name: motivation
+          kind: not-a-real-kind
+          applies_to: [goal]
+          branches:
+            g2o: {kind: stored-edge, connection: archimate-realization, direction: incoming, endpoint: {type: outcome}}
+          leaf: {kind: none}
+"""
+
+
+def test_fires_on_malformed_trace_pattern_declaration(tmp_path: Path) -> None:
+    # The ONE shared declaration detector already covers the trace grammar, since
+    # trace_patterns parses through query_from_mapping — an unknown pattern kind is a finding,
+    # not a silent load or a crash.
+    (finding,) = ViewpointDeclarationScanStep().detect(_view(tmp_path, _MALFORMED_TRACE))
+
+    assert finding.finding_id.startswith("malformed-viewpoints:")
+    assert finding.auto_migratable is False
+
+
 def test_apply_never_writes_and_reports_skipped(tmp_path: Path) -> None:
     view = _view(tmp_path, "viewpoints:\n  - slug: [unterminated\n")
     registry = StepRegistry()

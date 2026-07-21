@@ -61,7 +61,8 @@ def admin_create_entity(
 
     if dry_run:
         res = verify_content_in_temp_path(
-            verifier=verifier, file_type="entity", desired_name=path.name, content=content
+            verifier=verifier, file_type="entity", desired_name=path.name, content=content,
+            schema_repo_root=repo_root,
         )
         return dry_result(
             path=path, artifact_id=eid, content=content, verification=verification_to_entity_dict(path, res)
@@ -120,7 +121,8 @@ def admin_edit_entity(
 
     if dry_run:
         res = verify_content_in_temp_path(
-            verifier=verifier, file_type="entity", desired_name=entity_file.name, content=content
+            verifier=verifier, file_type="entity", desired_name=entity_file.name, content=content,
+            schema_repo_root=repo_root,
         )
         return dry_result(
             path=entity_file, artifact_id=artifact_id, content=content,

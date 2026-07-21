@@ -13,6 +13,7 @@ from collections.abc import Mapping
 
 from src.application.repository_upgrade.ports import UpgradeStep
 from src.application.repository_upgrade.steps.connection_metadata_scan import ConnectionMetadataScanStep
+from src.application.repository_upgrade.steps.default_schemata_ensure import DefaultSchemataEnsureStep
 from src.application.repository_upgrade.steps.group_meta_ontology_rename import GroupMetaOntologyRenameStep
 from src.application.repository_upgrade.steps.multiplicity_rename import MultiplicityRenameStep
 from src.application.repository_upgrade.steps.schema_file_scan import SchemaFileScanStep
@@ -64,6 +65,7 @@ def build_registry(selection_resolutions: Mapping[str, SelectionMode] | None = N
     registry.register(ViewpointIncidentTraversalStampStep())
     registry.register(ViewpointSelectionModeStampStep(selection_resolutions))
     registry.register(SchemaFileScanStep())
+    registry.register(DefaultSchemataEnsureStep())
     registry.register(ConnectionMetadataScanStep())
     registry.register(ViewpointApplicationScanStep())
     return registry

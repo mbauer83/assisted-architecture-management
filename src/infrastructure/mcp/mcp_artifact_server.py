@@ -102,3 +102,7 @@ register_write_tools(mcp_write)
 register_edit_tools(mcp_write)
 
 _sync_ops.register(mcp_write)
+# Same dispatch treatment as the read server: incoming tool-name normalization,
+# compact YAML responses, and — critically — rejection of unknown parameters
+# (otherwise a mistyped arg is silently dropped and the tool runs with defaults).
+install_call_tool_normalizer(mcp_write)

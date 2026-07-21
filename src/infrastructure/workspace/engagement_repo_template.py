@@ -8,11 +8,11 @@ from pathlib import Path
 
 from src.application.artifact_document_schema import get_document_subdirectory
 from src.config.repo_paths import ARCH_DOC_SCHEMATA, ARCH_REPO, DIAGRAM_CATALOG, DIAGRAMS, DOCS, MODEL, RENDERED
-from src.infrastructure.workspace._assurance_doc_types import ASSURANCE_DOCUMENT_SCHEMAS
-from src.infrastructure.workspace._repo_default_schemata import (
+from src.domain.repo_default_schemata import (
     BASE_DOCUMENT_SCHEMAS,
     DEFAULT_SCHEMATA,
 )
+from src.infrastructure.workspace._assurance_doc_types import ASSURANCE_DOCUMENT_SCHEMAS
 
 INITIAL_COMMIT_MESSAGE = "Initialize engagement architecture repository"
 

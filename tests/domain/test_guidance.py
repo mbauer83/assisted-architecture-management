@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from src.domain.guidance import GuidanceEntry, GuidanceKey, GuidanceOverlay, guidance_overlay_from_mapping
+from src.domain.guidance import (
+    GuidanceContextKey,
+    GuidanceEntry,
+    GuidanceKey,
+    GuidanceOverlay,
+    guidance_overlay_from_mapping,
+)
 
 
 def _entry(text: str) -> GuidanceEntry:
@@ -146,3 +152,45 @@ class TestGuidanceOverlayFromMapping:
             },
         }
         assert guidance_overlay_from_mapping(data).is_empty()
+
+
+class TestGuidanceOverlayV2Context:
+    """v2 broader-level context maps (any non-type-slot top-level key) parse into context
+    entries alongside the unchanged type slots. The parser needs no hierarchy — level/node
+    validation is the import CLI's --strict job and the runtime cache is already clean."""
+
+    def _doc(self) -> dict:
+        return {
+            "guidance_format": 2,
+            "meta_ontologies": {
+                "archimate-4": {
+                    "domain": {
+                        "motivation": {"context": "Why the architecture is shaped this way."},
+                        "strategy": {"context": "The business model, org-independently."},
+                    },
+                    "entity_types": {
+                        "requirement": {"create_when": "cw", "never_create_when": "nw"},
+                    },
+                },
+            },
+        }
+
+    def test_context_parsed(self) -> None:
+        overlay = guidance_overlay_from_mapping(self._doc())
+        key = GuidanceContextKey("archimate-4", "domain", "motivation")
+        assert overlay.context_for(key) == "Why the architecture is shaped this way."
+
+    def test_type_slots_still_parse_in_v2(self) -> None:
+        overlay = guidance_overlay_from_mapping(self._doc())
+        base = GuidanceKey(module_alias="archimate-4", concept_kind="entity", type_name="requirement")
+        assert overlay.get(base) == GuidanceEntry(create_when="cw", never_create_when="nw")
+
+    def test_node_without_context_field_produces_no_entry(self) -> None:
+        doc = self._doc()
+        doc["meta_ontologies"]["archimate-4"]["domain"]["business"] = {"note": "no context key here"}
+        overlay = guidance_overlay_from_mapping(doc)
+        assert overlay.context_for(GuidanceContextKey("archimate-4", "domain", "business")) is None
+
+    def test_every_context_level_key_is_read(self) -> None:
+        overlay = guidance_overlay_from_mapping(self._doc())
+        assert overlay.context_for(GuidanceContextKey("archimate-4", "domain", "strategy")) is not None

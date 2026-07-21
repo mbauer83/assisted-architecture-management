@@ -17,20 +17,20 @@ from src.infrastructure.guidance_import import (
 
 class TestValidateSchema:
     def test_accepts_valid_document(self) -> None:
-        data = {"guidance_format": 1, "meta_ontologies": {"archimate-4": {}}}
+        data = {"guidance_format": 2, "meta_ontologies": {"archimate-4": {}}}
         assert validate_schema(data) == data
 
     def test_rejects_non_mapping(self) -> None:
         with pytest.raises(GuidanceImportError, match="mapping"):
             validate_schema(["not", "a", "mapping"])
 
-    def test_rejects_unsupported_format(self) -> None:
-        with pytest.raises(GuidanceImportError, match="guidance_format"):
-            validate_schema({"guidance_format": 2, "meta_ontologies": {}})
+    def test_rejects_superseded_format_with_migration_hint(self) -> None:
+        with pytest.raises(GuidanceImportError, match="arch-repair upgrade"):
+            validate_schema({"guidance_format": 1, "meta_ontologies": {"archimate-4": {}}})
 
     def test_rejects_missing_meta_ontologies(self) -> None:
         with pytest.raises(GuidanceImportError, match="meta_ontologies"):
-            validate_schema({"guidance_format": 1})
+            validate_schema({"guidance_format": 2})
 
 
 class TestSelectAliases:

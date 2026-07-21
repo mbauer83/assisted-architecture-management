@@ -32,6 +32,9 @@ from src.domain.viewpoint_query_parsing import query_from_mapping
 from src.domain.viewpoint_scope_query import definition_with_scope_query
 from src.domain.viewpoint_summary import render_query_summary
 from src.domain.viewpoints import ViewpointCatalog, ViewpointDefinition
+from src.infrastructure.assurance.signal_attribute_capability import (
+    composed_signal_attribute_capability,
+)
 from src.infrastructure.mcp.artifact_mcp.context import (
     RepoScope,
     repo_cached,
@@ -156,6 +159,7 @@ def register_query_viewpoint_tools(mcp: FastMCP) -> None:
                 default_limit=viewpoints_execution_default_entity_limit_mcp(),
                 default_legibility_budget=viewpoints_legibility_budget(),
                 timeout_seconds=viewpoints_execution_timeout_seconds(),
+                signal_capability=composed_signal_attribute_capability(),
             )
         except UnknownViewpointSlugError as exc:
             raise ValueError(str(exc)) from exc

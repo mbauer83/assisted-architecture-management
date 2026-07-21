@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from src.application.derivation.strategy_registry import DerivationStrategyCatalog
+from src.application.guidance_composition import GuidanceContextView
 from src.domain.catalogs import ConnectionSemantics, DiagramTypeCatalog, OntologyCatalog
 from src.domain.module_catalog import ModuleCatalog
 from src.domain.specializations import SpecializationCatalog
@@ -28,3 +29,4 @@ class RuntimeCatalogs:
     viewpoints: ViewpointCatalog = field(default_factory=ViewpointCatalog.empty)
     viewpoint_enforcement: EnforcementSetting = "warn"
     datatype_type_references_blocking: bool = True
+    guidance_context: GuidanceContextView = field(default_factory=GuidanceContextView)

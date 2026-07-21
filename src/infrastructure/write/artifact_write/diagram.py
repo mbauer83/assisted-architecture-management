@@ -122,6 +122,28 @@ def _build_from_puml(
     )
 
 
+def _refuse_signal_viewpoint_persistence(viewpoint_fm: dict | None, verifier: ArtifactVerifier) -> None:
+    """Signal-styled output is classification-bearing and ephemeral: a viewpoint
+    that DECLARES a security-signal source may never be applied to a
+    git-persisted diagram (refusal is semantic, not value-dependent). The
+    stamped export endpoint is the sanctioned way to take styled output out."""
+    if not viewpoint_fm:
+        return
+    slug = str(viewpoint_fm.get("slug") or "")
+    if not slug:
+        return
+    from src.domain.viewpoint_derived_attribute_deferral import declares_signal_source  # noqa: PLC0415
+
+    catalog = getattr(getattr(verifier, "_runtime_catalogs", None), "viewpoints", None)
+    definition = catalog.get(slug) if catalog is not None else None
+    if definition is not None and declares_signal_source(definition):
+        raise ValueError(
+            f"viewpoint '{slug}' declares a security-signal source; its styled output is "
+            "classification-bearing and must not be persisted into a git-tracked diagram — "
+            "use the ephemeral render and the stamped export instead"
+        )
+
+
 def create_diagram(
     *,
     repo_root: Path,
@@ -223,6 +245,7 @@ def create_diagram(
     from src.domain.viewpoint_application_parsing import normalize_viewpoint_frontmatter
 
     viewpoint_fm = normalize_viewpoint_frontmatter(viewpoint, target_kind="diagram", target_id=effective_id)
+    _refuse_signal_viewpoint_persistence(viewpoint_fm, verifier)
 
     content = format_diagram_puml(
         artifact_id=effective_id,

@@ -61,6 +61,7 @@ def verify_content_in_temp_path(
     desired_name: str,
     content: str,
     support_repo_root: Path | None = None,
+    schema_repo_root: Path | None = None,
     verify_fn: Callable[[Path], VerificationResult] | None = None,
 ) -> VerificationResult:
     """Verify *content* by writing it to a temp location laid out for its file type.
@@ -68,6 +69,11 @@ def verify_content_in_temp_path(
     ``verify_fn`` overrides the file-type's default verifier method — e.g. matrix
     diagrams share ``file_type="diagram"``'s temp layout but need
     ``verify_matrix_diagram_file`` instead of the PUML-oriented ``verify_diagram_file``.
+
+    ``schema_repo_root`` names the repo whose ``.arch-repo/schemata`` govern the content:
+    the temp file lives outside every repo root, so without it the entity frontmatter- and
+    attribute-schema checks (which resolve schemata relative to the governing repo) would be
+    silently skipped in the dry-run preview — under-reporting relative to the real write.
     """
     tmp_root = Path(tempfile.mkdtemp(prefix=f"model-write-verify-{file_type}-"))
     if file_type == "diagram":
@@ -82,8 +88,10 @@ def verify_content_in_temp_path(
     if verify_fn is not None:
         return verify_fn(tmp_path)
 
+    if file_type == "entity":
+        return verifier.verify_entity_file(tmp_path, schema_repo_root=schema_repo_root)
+
     dispatch = {
-        "entity": verifier.verify_entity_file,
         "connection": verifier.verify_connection_file,
         "document": verifier.verify_document_file,
         "diagram": verifier.verify_diagram_file,

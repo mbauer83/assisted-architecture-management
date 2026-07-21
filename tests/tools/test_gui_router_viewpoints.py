@@ -171,9 +171,11 @@ class TestRequestShape:
             "entity_ids", "connection_ids", "entities", "connections",
             "total_entity_count", "returned_entity_count", "total_connection_count", "returned_connection_count",
             "truncated", "entity_limit", "matrix_axes", "warnings", "duration_ms", "query_summary",
-            "anchor_ids", "target_population", "aggregation",
+            "anchor_ids", "target_population", "aggregation", "bound_parameters", "trace_table",
         }
-        # D15 boundary: the shared MCP/REST content stays unstyled — no style tokens leak in.
+        # An ordinary viewpoint (no trace_patterns) carries a null trace_table — additive + inert.
+        assert body["trace_table"] is None
+        # The shared MCP/REST content stays unstyled — no style tokens leak in.
         assert all("style" not in entity for entity in body["entities"])
 
 

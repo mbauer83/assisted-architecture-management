@@ -165,6 +165,65 @@ class TestBulkCreate:
 
 
 # ---------------------------------------------------------------------------
+# Field propagation: group / specialization / attribute_types must reach the
+# create+edit core exactly as the single-item tools deliver them. Regression for
+# the bulk path silently dropping these (group → entity landed in the root model
+# dir instead of projects/<group>/; specialization → effective attribute schema
+# computed against the wrong profile).
+# ---------------------------------------------------------------------------
+
+
+class TestBulkFieldPropagation:
+    def test_create_group_places_entity_under_projects_dir(self, repo: Path) -> None:
+        results = _bulk(
+            repo,
+            [
+                {"op": "create_entity", "artifact_type": "requirement", "name": "Grouped", "group": "my-group"},
+            ],
+        )
+        assert results[0]["wrote"] is True, results[0]
+        path = str(results[0]["path"])
+        assert "projects/my-group/model/motivation/requirement/" in path, path
+
+    def test_create_without_group_stays_in_root_model(self, repo: Path) -> None:
+        results = _bulk(
+            repo,
+            [
+                {"op": "create_entity", "artifact_type": "requirement", "name": "Ungrouped"},
+            ],
+        )
+        path = str(results[0]["path"])
+        assert "/projects/" not in path, path
+        assert "/model/motivation/requirement/" in path, path
+
+    def test_create_specialization_is_persisted(self, repo: Path) -> None:
+        results = _bulk(
+            repo,
+            [
+                {
+                    "op": "create_entity",
+                    "artifact_type": "requirement",
+                    "name": "Constrained",
+                    "specialization": "constraint",
+                },
+            ],
+        )
+        assert results[0]["wrote"] is True, results[0]
+        assert "specialization: constraint" in Path(str(results[0]["path"])).read_text()
+
+    def test_edit_applies_specialization(self, repo: Path) -> None:
+        eid = _make(repo, "requirement", "To Specialize")
+        results = _bulk(
+            repo,
+            [
+                {"op": "edit_entity", "artifact_id": eid, "specialization": "constraint"},
+            ],
+        )
+        assert results[0]["wrote"] is True, results[0]
+        assert "specialization: constraint" in Path(str(results[0]["path"])).read_text()
+
+
+# ---------------------------------------------------------------------------
 # $ref substitution
 # ---------------------------------------------------------------------------
 

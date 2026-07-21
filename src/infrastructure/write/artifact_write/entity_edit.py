@@ -183,7 +183,8 @@ def edit_entity(
     )
 
     preview_res = verify_content_in_temp_path(
-        verifier=verifier, file_type="entity", desired_name=target_entity_file.name, content=content
+        verifier=verifier, file_type="entity", desired_name=target_entity_file.name, content=content,
+        schema_repo_root=repo_root,
     )
 
     renamed = effective_artifact_id != artifact_id

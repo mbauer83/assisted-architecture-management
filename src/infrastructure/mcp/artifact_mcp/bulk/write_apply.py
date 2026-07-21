@@ -59,6 +59,7 @@ def apply_create_entities(
             results[index] = skipped_result("create_entity", dry_run=dry_run, operation_id=operation_id)
             continue
         try:
+            from src.domain.groups import UNCATEGORIZED  # noqa: PLC0415
             from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
             result = artifact_write_ops.create_entity(
@@ -69,11 +70,14 @@ def apply_create_entities(
                 name=item["name"],
                 summary=item.get("summary"),
                 properties=item.get("properties"),
+                attribute_types=item.get("attribute_types"),
                 notes=item.get("notes"),
                 keywords=item.get("keywords"),
+                specialization=item.get("specialization"),
                 artifact_id=item.get("artifact_id"),
                 version=item.get("version", "0.1.0"),
                 status=item.get("status", "draft"),
+                group=item.get("group") or UNCATEGORIZED,
                 last_updated=None,
                 dry_run=False,
             )
@@ -196,8 +200,10 @@ def _apply_single_edit(
             name=item.get("name"),
             summary=item["summary"] if "summary" in item else _ENTITY_UNSET,
             properties=item["properties"] if "properties" in item else _ENTITY_UNSET,
+            attribute_types=item["attribute_types"] if "attribute_types" in item else _ENTITY_UNSET,
             notes=item["notes"] if "notes" in item else _ENTITY_UNSET,
             keywords=item["keywords"] if "keywords" in item else _ENTITY_UNSET,
+            specialization=item["specialization"] if "specialization" in item else _ENTITY_UNSET,
             version=item.get("version"),
             status=item.get("status"),
             group=item.get("group"),

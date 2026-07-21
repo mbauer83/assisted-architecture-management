@@ -20,6 +20,44 @@ def _dump_yaml_text(data: object) -> str:
     return dumped.rstrip()
 
 
+def _reject_unknown_parameters(tool: Any, arguments: dict[str, Any]) -> None:
+    """Fail loud on an unknown tool parameter instead of silently dropping it.
+
+    FastMCP's argument model ignores extra fields (pydantic ``extra='ignore'``) and this
+    handler dispatches with ``validate_input=False``, so without this check a mistyped or
+    unrecognized parameter is silently discarded and the tool runs with its defaults — an easy
+    way to get a confidently wrong result (e.g. a filter typo returning the full, unfiltered
+    payload). The check is skipped for tools whose input schema explicitly opts into
+    ``additionalProperties`` (e.g. a ``**kwargs`` signature). The raised message enumerates the
+    accepted parameters with their descriptions so the caller can correct the call immediately;
+    the low-level server converts it into an ``isError`` tool result.
+    """
+    schema = getattr(tool, "parameters", None)
+    if not isinstance(schema, dict) or schema.get("additionalProperties", False):
+        return
+    properties = schema.get("properties")
+    properties = properties if isinstance(properties, dict) else {}
+    accepted = set(properties)
+    context_kwarg = getattr(tool, "context_kwarg", None)
+    if isinstance(context_kwarg, str):
+        accepted.add(context_kwarg)
+    unknown = [key for key in arguments if key not in accepted]
+    if not unknown:
+        return
+    listed = []
+    for pname in sorted(properties):
+        spec: dict[str, Any] = properties[pname] if isinstance(properties[pname], dict) else {}
+        detail = spec.get("description") or spec.get("title") or ""
+        ptype = spec.get("type", "")
+        head = f"  - {pname}" + (f" ({ptype})" if ptype else "")
+        listed.append(head + (f": {detail}" if detail else ""))
+    accepted_block = "\n".join(listed) if listed else "  (this tool takes no parameters)"
+    raise ValueError(
+        f"Unknown parameter(s) {sorted(unknown)} for tool {tool.name!r}. "
+        f"Accepted parameters:\n{accepted_block}"
+    )
+
+
 def normalize_incoming_tool_name(tool_name: str, *, known_tools: set[str]) -> str:
     """Normalize an incoming tool name from bridges that namespace tools."""
 
@@ -45,6 +83,9 @@ def install_call_tool_normalizer(mcp: FastMCP) -> None:
             logger.info("Normalized incoming tool name %r -> %r", name, normalized)
         context = mcp.get_context()
         tool = mcp._tool_manager.get_tool(normalized)  # type: ignore[attr-defined]
+
+        if tool is not None:
+            _reject_unknown_parameters(tool, arguments)
 
         if tool is not None and tool.output_schema is not None:
             # Structured-output tool: use convert_result=True to get the

@@ -174,6 +174,7 @@ def create_entity(
             file_type="entity",
             desired_name=path.name,
             content=content,
+            schema_repo_root=repo_root,
         )
         return WriteResult(
             wrote=False,

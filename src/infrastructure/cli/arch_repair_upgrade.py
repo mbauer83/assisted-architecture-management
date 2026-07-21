@@ -33,41 +33,58 @@ See `src.infrastructure.repository_upgrade.guard`.
 from __future__ import annotations
 
 import argparse
-import json
+import os
 import sys
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Literal, cast
 
+from src.application.deployment_upgrade.orchestrate import apply_targets, evaluate_targets
+from src.application.deployment_upgrade.ports import (
+    OperationalStepRegistry,
+    build_operational_registry,
+)
 from src.application.repository_upgrade.registry import StepRegistry, build_registry
 from src.application.repository_upgrade.workspace import (
     RepoUpgradeTarget,
     apply_workspace,
     evaluate_workspace,
 )
-from src.domain.repository_upgrade import COVERAGE_NOTE, RepoUpgradeReport, WorkspaceUpgradeReport
+from src.domain.deployment_layout import DeploymentLayoutConflict
+from src.domain.operational_upgrade import (
+    ApplyProgress,
+    DeploymentApplyOutcome,
+    DeploymentPreflight,
+    DeploymentUpgradeReport,
+    classify_apply_outcome,
+)
 from src.infrastructure.backend.backend_probe import (
     backend_url,
     configured_backend_url,
     probe_backend_url,
     resolve_backend_port,
 )
-from src.infrastructure.repository_upgrade.atomic_write import sweep_stale_tmp_files
+from src.infrastructure.cli._upgrade_deployment import (
+    DeploymentSide,
+    add_deployment_arguments,
+    build_deployment_side,
+    operational_blocking_findings,
+)
+from src.infrastructure.cli._upgrade_repo_phases import (
+    emit_deployment,
+    note_dirty_overlap,
+    sweep_and_recover,
+)
 from src.infrastructure.repository_upgrade.fs_adapter import (
     FilesystemRepoUpgradeView,
     FilesystemRepoUpgradeWriter,
 )
 from src.infrastructure.repository_upgrade.guard import (
     check_backend_not_serving,
-    conflicting_dirty_files,
     probe_backend_identity,
 )
 from src.infrastructure.workspace.workspace_init import load_init_state
-from src.infrastructure.write.artifact_write.m4_transaction import (
-    TransactionRecoveryError,
-    recover_transactions,
-)
 
 
 def software_version() -> str:
@@ -81,6 +98,25 @@ EXIT_UNRESOLVED_MIGRATION = 3
 """Distinct commit-mode exit status: a finding that blocks the whole commit (e.g. a
 divergent viewpoint selection with no --resolve-selection choice) was present — nothing
 was written anywhere; the report lists the required choices."""
+
+EXIT_PARTIAL_APPLY = 20
+"""Commit mode: at least one complete target unit committed, then a LATER target
+failed. Wins over the repository code-1 semantics (a cross-target failure dominates
+within-repository step errors). The report is an exact partial record with resume
+instructions — re-running resumes safely."""
+
+EXIT_INFRASTRUCTURE_FAILURE = 21
+"""Commit mode: infrastructure/credential failure before any target commit — no
+migration writes happened (separately reported pre-existing consistency repair may
+have written)."""
+
+_EXIT_BY_OUTCOME: dict[DeploymentApplyOutcome, int] = {
+    "success": 0,
+    "repository_step_errors": 1,
+    "unresolved_migration": EXIT_UNRESOLVED_MIGRATION,
+    "partial_apply": EXIT_PARTIAL_APPLY,
+    "infrastructure_failure": EXIT_INFRASTRUCTURE_FAILURE,
+}
 
 
 def parser() -> argparse.ArgumentParser:
@@ -102,6 +138,7 @@ def parser() -> argparse.ArgumentParser:
             "Writes ONLY that definition's selection_mode — never a semantic conversion."
         ),
     )
+    add_deployment_arguments(p)
     return p
 
 
@@ -115,7 +152,9 @@ def parse_selection_resolutions(raw: list[str]) -> dict[str, Literal["scope", "q
     return resolutions
 
 
-def resolve_repo_roots(*, repo_root: list[str], workspace: str | None) -> list[Path]:
+def resolve_repo_roots(
+    *, repo_root: list[str], workspace: str | None, allow_empty: bool = False
+) -> list[Path]:
     roots = [Path(p).resolve() for p in repo_root]
     if workspace is not None:
         state = load_init_state(Path(workspace).resolve())
@@ -123,7 +162,7 @@ def resolve_repo_roots(*, repo_root: list[str], workspace: str | None) -> list[P
             raise SystemExit(f"ERROR: no arch-init state found under {workspace}")
         roots.append(Path(state["engagement_root"]).resolve())
         roots.append(Path(state["enterprise_root"]).resolve())
-    if not roots:
+    if not roots and not allow_empty:
         raise SystemExit("ERROR: specify --repo-root (repeatable) and/or --workspace")
     unique: list[Path] = []
     for root in roots:
@@ -132,29 +171,67 @@ def resolve_repo_roots(*, repo_root: list[str], workspace: str | None) -> list[P
     return unique
 
 
-def main_upgrade(argv: list[str], *, registry: StepRegistry | None = None) -> int:
+def main_upgrade(
+    argv: list[str],
+    *,
+    registry: StepRegistry | None = None,
+    operational_registry: OperationalStepRegistry | None = None,
+) -> int:
     args = parser().parse_args(argv)
     if registry is None:
         registry = build_registry(parse_selection_resolutions(args.resolve_selection))
-    roots = resolve_repo_roots(repo_root=args.repo_root, workspace=args.workspace)
+    if operational_registry is None:
+        operational_registry = build_operational_registry()
+
+    # Phase 1 — deployment identity + operational target discovery (with physical
+    # dedup). A layout conflict is a hard error before any target is opened.
+    try:
+        side = build_deployment_side(args, os.environ)
+    except DeploymentLayoutConflict as exc:
+        raise SystemExit(f"ERROR: {exc}") from exc
+    roots = resolve_repo_roots(
+        repo_root=args.repo_root, workspace=args.workspace, allow_empty=side.active
+    )
     version = software_version()
     targets = [RepoUpgradeTarget(FilesystemRepoUpgradeView(r), FilesystemRepoUpgradeWriter(r)) for r in roots]
 
     if not args.commit:
-        report = evaluate_workspace(targets, registry=registry, software_version=version)
-        _emit(report, args.json_output)
+        # Dry-run is always exit 0 — findings, blockers, and uninspectable targets are
+        # report states, never exit codes (existing automation reads 0 as "evaluated").
+        repo_report = evaluate_workspace(targets, registry=registry, software_version=version)
+        operational = evaluate_targets(side.handles, operational_registry)
+        emit_deployment(
+            DeploymentUpgradeReport(
+                repos=repo_report, operational_targets=operational, preflight=side.preflight
+            ),
+            args.json_output,
+        )
         return 0
 
-    # 0: whole-deployment atomicity gate — a commit-blocking finding ANYWHERE means the
-    # upgrade must not write anything (not even other steps' mechanical rewrites): the
-    # run either completes in full or changes nothing and fails loudly with a worklist.
+    # Phase 2 — read-only readiness: the hard backend-serving guard (repositories).
+    for root in roots:
+        _guard_backend_not_serving(root)
+
+    # Phases 3–4 — repository recovery plan + classified pre-existing consistency
+    # repair (stale-temp sweep, transaction recovery). These are existing repair
+    # behaviors reported as such; the no-writes-before-preflight guarantee applies
+    # to *migration* writes.
+    repairs: list[str] = []
+    for root in roots:
+        repairs.extend(sweep_and_recover(root))
+
+    # Phase 5 — re-scan + all-target semantic preflight: a commit-blocking finding
+    # ANYWHERE (repository or operational) means the upgrade must not write anything;
+    # the run either completes in full or changes nothing and fails loudly.
     gate_report = evaluate_workspace(targets, registry=registry, software_version=version)
+    gate_operational = evaluate_targets(side.handles, operational_registry)
     blocking = [
         result.finding
         for repo_report in gate_report.per_repo
         for result in repo_report.results
         if result.finding.blocks_commit
-    ]
+    ] + operational_blocking_findings(gate_operational)
+    preflight = _preflight_with_repairs(side, repairs)
     if blocking:
         print("UNRESOLVED MIGRATION — nothing was written. Required choices:", file=sys.stderr)
         for finding in blocking:
@@ -163,24 +240,52 @@ def main_upgrade(argv: list[str], *, registry: StepRegistry | None = None) -> in
                 print(f"    → {finding.manual_instructions}", file=sys.stderr)
         return EXIT_UNRESOLVED_MIGRATION
 
-    # 1–3: hard backend guard, then sweep + recovery — must all land before we look at git
-    # status at all, since recovery can itself materialize real (legitimate) file changes.
-    for root in roots:
-        _guard_backend_not_serving(root)
-    for root in roots:
-        _sweep_and_recover(root)
+    # Informational dirty-overlap notes — see the module docstring for why git
+    # status is not a safety gate here.
+    for root, repo_report in zip(roots, gate_report.per_repo, strict=True):
+        note_dirty_overlap(root, repo_report.touched_locations)
+        print(f"Backup/branch recommendation: commit or branch {root} before proceeding.", file=sys.stderr)
 
-    # 4: evaluate against the now-consistent repo purely to report which touched files (if
-    # any) already have uncommitted local edits — informational only, never blocking; see the
-    # module docstring for why git status is not a safety gate here.
-    preflight = evaluate_workspace(targets, registry=registry, software_version=version)
-    for root, repo_report in zip(roots, preflight.per_repo, strict=True):
-        _note_dirty_overlap(root, repo_report.touched_locations)
-        print(f"Backup/branch recommendation: commit or branch {root} before proceeding.")
+    # Phase 6 — ordered per-target apply: repositories first (existing semantics,
+    # grandfathered per-repo isolation), then operational targets in kind order.
+    repo_report_applied = apply_workspace(targets, registry=registry, software_version=version)
+    committed = [
+        f"repository:{r.repo_root}"
+        for r in repo_report_applied.per_repo
+        if not r.has_errors and any(result.outcome == "applied" for result in r.results)
+    ]
+    operational_applied, failed_target = apply_targets(side.handles, operational_registry)
+    committed.extend(r.target.stable_id for r in operational_applied if r.committed)
+    outcome = classify_apply_outcome(
+        ApplyProgress(
+            committed_target_ids=tuple(committed),
+            failed_target_id=failed_target,
+            repository_step_errors=repo_report_applied.has_errors,
+        )
+    )
+    emit_deployment(
+        DeploymentUpgradeReport(
+            repos=repo_report_applied,
+            operational_targets=operational_applied,
+            preflight=preflight,
+            outcome=outcome,
+        ),
+        args.json_output,
+    )
+    return _EXIT_BY_OUTCOME[outcome]
 
-    report = apply_workspace(targets, registry=registry, software_version=version)
-    _emit(report, args.json_output)
-    return 1 if report.has_errors else 0
+
+def _preflight_with_repairs(side: DeploymentSide, repairs: list[str]) -> DeploymentPreflight:
+    base = side.preflight or DeploymentPreflight(
+        settings_document="", settings_source="", operator_owned=False
+    )
+    return DeploymentPreflight(
+        settings_document=base.settings_document,
+        settings_source=base.settings_source,
+        operator_owned=base.operator_owned,
+        notes=base.notes,
+        pre_existing_repairs=tuple(repairs),
+    )
 
 
 def _guard_backend_not_serving(repo_root: Path) -> None:
@@ -192,53 +297,3 @@ def _guard_backend_not_serving(repo_root: Path) -> None:
         raise SystemExit(f"ERROR: {guard.reason}")
 
 
-def _sweep_and_recover(repo_root: Path) -> None:
-    # Sweep orphaned atomic-write temp files a previous, killed `upgrade --commit` may have
-    # left behind — harmless litter, never a source of truth, safe to remove now that no
-    # concurrent writer can be holding one open.
-    swept = sweep_stale_tmp_files(repo_root)
-    if swept:
-        print(f"Removed {len(swept)} stale temp file(s) from a previous interrupted run in {repo_root}.")
-
-    # Idempotent recovery of any transaction a crashed backend left mid-flight, so steps
-    # always see a consistent repo regardless of git-sync/promotion history.
-    try:
-        recovered = recover_transactions(
-            repo_root, rebuild_index=FilesystemRepoUpgradeWriter(repo_root).rebuild_index
-        )
-    except TransactionRecoveryError as exc:
-        raise SystemExit(
-            f"ERROR: {repo_root} has an unrecoverable pending transaction — resolve manually "
-            f"before upgrading: {exc}"
-        ) from exc
-    if recovered:
-        print(f"Recovered {recovered} pending transaction(s) in {repo_root} before upgrading.")
-
-
-def _note_dirty_overlap(repo_root: Path, touched_locations: frozenset[str]) -> None:
-    overlap = conflicting_dirty_files(repo_root, touched_locations)
-    if overlap:
-        files = "\n".join(f"  {f}" for f in overlap)
-        print(
-            f"Note: {repo_root} has uncommitted local edits to {len(overlap)} file(s) this "
-            f"run will also rewrite — your edits are carried forward, not lost, but review "
-            f"the combined diff before committing:\n{files}"
-        )
-
-
-def _emit(report: WorkspaceUpgradeReport | RepoUpgradeReport, as_json: bool) -> None:
-    if as_json:
-        print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
-        return
-    print(f"Note: {COVERAGE_NOTE}")
-    repos = report.per_repo if isinstance(report, WorkspaceUpgradeReport) else [report]
-    for repo_report in repos:
-        print(f"\n{repo_report.repo_root}")
-        print(f"  format_contract_version: {repo_report.format_contract_version}")
-        print(f"  applied_steps: {', '.join(repo_report.applied_steps_after) or '(none)'}")
-        if not repo_report.results:
-            print("  no findings")
-            continue
-        for result in repo_report.results:
-            f = result.finding
-            print(f"  [{result.outcome}] {f.step_id}/{f.finding_id} ({f.severity}) — {f.location}: {f.description}")

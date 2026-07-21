@@ -221,8 +221,8 @@ def register(mcp: FastMCP) -> None:
             "confidential — source is redirected to a gitignored confidential/ root and rendering to disk is "
             "withheld. Ignored for non-assurance diagram types.\n\n"
             "viewpoint: apply a ViewpointDefinition to narrow this diagram's authoring scope — "
-            "{slug, version, enforcement_override?, derivation_params?}. Call artifact_authoring_guidance "
-            "to discover slugs/versions via its 'viewpoints' list.\n\n"
+            "{slug, version, enforcement_override?, derivation_params?}. Call "
+            "artifact_query_viewpoint(action='list') to discover slugs/versions.\n\n"
             "dry_run=true validates without writing."
         ),
         annotations=LOCAL_WRITE,

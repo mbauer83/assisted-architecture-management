@@ -314,6 +314,13 @@ def edit_diagram(
 
     eff_viewpoint_raw = fm.get("viewpoint") if viewpoint is _VIEWPOINT_UNSET else viewpoint
     eff_viewpoint = normalize_viewpoint_frontmatter(eff_viewpoint_raw, target_kind="diagram", target_id=artifact_id)
+    if viewpoint is not _VIEWPOINT_UNSET:
+        # New applications only — an already-persisted value is a verifier concern.
+        from src.infrastructure.write.artifact_write.diagram import (  # noqa: PLC0415
+            _refuse_signal_viewpoint_persistence,
+        )
+
+        _refuse_signal_viewpoint_persistence(eff_viewpoint, verifier)
 
     content = format_diagram_puml(
         artifact_id=artifact_id,

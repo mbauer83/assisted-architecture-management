@@ -1,13 +1,15 @@
-"""Default JSON-Schema data for repo scaffolding (base doc-types + entity schemata).
+"""Shipped default JSON-Schema data for repo scaffolding (base doc-types + entity schemata).
 
-Pure data, separated from engagement_repo_template.py behaviour so neither module grows
-past the source-length policy. Assurance doc-types are merged onto BASE_DOCUMENT_SCHEMAS
-by the template; here we keep only the base set and the attribute/frontmatter schemata.
+Pure declarative method data (domain layer): consumed by the workspace template's
+ensure-missing pass AND the repository upgrade detector, so both surfaces ship the
+same defaults. Assurance doc-types are merged onto BASE_DOCUMENT_SCHEMAS by the
+template; here we keep only the base set and the attribute/frontmatter schemata.
 """
 
 from __future__ import annotations
 
-from src.infrastructure.workspace._repo_default_assurance_schemata import ASSURANCE_ATTRIBUTE_SCHEMATA
+from src.domain.repo_default_assurance_schemata import ASSURANCE_ATTRIBUTE_SCHEMATA
+from src.domain.repo_default_attribute_schemata import ARCHIMATE_ATTRIBUTE_SCHEMATA
 
 BASE_DOCUMENT_SCHEMAS: dict[str, dict] = {
     "adr": {
@@ -88,6 +90,7 @@ BASE_DOCUMENT_SCHEMAS: dict[str, dict] = {
 
 DEFAULT_SCHEMATA: dict[str, dict] = {
     **ASSURANCE_ATTRIBUTE_SCHEMATA,
+    **ARCHIMATE_ATTRIBUTE_SCHEMATA,
     "attributes.capability.schema.json": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "attributes.capability.schema.json",
@@ -171,6 +174,28 @@ DEFAULT_SCHEMATA: dict[str, dict] = {
             "Priority": {"type": "string", "enum": ["Must", "Should", "Could", "Won't", "Never"]},
             "Category": {"type": "string"},
             "Children": {"type": "string"},
+        },
+        "additionalProperties": True,
+    },
+    "attributes.resource.schema.json": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "attributes.resource.schema.json",
+        "title": "Resource Attribute Schema",
+        "description": "Attribute schema for Properties table in Resource entities.",
+        "type": "object",
+        "required": [],
+        "properties": {
+            "investment_level": {
+                "type": "integer",
+                "title": "Investment Level",
+                "minimum": 1,
+                "maximum": 5,
+                "description": (
+                    "Relative investment concentration on this strategic asset, used by the "
+                    "shipped resource-map heat-map. Bands: 1 minimal upkeep · 2 sustaining · "
+                    "3 steady investment · 4 growth focus · 5 primary focus."
+                ),
+            },
         },
         "additionalProperties": True,
     },

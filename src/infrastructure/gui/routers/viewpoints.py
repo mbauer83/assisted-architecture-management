@@ -35,11 +35,19 @@ from src.domain.viewpoint_binding_evaluation import BindingCardinalityError
 from src.domain.viewpoint_condition_validation import RegistrySnapshot
 from src.domain.viewpoint_query_parsing import query_from_mapping
 from src.domain.viewpoints import TargetKind
+from src.infrastructure.assurance.signal_attribute_capability import (
+    composed_signal_attribute_capability,
+)
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
 from src.infrastructure.gui.routers._viewpoint_freshness import fresh_viewpoints_runtime_catalogs_dependency
+from src.infrastructure.gui.routers.viewpoints_signal_render import (
+    signal_banner_for,
+    signal_render_router,
+)
 
 router = APIRouter()
+router.include_router(signal_render_router)
 
 # Fixed notation for unpersisted diagram previews. Styling overlays are applied by the
 # client to the returned SVG, so this endpoint returns unstyled notation only.
@@ -105,6 +113,7 @@ def execute_viewpoint(
             default_limit=max_entities,
             timeout_seconds=viewpoints_execution_timeout_seconds(),
             default_legibility_budget=viewpoints_legibility_budget(),
+            signal_capability=composed_signal_attribute_capability(),
         )
     except UnknownViewpointSlugError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -147,6 +156,7 @@ def export_viewpoint_csv(
             default_limit=max_entities,
             timeout_seconds=viewpoints_execution_timeout_seconds(),
             default_legibility_budget=viewpoints_legibility_budget(),
+            signal_capability=composed_signal_attribute_capability(),
         )
     except UnknownViewpointSlugError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -191,6 +201,7 @@ def execute_viewpoint_projection(
             read_access=repo,
             registries=registries,
             parameters=parameters,
+            signal_capability=composed_signal_attribute_capability(),
         )
     except UnknownViewpointSlugError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -207,12 +218,18 @@ def execute_viewpoint_projection(
 
 @router.post("/api/viewpoints/execute-diagram")
 def execute_viewpoint_diagram(
+    response: Response,
     slug: Annotated[str | None, Body()] = None,
     query: Annotated[dict[str, object] | None, Body()] = None,
     parameters: Annotated[dict[str, object] | None, Body()] = None,
     catalogs: RuntimeCatalogs = Depends(fresh_viewpoints_runtime_catalogs_dependency),
 ) -> dict[str, object]:
-    """Render an unpersisted ArchiMate diagram for the evaluated population."""
+    """Render an unpersisted ArchiMate diagram for the evaluated population.
+
+    Entirely in memory. When the definition declares a security-signal source
+    the response is marked no-store and carries a `signal_banner` (computed
+    classification + basis runs + generation timestamp) — the D11 ephemeral
+    render; downloads go through /api/viewpoints/export-render."""
     if (slug is None) == (query is None):
         raise HTTPException(400, "exactly one of 'slug' or 'query' must be provided")
     parsed_query = query_from_mapping(query, label="query") if query is not None else None
@@ -234,6 +251,7 @@ def execute_viewpoint_diagram(
             default_limit=max_entities,
             timeout_seconds=viewpoints_execution_timeout_seconds(),
             default_legibility_budget=viewpoints_legibility_budget(),
+            signal_capability=composed_signal_attribute_capability(),
         )
     except UnknownViewpointSlugError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -277,7 +295,16 @@ def execute_viewpoint_diagram(
     # select overlay needs this mapping to resolve SVG elements back to artifact ids, the
     # same way a real persisted diagram's viewer already does from its own diagram_entities.
     entity_aliases = {e.artifact_id: normalize_puml_alias(e.display_alias) for e in entities if e.display_alias}
-    return {"svg": svg, "warnings": [*result.warnings, *render_warnings], "entity_aliases": entity_aliases}
+    payload: dict[str, object] = {
+        "svg": svg,
+        "warnings": [*result.warnings, *render_warnings],
+        "entity_aliases": entity_aliases,
+    }
+    banner = signal_banner_for(slug, catalogs, list(result.entity_ids))
+    if banner is not None:
+        response.headers["Cache-Control"] = "no-store"
+        payload["signal_banner"] = banner
+    return payload
 
 
 @router.get("/api/diagrams/{artifact_id}/viewpoint-projection")

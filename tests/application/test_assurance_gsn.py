@@ -22,7 +22,7 @@ class _Store:
         ]
         self.edges = [
             {"source_id": "H@1", "target_id": "L@1", "conn_type": "leads-to"},
-            {"source_id": "U@1", "target_id": "H@1", "conn_type": "violates"},
+            {"source_id": "U@1", "target_id": "H@1", "conn_type": "leads-to"},
             {"source_id": "U@1", "target_id": "C@1", "conn_type": "derives"},
             {"source_id": "C@1", "target_id": "E@1", "conn_type": "evidenced-by"},
         ]

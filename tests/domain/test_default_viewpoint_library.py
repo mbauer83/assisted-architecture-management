@@ -65,6 +65,8 @@ _CUSTOM_SLUGS = {
     "process-technology-support",
     "requirements-coverage-gaps",
     "component-traceability-gaps",
+    "security-posture",
+    "motivation-coverage",
 }
 
 
@@ -77,7 +79,7 @@ def test_library_covers_the_25_standard_slugs_plus_the_custom_impact_analysis_se
     shipped_only = load_module_viewpoint_catalog(_ARCH_PACKAGE_DIR)
     slugs = {d.slug for d in shipped_only.entries}
     assert slugs == _KNOWN_SLUGS | _CUSTOM_SLUGS
-    assert len(slugs) == 30
+    assert len(slugs) == 32
     # The custom slugs are this tool's own capability, never presented as part of the
     # ArchiMate standard's example set (see standard_viewpoint_tables.py, which only
     # transcribes the 25 spec-derived definitions).

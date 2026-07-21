@@ -15,7 +15,7 @@ from src.application.repository_upgrade.registry import StepRegistry
 from src.domain.repository_upgrade import ScannedSurface
 
 REQUIRED_STEP_IDS_BY_SURFACE: dict[ScannedSurface, tuple[str, ...]] = {
-    "profiles": ("schema-file-scan",),
+    "profiles": ("schema-file-scan", "default-schemata-ensure"),
     "customizations": ("specialization-declaration-scan", "viewpoint-declaration-scan"),
     "entity_frontmatter": ("unrecognized-structure-scan",),
     "connection_declarations": ("connection-metadata-scan",),

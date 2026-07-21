@@ -16,12 +16,12 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from src.application.guidance_composition import GuidanceContextView
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.domain.allowed_bindings import serialize_allowed_bindings
 from src.domain.module_types import ConnectionTypeName, EntityTypeName
 from src.domain.ontology_protocol import DiagramTypeWriteGuidance
 from src.domain.specializations import SpecializationCatalog, SpecializationInfo
-from src.infrastructure.write.artifact_write.viewpoint_type_guidance import viewpoint_guidance
 
 
 def pair_connection_guidance(source_type: str, target_type: str) -> dict[str, object]:
@@ -119,7 +119,7 @@ def get_type_guidance(
     process-wide default is built lazily.
     """
     cats = catalogs if catalogs is not None else _default_catalogs()
-    result: dict[str, object] = {"viewpoints": viewpoint_guidance(cats.viewpoints)}
+    result: dict[str, object] = {}
 
     if target is not None:
         if filter is None:
@@ -149,7 +149,7 @@ def get_type_guidance(
         )
 
     if filter is not None or diagram_type is None:
-        entity_section = _entity_type_guidance(filter, cats.specializations)
+        entity_section = _entity_type_guidance(filter, cats.specializations, cats.guidance_context)
         result.update(entity_section)
         result["connection_types"] = _connection_type_guidance(cats.specializations)
 
@@ -270,6 +270,7 @@ def _connection_type_guidance(specialization_catalog: SpecializationCatalog) -> 
 def _entity_type_guidance(
     filter: list[str] | None,  # noqa: A002
     specialization_catalog: SpecializationCatalog,
+    guidance_context: GuidanceContextView,
 ) -> dict[str, object]:
     # Internal entity types (e.g. global-artifact-reference) are never manually created — they
     # are produced exclusively by mechanisms like artifact promotion. Excluding them here keeps
@@ -328,6 +329,9 @@ def _entity_type_guidance(
         entry["specializations"] = [
             _serialize_specialization(s) for s in specialization_catalog.for_type("entity", info.artifact_type)
         ]
+        context = guidance_context.context_for(info.artifact_type)
+        if context:
+            entry["context"] = [{"level": c.level_id, "node": c.node_id, "text": c.text} for c in context]
         entries.append(entry)
 
     out: dict[str, object] = {"entity_types": entries, "total": len(entries)}

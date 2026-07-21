@@ -12,8 +12,8 @@ from typing import Any
 from fastapi import APIRouter, Depends
 
 from src.application.runtime_catalogs import RuntimeCatalogs
+from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers._entity_filter import parse_csv_filter
-from src.infrastructure.gui.routers._viewpoint_freshness import fresh_viewpoints_runtime_catalogs_dependency
 from src.infrastructure.write import artifact_write_ops
 
 router = APIRouter()
@@ -25,7 +25,7 @@ def read_authoring_guidance(
     domain: str | None = None,
     diagram_type: str | None = None,
     target: str | None = None,
-    catalogs: RuntimeCatalogs = Depends(fresh_viewpoints_runtime_catalogs_dependency),
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> dict[str, Any]:
     terms = parse_csv_filter(entity_type) | parse_csv_filter(domain)
     return artifact_write_ops.get_type_guidance(

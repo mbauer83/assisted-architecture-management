@@ -25,15 +25,6 @@ def test_assurance_locked_response_has_structured_error_key() -> None:
     assert "message" in result
 
 
-def test_assurance_signals_locked_response_is_structured() -> None:
-    ctx = AssuranceContext()
-    result = ctx.signals_locked_response()
-
-    assert isinstance(result, dict)
-    assert result.get("error") == "signals_store_locked"
-    assert "message" in result
-
-
 def test_assurance_list_nodes_tool_returns_locked_when_store_unavailable(monkeypatch) -> None:
     """assurance_list_nodes returns locked_response() dict when store is not unlocked."""
     from src.infrastructure.mcp.assurance_mcp import context as ctx_module  # noqa: PLC0415

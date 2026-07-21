@@ -49,3 +49,38 @@ def _reset_installed_mutation_executor():
     from src.infrastructure.write.mutation_executor_registry import _reset_executor_for_test
 
     _reset_executor_for_test()
+
+# ── Credential-store isolation (MANDATORY, suite-wide) ───────────────────────
+# INCIDENT GUARD (2026-07-20): a test placed outside tests/assurance//
+# tests/integration/ called `init_store`, which wrote a freshly generated key
+# through the REAL OS credential backend and overwrote the live assurance
+# store's `db-encryption-key` and `db-recovery-key` — permanently locking the
+# real store. No test may EVER reach the real credential backend, regardless
+# of where the test file lives, so the in-memory replacement is installed
+# autouse at the session root (the per-package fixtures in tests/assurance/
+# and tests/integration/ remain as redundant local layers).
+
+
+class _InMemoryCredentialBackend:
+    def __init__(self) -> None:
+        self._store: dict[str, str] = {}
+
+    def get(self, account: str) -> str | None:
+        return self._store.get(account)
+
+    def set(self, account: str, value: str) -> None:
+        self._store[account] = value
+
+    def delete(self, account: str) -> None:
+        self._store.pop(account, None)
+
+
+@pytest.fixture(autouse=True)
+def _global_in_memory_credential_store():
+    from src.infrastructure.assurance import _credential_store
+
+    previous = _credential_store._backend
+    _credential_store._backend = _InMemoryCredentialBackend()
+    yield
+    _credential_store._backend = previous
+

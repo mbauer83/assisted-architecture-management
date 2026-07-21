@@ -32,7 +32,7 @@ from src.infrastructure.guidance_import import (
     validate_schema,
 )
 
-_GUIDANCE_FORMAT_VERSION = 1
+_GUIDANCE_FORMAT_VERSION = 2
 
 
 def run_import(

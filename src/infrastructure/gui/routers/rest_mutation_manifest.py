@@ -87,6 +87,7 @@ NON_MUTATING_REST_ROUTES: frozenset[RouteKey] = frozenset(
         ("POST", "/api/viewpoints/summarize"),
         ("POST", "/api/viewpoints/execute"),
         ("POST", "/api/viewpoints/export-csv"),
+        ("POST", "/api/viewpoints/export-render"),
         ("POST", "/api/viewpoints/execute-projection"),
         ("POST", "/api/viewpoints/execute-diagram"),
         ("POST", "/api/identifiers/allocate"),

@@ -9,7 +9,9 @@ from typing import Any
 
 from fastapi import Request
 
+from src.application.assurance_edge_catalog import EdgeCatalogSource
 from src.application.derivation.strategy_registry import DerivationStrategyCatalogBuilder
+from src.application.guidance_composition import GuidanceContextView
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.application.startup_validation import validate_registry_consistency
 from src.config.settings import datatype_type_references_blocking, viewpoint_enforcement_setting
@@ -184,6 +186,31 @@ def _build_derivation_catalog():
     return builder.build()
 
 
+def _build_guidance_context_view(registry: ModuleRegistry) -> GuidanceContextView:
+    """Assemble the serving-time layered-guidance context view, keyed by meta-ontology alias.
+
+    Each meta-ontology's cache is loaded once and paired with its derived hierarchy; only
+    aliases that actually carry context are indexed. Entity type names map back to their owning
+    alias so ``get_type_guidance`` can compose a type's ancestry context without touching the
+    cache or hierarchy itself.
+    """
+    from src.domain.guidance_hierarchy_source import resolve_guidance_hierarchy  # noqa: PLC0415
+
+    sources: dict[str, object] = {}
+    type_alias: dict[str, str] = {}
+    for alias in (_ARCHIMATE_META_ALIAS, _SYSML_META_ALIAS, _ASSURANCE_META_ALIAS):
+        module = resolve_meta_ontology_module(alias, registry)
+        if module is None:
+            continue
+        overlay = _load_guidance_overlay(alias)
+        if not overlay.context_entries:
+            continue
+        sources[alias] = (resolve_guidance_hierarchy(module), overlay)
+        for type_name in module.entity_types:
+            type_alias.setdefault(str(type_name), alias)
+    return GuidanceContextView(sources=sources, type_alias=type_alias)  # type: ignore[arg-type]
+
+
 def build_runtime_catalogs(registry: ModuleRegistry) -> RuntimeCatalogs:
     """Build a frozen RuntimeCatalogs from a fully-built ModuleRegistry."""
     module_catalog = build_module_catalog(registry)
@@ -200,6 +227,7 @@ def build_runtime_catalogs(registry: ModuleRegistry) -> RuntimeCatalogs:
         viewpoints=_load_viewpoints(),
         viewpoint_enforcement=viewpoint_enforcement_setting(),
         datatype_type_references_blocking=datatype_type_references_blocking(),
+        guidance_context=_build_guidance_context_view(registry),
     )
 
 
@@ -240,6 +268,14 @@ def runtime_catalogs_dependency(request: Request) -> RuntimeCatalogs:
 @lru_cache(maxsize=1)
 def get_module_registry() -> ModuleRegistry:
     return build_module_registry()
+
+
+def assurance_ontology_module() -> EdgeCatalogSource:
+    """The statically loaded assurance ontology module — pure package
+    configuration, independent of runtime capability enablement. Edge-matrix
+    validation and the edge catalog read it directly; whether a transport
+    surface is exposed at all is gated separately (registry enablement)."""
+    return _assurance_module
 
 
 _META_ONTOLOGY_ALIASES: dict[str, str] = {

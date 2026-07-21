@@ -14,6 +14,7 @@ import os
 
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from src.infrastructure.mcp.artifact_mcp.name_normalization import install_call_tool_normalizer
 from src.infrastructure.mcp.assurance_mcp.context import get_assurance_context
 from src.infrastructure.mcp.assurance_mcp.read_tools import register_read_tools
 from src.infrastructure.mcp.assurance_mcp.write_tools import register_write_tools
@@ -62,6 +63,12 @@ mcp_assurance_write = FastMCP(
 
 register_read_tools(mcp_assurance_read)
 register_write_tools(mcp_assurance_write)
+
+# Uniform dispatch treatment across every MCP server (see mcp_artifact_server):
+# tool-name normalization, compact YAML responses for token efficiency, and
+# rejection of unknown parameters instead of silently dropping them.
+install_call_tool_normalizer(mcp_assurance_read)
+install_call_tool_normalizer(mcp_assurance_write)
 
 # Expose the context accessor for test/integration use.
 __all__ = ["mcp_assurance_read", "mcp_assurance_write", "get_assurance_context"]

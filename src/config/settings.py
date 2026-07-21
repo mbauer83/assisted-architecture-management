@@ -1,13 +1,26 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import yaml  # type: ignore[import-untyped]
 
 from src.domain.classification import TLP_ORDER
+from src.domain.deployment_layout import ENV_SETTINGS_PATH
 from src.domain.viewpoints import EnforcementSetting
 
 _CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "config"
+
+
+def settings_document_path() -> Path:
+    """The active settings document.
+
+    Honors the `ARCH_SETTINGS_PATH` process selector (stage 1 of the deployment
+    layout — Docker exports it so runtime and upgrade read the same document);
+    falls back to the source-tree compatibility default.
+    """
+    env = os.environ.get(ENV_SETTINGS_PATH)
+    return Path(env).expanduser() if env else _CONFIG_DIR / "settings.yaml"
 _DEFAULT_ENGAGEMENT: dict[str, object] = {}
 _DEFAULTS: dict[str, dict[str, object]] = {
     "backend": {
@@ -59,6 +72,13 @@ _DEFAULTS: dict[str, dict[str, object]] = {
     "exchange": {
         "max_document_bytes": 10_000_000,
     },
+    "assurance": {
+        "neighbors_default_max_hops": 1,
+        "neighbors_max_hops": 4,
+        "neighbors_max_nodes": 150,
+        "neighbors_max_edges": 300,
+        "neighbors_time_budget_seconds": 2.0,
+    },
 }
 
 _VALID_STORE_BACKENDS = frozenset({"sqlcipher", "pocketbase", "private-git"})
@@ -70,7 +90,7 @@ _SettingsSection = dict[str, object]
 
 
 def load_settings() -> dict:
-    path = _CONFIG_DIR / "settings.yaml"
+    path = settings_document_path()
     if not path.exists():
         return _DEFAULTS.copy()
     data: dict[str, object] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}

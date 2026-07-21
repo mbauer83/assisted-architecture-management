@@ -13,13 +13,17 @@ from typing import cast
 from urllib.parse import urlparse
 
 from src.domain.guidance import ConceptKind
+from src.domain.guidance_hierarchy_source import resolve_guidance_hierarchy
 from src.domain.module_registry import ModuleRegistry
 from src.domain.ontology_protocol import OntologyModule
 from src.infrastructure.app_bootstrap import resolve_meta_ontology_module
 
 _MAX_SOURCE_BYTES = 5_000_000
 _FETCH_TIMEOUT_S = 10.0
-_SUPPORTED_GUIDANCE_FORMAT = 1
+# Only the latest format is imported. An older cache is migrated offline by
+# ``arch-repair upgrade`` (guidance_cache target), never read as-is.
+_SUPPORTED_GUIDANCE_FORMAT = 2
+_V1_SLOT_KEYS = ("entity_types", "connection_types")
 
 
 class GuidanceImportError(Exception):
@@ -68,7 +72,11 @@ def validate_schema(data: object) -> dict[str, object]:
         raise GuidanceImportError("guidance document must be a YAML mapping")
     fmt = data.get("guidance_format")
     if fmt != _SUPPORTED_GUIDANCE_FORMAT:
-        raise GuidanceImportError(f"unsupported guidance_format {fmt!r} (expected {_SUPPORTED_GUIDANCE_FORMAT})")
+        raise GuidanceImportError(
+            f"unsupported guidance_format {fmt!r} (expected {_SUPPORTED_GUIDANCE_FORMAT}). "
+            "Only the latest format is imported; migrate an already-imported older cache with "
+            "`arch-repair upgrade`."
+        )
     meta_ontologies = data.get("meta_ontologies")
     if not isinstance(meta_ontologies, dict):
         raise GuidanceImportError("guidance document is missing a 'meta_ontologies' mapping")
@@ -127,6 +135,38 @@ def _filter_type_entry(
     return filtered, matched, unmatched
 
 
+def _filter_context_levels(
+    om: OntologyModule, alias_data: Mapping[str, object]
+) -> tuple[dict[str, object], list[str], list[str]]:
+    """Validate broader-level context maps (e.g. ``domain:``) against the module's derived
+    guidance hierarchy: the top-level key must be a declared level and each node id a declared
+    node at that level. The v1 type slots are validated separately; anything else is a level
+    map. Returns the filtered sections plus matched/unmatched key lists (``<level>.<node>``).
+    """
+    hierarchy = resolve_guidance_hierarchy(om)
+    matched: list[str] = []
+    unmatched: list[str] = []
+    filtered: dict[str, object] = {}
+    for level_id, section in alias_data.items():
+        if not isinstance(level_id, str) or level_id in _V1_SLOT_KEYS or not isinstance(section, Mapping):
+            continue
+        if not hierarchy.is_declared_level(level_id):
+            unmatched.append(f"{level_id} (undeclared guidance level)")
+            continue
+        valid_nodes = {node.node_id for node in hierarchy.nodes if node.level_id == level_id}
+        filtered_section: dict[str, object] = {}
+        for node_id, node_data in section.items():
+            key = f"{level_id}.{node_id}"
+            if node_id in valid_nodes:
+                matched.append(key)
+                filtered_section[str(node_id)] = node_data
+            else:
+                unmatched.append(key)
+        if filtered_section:
+            filtered[level_id] = filtered_section
+    return filtered, matched, unmatched
+
+
 def filter_alias_document(
     alias: str, alias_data: object, registry: ModuleRegistry, *, strict: bool
 ) -> GuidanceImportSummary:
@@ -168,6 +208,11 @@ def filter_alias_document(
             filtered_section[type_name] = filtered_entry
         if filtered_section:
             filtered[section] = filtered_section
+
+    context_filtered, context_matched, context_unmatched = _filter_context_levels(om, alias_data)
+    matched.extend(context_matched)
+    unmatched.extend(context_unmatched)
+    filtered.update(context_filtered)
 
     if unmatched and strict:
         raise GuidanceImportError(f"unknown guidance keys for {alias!r} (--strict): {sorted(unmatched)}")

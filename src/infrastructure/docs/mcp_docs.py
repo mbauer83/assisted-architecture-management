@@ -120,19 +120,18 @@ _ASSURANCE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "Supply chain / AIBOM",
         (
             "assurance_aibom_export",
-            "assurance_aibom_coverage",
             "assurance_scan_ai_candidates",
-            "assurance_import_bom",
-            "assurance_import_vulnerabilities",
-            "assurance_list_bom_components",
-            "assurance_list_vulnerabilities",
             "assurance_reconcile_aibom",
-            "assurance_set_anchor",
         ),
     ),
     (
         "Security signals",
-        ("assurance_security_stats", "assurance_risk_register", "assurance_register_arch_ref", "assurance_model_this"),
+        (
+            "assurance_security_metrics",
+            "assurance_risk_register",
+            "assurance_register_arch_ref",
+            "assurance_model_this",
+        ),
     ),
     (
         "Store administration",

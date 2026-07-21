@@ -122,8 +122,8 @@ class TestCreateDiagramToolSchema:
     def test_description_mentions_viewpoint(self, tool) -> None:
         desc = tool.description
         assert "viewpoint" in desc, "Description must document the viewpoint parameter"
-        assert "artifact_authoring_guidance" in desc, (
-            "Description must point at artifact_authoring_guidance for viewpoint discovery"
+        assert "artifact_query_viewpoint" in desc, (
+            "Description must point at artifact_query_viewpoint for viewpoint discovery"
         )
 
 
@@ -166,8 +166,10 @@ class TestAuthoringGuidanceToolSchema:
         assert "filter" in desc, "Description must cover filter param"
         assert "target" in desc, "Description must cover target param"
 
-    def test_description_mentions_viewpoints_response_field(self, tool) -> None:
+    def test_description_directs_viewpoint_discovery_elsewhere(self, tool) -> None:
+        """Authoring guidance is entity/connection/diagram-type only; viewpoint discovery
+        belongs to the dedicated artifact_query_viewpoint tool, not this one."""
         desc = tool.description
-        assert "viewpoints" in desc, (
-            "Description must document the always-present 'viewpoints' response field — WU-E6 regression"
+        assert "artifact_query_viewpoint" in desc, (
+            "Description must direct viewpoint discovery to artifact_query_viewpoint"
         )

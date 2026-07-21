@@ -24,6 +24,8 @@ _CUSTOM_SLUGS = frozenset(
         "process-technology-support",
         "requirements-coverage-gaps",
         "component-traceability-gaps",
+        "security-posture",
+        "motivation-coverage",
     }
 )
 # The realization family deliberately deviates from the bare spec tables: each member

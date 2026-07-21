@@ -209,6 +209,12 @@ def test_reads_resume_promptly_after_index_refresh(tmp_path: Path) -> None:
         except Exception as exc:
             read_errors.append(exc)
 
+    # Uncontended baseline for one read on THIS machine under the CURRENT suite
+    # load — the assertions below scale with it so parallel test workers doing
+    # CPU-heavy work nearby cannot fail a test whose subject is lock behavior,
+    # not absolute latency.
+    baseline_read = asyncio.run(_async_get("/api/entities?domain=motivation"))
+
     REFRESH_HOLD_S = 0.15  # hold the write lock this long to simulate a refresh
 
     def _slow_refresh() -> None:
@@ -233,16 +239,19 @@ def test_reads_resume_promptly_after_index_refresh(tmp_path: Path) -> None:
     assert len(results) == 6
 
     # All readers were unblocked together when the write lock released.
-    # The maximum individual read time should not be >> REFRESH_HOLD_S + one read.
+    # The maximum individual read time should not be >> REFRESH_HOLD_S + a few
+    # reads' worth of work; six fully serialized readers would cost ~6 baseline
+    # reads on top of the hold.
     max_read = max(results)
-    assert max_read < REFRESH_HOLD_S + 0.5, (
+    assert max_read < REFRESH_HOLD_S + max(0.5, baseline_read * 3), (
         f"Reads appear to serialize after refresh: max read time={max_read:.3f}s, "
-        f"refresh held lock for {REFRESH_HOLD_S}s"
+        f"refresh held lock for {REFRESH_HOLD_S}s, single read baseline={baseline_read:.3f}s"
     )
     # The spread between fastest and slowest reader should be small
     # (they were all released at the same time).
     spread = max(results) - min(results)
-    assert spread < 0.3, (
+    assert spread < max(0.3, baseline_read * 3), (
         f"Large spread among readers ({spread:.3f}s) suggests they ran one-at-a-time "
-        f"rather than concurrently after the refresh completed"
+        f"rather than concurrently after the refresh completed "
+        f"(single read baseline={baseline_read:.3f}s)"
     )
