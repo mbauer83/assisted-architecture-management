@@ -336,3 +336,35 @@ test.describe('failed save', () => {
     await removeViewpoint(request, slug)
   })
 })
+
+test.describe('reference integrity surfacing', () => {
+  test('a broken reference shows a catalogue badge and an editor notice', async ({ page, request }) => {
+    const slug = uniqueSlug('broken-ref')
+    // An entity-id parameter default is warning-severity (not save-blocked), so it can be
+    // created directly — a nonexistent anchor is a broken reference the report must surface.
+    await createViewpoint(request, {
+      slug, version: 1, name: 'Broken Reference Test', selection_mode: 'query',
+      query: {
+        query_schema: 1,
+        entity_criteria: { kind: 'group', conjunction: 'and', children: [] },
+        parameters: [{ name: 'anchor', type: 'entity-id', required: false, default: 'ENT@0.does-not-exist' }],
+      },
+    })
+
+    // Server computed the report on the list endpoint (never persisted, so it recomputes).
+    const entry = await findEntry(request, slug)
+    expect(entry.broken_references.some((b: { reference: string }) => b.reference === 'ENT@0.does-not-exist')).toBe(true)
+
+    await page.goto('/viewpoints')
+    const row = page.locator('tr', { hasText: slug })
+    await expect(row.getByText(/broken reference/i)).toBeVisible()
+
+    await row.getByRole('button', { name: 'Edit', exact: true }).click()
+    await expect(page.getByText(/no longer (resolve|resolves) against the current model/i)).toBeVisible()
+    await expect(page.getByText('ENT@0.does-not-exist')).toBeVisible()
+
+    page.once('dialog', (dialog) => void dialog.accept())
+    await page.getByRole('button', { name: '← Back' }).click()
+    await removeViewpoint(request, slug)
+  })
+})

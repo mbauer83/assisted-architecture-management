@@ -188,6 +188,79 @@ class TestEdit:
         assert resp.json()["issues"][0]["code"] == "unknown-slug"
 
 
+class TestReferenceReport:
+    """The reference-integrity report on the catalogue list (Stream R, one of its three
+    renderings). Ontology references are save-blocked, so a broken definition can only
+    arise from a definition saved while valid and then invalidated by model change — modeled
+    here by writing the catalog directly, then reading it back through the list endpoint."""
+
+    def _write_broken(self, engagement_root: Path) -> None:
+        from src.domain.viewpoint_criteria import AttributeCondition, EntityCriteriaGroup, ValueRef
+        from src.domain.viewpoints import ExecutableViewpointQuery, ViewpointCatalog, ViewpointDefinition
+        from src.infrastructure.viewpoint_declarations import write_viewpoint_catalog_file
+
+        definition = ViewpointDefinition(
+            slug="broken",
+            version=1,
+            name="Broken",
+            selection_mode="query",
+            query=ExecutableViewpointQuery(
+                entity_criteria=EntityCriteriaGroup(
+                    children=(AttributeCondition(attribute="type", comparator="eq", value=ValueRef(literal="ghost")),)
+                )
+            ),
+        )
+        write_viewpoint_catalog_file(engagement_root, ViewpointCatalog((definition,)))
+
+    def test_list_reports_broken_reference_per_entry(self, client, engagement_root: Path) -> None:
+        self._write_broken(engagement_root)
+        entry = next(e for e in client.get("/api/viewpoints").json()["viewpoints"] if e["slug"] == "broken")
+        broken = entry["broken_references"]
+        assert any(b["reference"] == "ghost" and b["kind"] == "entity-type" for b in broken)
+        assert all(b["severity"] == "ontology" for b in broken)
+
+    def test_entity_id_default_is_savable_and_reported(self, client) -> None:
+        # An entity-id anchor is warning-severity, NOT save-blocked — so it can be created
+        # directly, and a nonexistent default surfaces as a broken entity-id reference.
+        # (This is exactly what the e2e route walk relies on to seed a broken reference.)
+        resp = client.post(
+            "/api/viewpoints",
+            json={
+                "definition": {
+                    "slug": "anchored",
+                    "version": 1,
+                    "name": "Anchored",
+                    "selection_mode": "query",
+                    "query": {
+                        "query_schema": 1,
+                        "parameters": [
+                            {"name": "anchor", "type": "entity-id", "required": False, "default": "ENT@0.gone"}
+                        ],
+                    },
+                },
+                "dry_run": False,
+            },
+        )
+        assert resp.json()["ok"] is True
+        entry = next(e for e in client.get("/api/viewpoints").json()["viewpoints"] if e["slug"] == "anchored")
+        assert any(
+            b["reference"] == "ENT@0.gone" and b["kind"] == "entity-id" and b["severity"] == "entity-id"
+            for b in entry["broken_references"]
+        )
+
+    def test_clean_definition_has_empty_report(self, client) -> None:
+        client.post("/api/viewpoints", json={"definition": _MINIMAL_DEFINITION, "dry_run": False})
+        entry = next(e for e in client.get("/api/viewpoints").json()["viewpoints"] if e["slug"] == "test-viewpoint")
+        assert entry["broken_references"] == []
+
+    def test_report_is_never_persisted(self, client, engagement_root: Path) -> None:
+        self._write_broken(engagement_root)
+        client.get("/api/viewpoints")  # computes the report
+        catalog_files = list(engagement_root.rglob("*.y*ml")) + list(engagement_root.rglob("*.json"))
+        assert catalog_files, "expected a written viewpoint catalog file"
+        assert not any("broken_references" in path.read_text() for path in catalog_files)
+
+
 class TestDelete:
     def test_deletes_existing(self, client, engagement_root: Path) -> None:
         from src.infrastructure.viewpoint_declarations import load_viewpoint_catalog_file

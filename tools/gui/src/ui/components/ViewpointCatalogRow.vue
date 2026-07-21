@@ -7,7 +7,8 @@ import type { ViewpointDefinitionEnvelope } from '../../domain'
 import { tierDisplayLowercase } from './TierBadge.helpers'
 import { formatScopeSummary } from '../views/ViewpointsManagementView.helpers'
 import {
-  REPRESENTATION_BADGES, collapsedScopeSummary, definitionNeedsInput, representationOf,
+  REPRESENTATION_BADGES, brokenReferenceCount, brokenReferenceSummary,
+  collapsedScopeSummary, definitionNeedsInput, representationOf,
 } from './ViewpointDefinitionsList.helpers'
 
 defineProps<{
@@ -40,6 +41,11 @@ const emit = defineEmits<{
           class="needs-input"
           title="Prompts for input before running (required parameters)"
         >needs input</span>
+        <span
+          v-if="brokenReferenceCount(def) > 0"
+          class="broken-refs"
+          :title="brokenReferenceSummary(def)"
+        >⚠ {{ brokenReferenceCount(def) }} broken {{ brokenReferenceCount(def) === 1 ? 'reference' : 'references' }}</span>
       </span>
       <span
         v-if="def.description"
@@ -138,6 +144,7 @@ td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e5e7eb; font
 .def-slug { font-weight: 400; color: #9ca3af; font-size: 12px; }
 .rep-badge { color: #6366f1; margin-right: 2px; }
 .needs-input { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; background: #fef3c7; color: #92400e; border-radius: 99px; padding: 1px 7px; margin-left: 6px; vertical-align: middle; }
+.broken-refs { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; background: #fee2e2; color: #991b1b; border-radius: 99px; padding: 1px 7px; margin-left: 6px; vertical-align: middle; white-space: nowrap; }
 .def-desc { display: block; font-size: 12px; color: #6b7280; margin-top: 2px; }
 .tier-tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
 .tier-engagement { background: #dcfce7; color: #166534; }

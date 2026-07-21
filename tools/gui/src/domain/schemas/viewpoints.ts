@@ -273,6 +273,18 @@ export const ScopeSummarySchema = Schema.Struct({
 })
 export type ScopeSummary = typeof ScopeSummarySchema.Type
 
+/** One authored reference (entity/connection type, specialization slug, attribute path,
+ * or entity-id anchor) that no longer resolves against the current model. Computed on
+ * demand from (definition, model), never persisted — the same report is rendered as a
+ * catalogue-list badge, per-reference editor notices, and execution warnings. */
+export const BrokenReferenceSchema = Schema.Struct({
+  kind: Schema.Literal('entity-type', 'connection-type', 'specialization', 'attribute-path', 'entity-id'),
+  reference: Schema.String,
+  locus: Schema.String,
+  severity: Schema.Literal('ontology', 'entity-id'),
+})
+export type BrokenReference = typeof BrokenReferenceSchema.Type
+
 export const ViewpointDefinitionEnvelopeSchema = Schema.Struct({
   slug: Schema.String,
   version: Schema.Number,
@@ -311,6 +323,10 @@ export const ViewpointDefinitionEnvelopeSchema = Schema.Struct({
   tier: Schema.Literal('module', 'enterprise', 'engagement'),
   scope_summary: ScopeSummarySchema,
   query_summary: Schema.NullOr(Schema.String),
+  /** Broken references in this definition's active selection + presentation, computed on
+   * demand and never persisted. Optional so an older backend (or a hand-built fixture)
+   * decodes cleanly; treat absent as none. */
+  broken_references: Schema.optional(Schema.Array(BrokenReferenceSchema)),
 })
 export type ViewpointDefinitionEnvelope = typeof ViewpointDefinitionEnvelopeSchema.Type
 

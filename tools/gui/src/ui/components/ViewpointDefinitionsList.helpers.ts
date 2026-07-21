@@ -25,6 +25,18 @@ export const REPRESENTATION_BADGES: Record<Representation, { glyph: string; labe
 export const definitionNeedsInput = (envelope: ViewpointDefinitionEnvelope): boolean =>
   needsParameterPrompt(parameterSignatureOf(envelope))
 
+/** How many authored references in this definition no longer resolve against the current
+ * model — the count the catalogue badge shows. */
+export const brokenReferenceCount = (envelope: ViewpointDefinitionEnvelope): number =>
+  (envelope.broken_references ?? []).length
+
+/** Tooltip enumerating each broken reference (locus + what it names), so the badge
+ * explains itself on hover without opening the editor. */
+export const brokenReferenceSummary = (envelope: ViewpointDefinitionEnvelope): string =>
+  (envelope.broken_references ?? [])
+    .map((broken) => `${broken.locus}: '${broken.reference}' no longer exists`)
+    .join('\n')
+
 /** One-line scope summary with the type dumps collapsed to counts — the full lists
  * stay one toggle away, they just don't dominate the catalog row. */
 export const collapsedScopeSummary = (summary: ScopeSummary): string => {

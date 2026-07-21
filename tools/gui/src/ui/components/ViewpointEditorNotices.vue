@@ -2,7 +2,9 @@
 /** The editor's notice stack: read-only-master hint, fork-in-progress hint, version-bump
  * hint, and the clickable validation-issue list. Pure display — issue focusing stays with
  * the parent, which owns the highlighted-node overlay. */
-import type { ViewpointDefinitionEnvelope, ViewpointReferencer, ViewpointValidationIssue } from '../../domain'
+import type {
+  BrokenReference, ViewpointDefinitionEnvelope, ViewpointReferencer, ViewpointValidationIssue,
+} from '../../domain'
 
 withDefaults(defineProps<{
   isReadOnly: boolean
@@ -10,9 +12,10 @@ withDefaults(defineProps<{
   forkedFromSlug: string | null
   showVersionBumpHint: boolean
   quarantinedRuleCount?: number
+  brokenReferences?: readonly BrokenReference[]
   referencers: readonly ViewpointReferencer[]
   issues: readonly ViewpointValidationIssue[]
-}>(), { quarantinedRuleCount: 0 })
+}>(), { quarantinedRuleCount: 0, brokenReferences: () => [] })
 const emit = defineEmits<{ focusIssue: [issue: ViewpointValidationIssue] }>()
 </script>
 
@@ -53,6 +56,27 @@ const emit = defineEmits<{ focusIssue: [issue: ViewpointValidationIssue] }>()
     </span>
   </p>
 
+  <div
+    v-if="brokenReferences.length > 0"
+    class="broken-block"
+  >
+    <p class="broken-lead">
+      {{ brokenReferences.length }} reference{{ brokenReferences.length === 1 ? '' : 's' }} no longer
+      {{ brokenReferences.length === 1 ? 'resolves' : 'resolve' }} against the current model. Results
+      are degraded until repaired — remap the reference, drop the term, or disable the affected style
+      rule (Presentation tab). Saving with a bumped version acknowledges the repair.
+    </p>
+    <ul class="broken-list">
+      <li
+        v-for="(broken, i) in brokenReferences"
+        :key="i"
+        :class="broken.severity"
+      >
+        <b>{{ broken.locus }}</b>: {{ broken.kind }} <code>{{ broken.reference }}</code> no longer exists
+      </li>
+    </ul>
+  </div>
+
   <ul
     v-if="issues.length > 0"
     class="issue-list"
@@ -75,4 +99,11 @@ const emit = defineEmits<{ focusIssue: [issue: ViewpointValidationIssue] }>()
 .issue-list li { padding: 6px 10px; border-radius: 6px; margin: 4px 0; cursor: pointer; font-size: 12.5px; }
 .issue-list li.error { background: #fee2e2; color: #991b1b; }
 .issue-list li.warning { background: #fef3c7; color: #92400e; }
+.broken-block { border: 1px solid #fecaca; border-radius: 6px; padding: 8px 12px; margin: 4px 0; }
+.broken-lead { margin: 0 0 6px; font-size: 12.5px; color: #991b1b; }
+.broken-list { list-style: none; padding: 0; margin: 0; }
+.broken-list li { padding: 5px 10px; border-radius: 6px; margin: 3px 0; font-size: 12.5px; }
+.broken-list li.ontology { background: #fee2e2; color: #991b1b; }
+.broken-list li.entity-id { background: #fef3c7; color: #92400e; }
+.broken-list code { font-family: ui-monospace, monospace; }
 </style>

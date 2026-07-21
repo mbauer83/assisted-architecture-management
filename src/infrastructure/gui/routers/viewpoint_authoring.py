@@ -28,6 +28,7 @@ from src.application.viewpoints.persist_definition import (
     persist_viewpoint_definition,
 )
 from src.application.viewpoints.pins import load_pinned_slugs, save_pinned_slugs
+from src.application.viewpoints.reference_report_cache import cached_reference_report
 from src.application.viewpoints.registry_snapshot import build_registry_snapshot
 from src.config.viewpoints_settings import (
     viewpoints_derivation_max_hops,
@@ -74,7 +75,40 @@ def _tier(slug: str, *, engagement_catalog: ViewpointCatalog, enterprise_catalog
     return "module"
 
 
-def _full_entry(definition: ViewpointDefinition, *, tier: str, merged: ViewpointCatalog) -> dict[str, Any]:
+def _reference_report_settings() -> RegistrySnapshot:
+    catalogs = build_runtime_catalogs(get_module_registry())
+    return build_registry_snapshot(
+        catalogs,
+        _both_roots(),
+        derivation_max_hops=viewpoints_derivation_max_hops(),
+        derivation_max_relationships=viewpoints_derivation_max_relationships(),
+        derivation_time_budget_seconds=viewpoints_derivation_time_budget_seconds(),
+    )
+
+
+def _broken_references(
+    definition: ViewpointDefinition, *, registries: RegistrySnapshot, index_generation: int | None
+) -> list[dict[str, str]]:
+    """The definition's broken references, computed on demand (never persisted) — the ONE
+    report rendered three ways: a count badge on the list, per-reference notices in the
+    editor, and result warnings at execution."""
+    report = cached_reference_report(
+        definition, registries=registries, read_access=s.get_repo(), index_generation=index_generation
+    )
+    return [
+        {"kind": broken.kind, "reference": broken.reference, "locus": broken.locus, "severity": broken.severity}
+        for broken in report
+    ]
+
+
+def _full_entry(
+    definition: ViewpointDefinition,
+    *,
+    tier: str,
+    merged: ViewpointCatalog,
+    registries: RegistrySnapshot,
+    index_generation: int | None,
+) -> dict[str, Any]:
     # The catalog row must describe the ACTIVE selection: a scope-mode definition's
     # (possibly divergent) inactive query never appears as its summary.
     active_query = definition_with_scope_query(definition)[0].query
@@ -96,6 +130,9 @@ def _full_entry(definition: ViewpointDefinition, *, tier: str, merged: Viewpoint
             definition.forked_from,
             merged.get(definition.forked_from.slug) if definition.forked_from is not None else None,
         ),
+        "broken_references": _broken_references(
+            definition, registries=registries, index_generation=index_generation
+        ),
     }
 
 
@@ -111,11 +148,17 @@ def list_viewpoint_definitions() -> dict[str, Any]:
         load_viewpoint_catalog_file(enterprise_root) if enterprise_root is not None else ViewpointCatalog.empty()
     )
     merged = load_effective_viewpoint_catalog(_both_roots())
+    # Registries + model generation resolved ONCE per request; the report is a pure function
+    # of (definition, model) and is recomputed on demand, never persisted (Stream R).
+    registries = _reference_report_settings()
+    index_generation = s.get_repo().read_model_version().generation
     entries = [
         _full_entry(
             d,
             tier=_tier(d.slug, engagement_catalog=engagement_catalog, enterprise_catalog=enterprise_catalog),
             merged=merged,
+            registries=registries,
+            index_generation=index_generation,
         )
         for d in sorted(merged.entries, key=lambda d: d.slug)
     ]

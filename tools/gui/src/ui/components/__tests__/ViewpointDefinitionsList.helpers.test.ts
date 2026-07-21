@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  collapsedScopeSummary, definitionNeedsInput, filterAndSortDefinitions, nextCatalogSort,
-  representationOf, toggledMember,
+  brokenReferenceCount, brokenReferenceSummary, collapsedScopeSummary, definitionNeedsInput,
+  filterAndSortDefinitions, nextCatalogSort, representationOf, toggledMember,
 } from '../ViewpointDefinitionsList.helpers'
 import type { ViewpointDefinitionEnvelope } from '../../../domain'
 
@@ -29,6 +29,27 @@ describe('definitionNeedsInput', () => {
       query: { query_schema: 1, parameters: [{ name: 'anchor', value_type: 'string', required: true, default: 'x' }] },
     })
     expect(definitionNeedsInput(defaulted)).toBe(false)
+  })
+})
+
+describe('broken-reference badge helpers', () => {
+  it('counts nothing when the field is absent or empty', () => {
+    expect(brokenReferenceCount(envelope())).toBe(0)
+    expect(brokenReferenceCount(envelope({ broken_references: [] }))).toBe(0)
+    expect(brokenReferenceSummary(envelope())).toBe('')
+  })
+
+  it('counts and summarises each broken reference', () => {
+    const broken = envelope({
+      broken_references: [
+        { kind: 'entity-type', reference: 'widget', locus: 'entity criteria', severity: 'ontology' },
+        { kind: 'entity-id', reference: 'ENT@1.gone', locus: "parameter 'anchor' default", severity: 'entity-id' },
+      ],
+    })
+    expect(brokenReferenceCount(broken)).toBe(2)
+    const summary = brokenReferenceSummary(broken)
+    expect(summary).toContain("entity criteria: 'widget' no longer exists")
+    expect(summary).toContain("parameter 'anchor' default: 'ENT@1.gone' no longer exists")
   })
 })
 
