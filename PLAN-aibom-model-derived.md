@@ -298,25 +298,24 @@ produces something a reader would accept.
 9. This repository's own AIBOM is generated, reviewed, and committed as a
    dogfooding artefact.
 
-## 9. Open questions for the owner
+## 9. Owner decisions (resolved 2026-07-21)
 
-**Q1 — Specialization breadth.** D2 proposes nine across five base types. Too
-many for a first cut? A narrower start (`ai-model`, `ai-dataset`,
-`ai-inference-service`) would prove the derivation with less ontology surface,
-at the cost of a second migration later.
+**Q1 — Specialization breadth → ALL NINE (D2).** Ship the full D2 set across five base
+types. The named-profile registry (Streams P/Q landed) removes the near-duplicate-schema
+cost that motivated a narrower start, so nine costs little more than three and avoids a
+second migration. WU-A1 declares all nine.
 
-**Q2 — Marking tool placement.** Marking an entity is an architecture write, so
-the tool belongs on `arch-repo-write`, not `arch-assurance-write` — which
-contradicts the existing (dangling) `assurance_mark_ai_component` name. Confirm
-the move; it is the principled placement but it crosses a server boundary.
+**Q2 — Marking placement → `arch-repo-write`, reuse `artifact_edit_entity`.** Marking is
+setting an AI specialization on an existing entity — an architecture write. Reuse the
+existing edit tool's `specialization` field rather than add a new tool (small-tool-count
+discipline); DROP the dangling `assurance_mark_ai_component` name and repoint
+`security_read_tools.py:146` at the arch-repo-write path. A thin dedicated tool is added
+only if a distinct affordance proves necessary.
 
-**Q3 — SPDX 3.0 AI Profile.** The other AIBOM standard, favoured for regulatory
-filings where CycloneDX is favoured for CI/CD. Out of scope here. Worth a second
-emitter later, or explicitly never?
+**Q3 — SPDX 3.0 AI Profile → DEFER (later, not never).** CycloneDX ML-BOM is the v1
+emitter. SPDX 3.0 AI Profile stays a documented future second emitter, revisited when a
+regulatory filing needs it — out of scope for this plan.
 
-**Q4 — Ordering.** This stream needs ontology changes and now depends on the
-profile registry (D3). The pending rename sweep and the OpenAPI schema work both
-touch overlapping surfaces. Recommended order: rename sweep → profile registry →
-OpenAPI → AIBOM, so AIBOM is built on reusable profiles and its REST surface is
-authored under the finished schema discipline, rather than retrofitted into
-both.
+**Q4 — Ordering → CONFIRMED.** profile registry (done) → OpenAPI → AIBOM, so AIBOM is built
+on reusable profiles and its REST surface authored under the finished schema discipline.
+Any still-pending rename sweep lands before AIBOM's ontology changes.

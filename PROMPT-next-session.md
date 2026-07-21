@@ -60,13 +60,15 @@ Do these in order. Within a plan, follow that plan's dependency graph.
    shape about to break. If it needs more than a thin task, write a short PLAN/TASKS pair
    first and get owner sign-off.
 6. **`TASKS-aibom-model-derived.md`** (Streams A→G) — hard-depends on named profiles (now
-   available) and on WU-U1. **BLOCKED ON OWNER QUESTIONS** — do not guess:
-   - Q1 (gates Stream A): ship all nine AI specializations, or start with a subset?
-   - Q2 (gates WU-E2): the marking tool's server home (`arch-repo-write` vs the dangling
-     `assurance_mark_ai_component`).
-   - Q3: SPDX 3.0 AI Profile as a second emitter — "later" vs "never".
-   Q4 recommends the ordering rename-sweep → profile-registry → OpenAPI → AIBOM (consistent
-   with this list). Surface Q1/Q2 to the owner before starting Stream A/E2.
+   available) and on WU-U1. **Owner Q1–Q4 RESOLVED 2026-07-21** (persisted in that plan's §9
+   + Questions), so the plan is unblocked:
+   - Q1 → ship ALL NINE AI specializations (D2); the profile registry removes the
+     duplicate-schema cost.
+   - Q2 → marking lives on `arch-repo-write`, REUSING `artifact_edit_entity`'s
+     `specialization` field (no new tool); drop the dangling `assurance_mark_ai_component`
+     and repoint `security_read_tools.py:146`.
+   - Q3 → SPDX 3.0 AI Profile DEFERRED (CycloneDX ML-BOM is v1; SPDX a future second emitter).
+   - Q4 → ordering confirmed (this list).
 7. **strategy-and-assurance-uplift remainder** (mostly closure; per its READ FIRST table):
    - **D1** (guidance format v2) — GENUINELY OPEN (7 boxes).
    - **E1** (docs) may start anytime; **E2** (deterministic screenshots) needs the B/C/D/G
@@ -95,9 +97,9 @@ Do these in order. Within a plan, follow that plan's dependency graph.
   `tools/gui/`) `npm run lint && npm run typecheck && npx vitest run` green; self-model
   synced (`artifact_verify` clean); PLAN §8 acceptance satisfied; restart-gated items
   verified or explicitly queued to X1.
-- **aibom**: owner Q1–Q3 resolved; all Stream A–G boxes ticked; the ML-BOM emits and
-  schema-validates; coverage surface + REST/MCP + GUI panel land; self-model + docs +
-  dogfooded export; gates green.
+- **aibom**: owner Q1–Q4 already resolved (§9); all Stream A–G boxes ticked; the ML-BOM
+  emits and schema-validates; coverage surface + REST/MCP + GUI panel land; self-model +
+  docs + dogfooded export; gates green.
 - **strategy-and-assurance-uplift**: D1 + E1 + E2 + G2-e2e + U0b closed; WU-X1 run over the
   integrated result at the final restart; the §13 acceptance criteria met.
 
@@ -141,9 +143,12 @@ Do these in order. Within a plan, follow that plan's dependency graph.
   now gitignored. Commit per coherent WU with the full-suite gate line in the message.
 - Model writes ONLY via `artifact_*` / `assurance_*` MCP tools, `dry_run=true` first,
   `artifact_verify` after each batch. Central clock (`src/domain/clock.py`) for timestamps.
-- Backend code is inert until the owner restarts `arch-backend`; MCP *surface* changes also
-  need a Claude session restart. Queue restart-gated verification; state plainly what needs
-  a restart.
+- Backend code is inert until the owner restarts `arch-backend`; a changed GUI needs the
+  frontend rebuilt/restarted; MCP *surface* changes (new/renamed tools) also need a Claude
+  **session** restart. When a change must take effect for the NEXT step to proceed or be
+  verified, PROACTIVELY ASK THE OWNER to perform the specific restart (backend / frontend /
+  Claude session), then continue once confirmed — rather than silently blocking or pressing
+  on against stale state. Otherwise, queue the restart-gated verification and say so plainly.
 
 ## This session's landing (context)
 

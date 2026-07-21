@@ -25,21 +25,26 @@ immediately. WU-A1 (specializations) has no such dependency and can proceed.
 
 ## Questions
 
-- **Q1 (gates WU-A1) — Specialization breadth.** Ship all nine specializations
-  (PLAN §4 D2), or start with `ai-model` / `ai-dataset` / `ai-inference-service`
-  and extend later? OPEN.
-- **Q2 (gates WU-E2) — Marking tool placement.** Marking is an architecture
-  write; the principled home is `arch-repo-write`, contradicting the dangling
-  `assurance_mark_ai_component` name. Confirm the cross-server move. OPEN.
-- **Q3 — SPDX 3.0 AI Profile as a second emitter.** Out of scope for this plan;
-  confirm "later" vs "never". OPEN.
-- **Q4 — Stream ordering.** Recommended: rename sweep → profile registry →
-  OpenAPI → AIBOM. OPEN.
+All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs):
+
+- **Q1 (gated WU-A1) — Specialization breadth → ALL NINE** (PLAN §4 D2). The named-profile
+  registry (landed) removes the near-duplicate-schema cost, so nine ≈ three in effort and
+  avoids a second migration. WU-A1 ships the full D2 set.
+- **Q2 (gated WU-E2) — Marking placement → `arch-repo-write`, REUSE `artifact_edit_entity`.**
+  Marking = setting an AI specialization on an existing entity (an architecture write);
+  reuse the existing edit tool's `specialization` field rather than add a tool
+  (small-tool-count discipline), and DROP the dangling `assurance_mark_ai_component` name.
+- **Q3 — SPDX 3.0 AI Profile → DEFER (later, not never).** CycloneDX ML-BOM is the v1
+  emitter; SPDX 3.0 AI Profile is a documented future second emitter, revisited when a
+  regulatory filing needs it.
+- **Q4 — Ordering → CONFIRMED:** profile registry (done) → OpenAPI → AIBOM, so AIBOM is
+  built on reusable profiles under finished schema discipline; any pending rename sweep
+  lands before AIBOM's ontology changes.
 
 ## Stream A — Ontology foundation
 
-### WU-A1 — AI specializations (needs Q1)
-- [ ] Declare the agreed specializations in
+### WU-A1 — AI specializations (Q1 resolved: ALL NINE)
+- [ ] Declare all nine specializations (Q1 decided) in
       `src/ontologies/archimate_4/specializations.yaml` (slug + name per base
       type, per PLAN §4 D2).
 - [ ] Verify each base type accepts specializations and that the slugs collide
@@ -158,12 +163,14 @@ immediately. WU-A1 (specializations) has no such dependency and can proceed.
 - [ ] Cross-surface parity test (same request ⇒ same body), per the convention
       established for signal ingest.
 
-### WU-E2 — Marking tool (needs A1, Q2)
-- [ ] Build the marking capability on the server Q2 selects — applying an AI
-      specialization to an entity, with its profile attributes.
+### WU-E2 — Marking tool (needs A1; Q2 resolved: arch-repo-write, reuse edit)
+- [ ] Marking = applying an AI specialization to an entity on `arch-repo-write` (Q2
+      decided). Prefer REUSING the existing `artifact_edit_entity` (its
+      `specialization` field) over a new tool; add a thin arch-repo-write tool only if a
+      distinct affordance proves necessary. Do NOT implement `assurance_mark_ai_component`.
 - [ ] **Fix the dangling reference**: `security_read_tools.py:146` currently
-      tells agents to call the nonexistent `assurance_mark_ai_component`. Update
-      it to the real tool name.
+      tells agents to call the nonexistent `assurance_mark_ai_component`. Point it at the
+      real arch-repo-write path (edit-entity specialization).
 - [ ] Tests: marking persists; the scanner's skip-branch for already-marked
       entities now actually fires (regression test for the previously
       unreachable branch).
