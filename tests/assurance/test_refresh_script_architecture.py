@@ -51,7 +51,26 @@ def test_script_never_references_connector_apis_even_lazily() -> None:
     assert offenders == [], f"connector API references found in the script: {offenders}"
 
 
-def test_script_submits_through_the_command() -> None:
+_LIFECYCLE_TRANSITIONS = (
+    "create_staging_run",
+    "populate_run",
+    "complete_run",
+    "activate_run",
+    "fail_run",
+)
+
+
+def test_script_submits_through_the_shared_ingest_boundary() -> None:
+    """The script assembles a typed bundle and submits it; the command (reached via
+    submit_bundle) owns the lifecycle, so run-id policy and the single-writer
+    boundary are not re-invented per surface."""
     source = _SCRIPT.read_text(encoding="utf-8")
-    assert "refresh_security_signals" in source
+    assert "submit_bundle" in source
+    assert "assemble_bundle" in source
     assert "RefreshBundle" in source
+
+
+def test_script_never_drives_lifecycle_transitions_itself() -> None:
+    source = _SCRIPT.read_text(encoding="utf-8")
+    offenders = [name for name in _LIFECYCLE_TRANSITIONS if name in source]
+    assert offenders == [], f"the script must not drive the run lifecycle: {offenders}"

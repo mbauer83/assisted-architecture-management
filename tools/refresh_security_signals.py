@@ -15,27 +15,19 @@ builds and reports the bundle without submitting anything.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import subprocess
 import sys
-import uuid
 from pathlib import Path
+from typing import Mapping, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.application.security_refresh.bundle_assembly import (  # noqa: E402
-    AcquisitionInputs,
-    attach_findings,
-    prepare_components,
-)
-from src.application.security_refresh.command import (  # noqa: E402
-    RefreshBundle,
-    refresh_security_signals,
-)
-from src.infrastructure.assurance._sbom_parser import parse_bom  # noqa: E402
+from src.application.security_refresh.bundle_assembly import AcquisitionInputs  # noqa: E402
+from src.application.security_refresh.command import RefreshBundle  # noqa: E402
 from src.infrastructure.assurance.osv_client import OsvClient, OsvComponentQuery  # noqa: E402
+from src.infrastructure.assurance.signal_ingest import assemble_bundle, submit_bundle  # noqa: E402
 
 
 def _run(command: list[str], *, cwd: Path | None = None) -> str:
@@ -61,34 +53,31 @@ def generate_npm_sbom() -> tuple[dict[str, object], dict[str, str]]:
 _GENERATORS = {"python": generate_python_sbom, "npm": generate_npm_sbom}
 
 
-def build_bundle(target: str, anchor_entity_id: str, *, osv_base_url: str | None) -> RefreshBundle:
-    sbom_data, generator_metadata = _GENERATORS[target]()
-    bom_digest = hashlib.sha256(
-        json.dumps(sbom_data, sort_keys=True).encode()).hexdigest()
-    meta, parsed = parse_bom(sbom_data)
-    assembled = prepare_components(meta, parsed)
+def _osv_acquire(
+    queryable: Sequence[Mapping[str, str]], *, osv_base_url: str | None,
+) -> AcquisitionInputs:
+    """Live acquisition: query OSV for every queryable component."""
     client = OsvClient(**({"base_url": osv_base_url} if osv_base_url else {}))
     acquisition = client.query_components([
         OsvComponentQuery(component_id=q["component_id"], purl=q["purl"])
-        for q in assembled.queryable
+        for q in queryable
     ])
-    attach_findings(assembled, AcquisitionInputs(
+    return AcquisitionInputs(
         vulnerability_ids_by_component=acquisition.vulnerability_ids_by_component,
         vulnerabilities_by_id=acquisition.vulnerabilities_by_id,
         unmatched_components=acquisition.unmatched_components,
         failed_vulnerability_fetches=acquisition.failed_vulnerability_fetches,
-    ))
-    return RefreshBundle(
-        anchor_entity_id=anchor_entity_id,
-        request_id=f"refresh-{uuid.uuid4()}",
-        components=tuple(assembled.components),
-        findings=tuple(assembled.findings),
-        diagnostics=assembled.diagnostics,
+    )
+
+
+def build_bundle(target: str, anchor_entity_id: str, *, osv_base_url: str | None) -> RefreshBundle:
+    sbom_data, generator_metadata = _GENERATORS[target]()
+    return assemble_bundle(
+        anchor_entity_id,
+        sbom_data,
+        acquire=lambda queryable: _osv_acquire(queryable, osv_base_url=osv_base_url),
         generator_metadata=generator_metadata,
         source_metadata={"vulnerability_source": "osv.dev"},
-        bom_digest=bom_digest,
-        bom_serial=str(meta.get("bom_serial") or ""),
-        bom_version=str(meta.get("bom_version") or ""),
     )
 
 
@@ -117,11 +106,7 @@ def report(bundle: RefreshBundle) -> None:
 
 
 def submit(bundle: RefreshBundle) -> int:
-    from src.infrastructure.assurance._refresh_run_store import (  # noqa: PLC0415
-        SQLCipherRefreshRunStore,
-    )
     from src.infrastructure.assurance.store_factory import get_assurance_bundle  # noqa: PLC0415
-    from src.infrastructure.assurance.write_serialization import run_write  # noqa: PLC0415
     from src.infrastructure.deployment.layout import resolve_manifest  # noqa: PLC0415
 
     manifest = resolve_manifest()
@@ -142,12 +127,7 @@ def submit(bundle: RefreshBundle) -> int:
     if run_store is None:
         print("refresh requires the SQLCipher store with co-located signals", file=sys.stderr)
         return 2
-    if not isinstance(run_store, SQLCipherRefreshRunStore):
-        print("unexpected run-store implementation", file=sys.stderr)
-        return 2
-    result = run_write(lambda: refresh_security_signals(
-        bundle, store=run_store, new_run_id=lambda: f"RUN@{uuid.uuid4().hex[:16]}",
-    ))
+    result = submit_bundle(bundle, run_store=run_store)
     print(f"result: {type(result).__name__}: {result}")
     return 0 if type(result).__name__ == "RefreshActivated" else 1
 

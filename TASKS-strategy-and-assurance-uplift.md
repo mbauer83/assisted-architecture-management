@@ -2734,8 +2734,53 @@ only existing nodes cannot measure a missing one".
   dev store per Q12 — no data migration), MCP/REST/CLI/docstrings, ~30 tests + the sizing spike +
   ledger. Verify full suite after.
 
+- 2026-07-21 · INGEST-via-MCP (backlog 1) · DONE, full backend suite GREEN (6115 passed / 5
+  skipped), ruff + zuban clean. MCP write coverage of ingestion is restored — the capability the
+  legacy assurance_import_bom/_import_vulnerabilities provided now lands as a proper snapshot.
+  · NEW TOOL `assurance_ingest_security_signals` (arch-assurance-write): an agent submits a
+    CycloneDX BOM document + optional OSV advisory records for one anchor; the tool assembles a
+    typed bundle and hands it to the command → staging → populate → complete → atomic activation,
+    superseding the anchor's previous snapshot. NOT a direct write: the signal-mutation capability
+    gate is consulted first, so an MCP ingest is denied in exactly the configurations a REST/CLI
+    one is (store_locked → locked_response; other denials → typed signal_mutation_denied).
+  · INPUT SHAPE: one mode, no behaviour flag — a BOM document (+ advisories), which is what an
+    agent actually holds. Internal component dicts are never asked of the caller.
+  · NEW `src/application/security_refresh/supplied_acquisition.py` (pure): matches supplied OSV
+    records to BOM components by package identity (purl type/namespace/name, or ecosystem+name
+    when the record carries no purl) — version deliberately ignored, because version-range
+    applicability stays in evaluate_applicability downstream. A supplied advisory is therefore
+    judged by the SAME semantics as a fetched one. Records matching nothing → diagnostics, never
+    silent drops. Tests tests/application/test_supplied_acquisition.py (8).
+  · NEW `src/infrastructure/assurance/signal_ingest.py` — the ONE submission boundary shared by
+    every ingest surface: assemble_bundle(anchor, bom, acquire=…) with acquisition INJECTED (live
+    OSV for the script, supplied records for MCP) + submit_bundle() wrapping the command in the
+    serialised assurance write. Run-id and request-id policy now have exactly one definition.
+    tools/refresh_security_signals.py was refactored onto it (its bespoke build_bundle/submit
+    duplication removed) — behaviour unchanged.
+  · TESTS: tests/assurance/test_signal_ingest_bundle.py (7 — directness from the dep graph, BOM
+    identity, digest excludes generated request ids, applicable/not-applicable advisories, root
+    never queried as a dependency); tests/assurance/test_ingest_security_signals_tool.py (11 —
+    outcome projection, both denial paths write nothing, end-to-end ingest over a REAL SQLCipher
+    run store, replay/conflict/supersede, typed validation failure).
+  · test_refresh_script_architecture.py: the `"refresh_security_signals" in source` text-grep
+    proxy was replaced by the ACTUAL contract — the script goes through the shared boundary
+    (submit_bundle/assemble_bundle) and never names a lifecycle transition
+    (create_staging_run/populate_run/complete_run/activate_run/fail_run). Stronger, not weaker.
+  · mcp_docs.py: the four signal tools were falling into the "Other" doc group; they now sit under
+    "Security signals". docs/04-assurance/mcp-tools.md regenerated.
+  · aibom_coverage DECISION: **DROP** (not rebuilt). Its semantics were an artifact of the legacy
+    per-component anchoring — it counted BOM components with no `arch_entity_id` plus rows in the
+    `anchor_mappings` table. In the snapshot model a snapshot is anchored as a whole, so every
+    component in it is anchored BY CONSTRUCTION and "unanchored components" is not a state that
+    can exist. The residual real questions are already answered: which anchors have coverage →
+    assurance_security_stats (anchors_with_active_run) / per-anchor assurance_security_metrics;
+    modeled-vs-discovered AI-BOM drift → assurance_reconcile_aibom. No functional loss.
+  · RESTART-GATED: the new tool appears on arch-assurance-write only after a backend restart (and
+    an MCP surface change also needs a Claude session restart to be callable).
+
 ### REMAINING BACKLOG (assurance security-signals — sequenced, owner-directed)
-1. [ ] INGEST-via-MCP tool (bundle-submit to the ingest command) + decide aibom_coverage.
+1. [x] INGEST-via-MCP tool (bundle-submit to the ingest command) + decide aibom_coverage — DONE
+       2026-07-21 (see the entry above); aibom_coverage DROPPED with rationale.
 2. [ ] Rename sweep: refresh→ingest (act) + →snapshot (data), consistent & role-functional (above).
 3. [ ] `arch-assurance seed [--with-signals]` command (loads seed-assurance.json; opt-in signal
        ingest for frontend+backend anchors) + Quickstart/README/docs for demo use.

@@ -127,6 +127,10 @@ _ASSURANCE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
         "Security signals",
         (
+            "assurance_ingest_security_signals",
+            "assurance_list_bom_components",
+            "assurance_list_vulnerabilities",
+            "assurance_security_stats",
             "assurance_security_metrics",
             "assurance_risk_register",
             "assurance_register_arch_ref",
