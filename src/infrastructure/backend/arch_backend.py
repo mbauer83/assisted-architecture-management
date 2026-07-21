@@ -280,8 +280,7 @@ def _start_daemon(*, argv: list[str] | None, log_path: Path) -> int:
     with open(log_path, "ab") as log:
         proc = subprocess.Popen(
             [sys.argv[0], *_daemon_argv(argv)],
-            stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-            start_new_session=True, cwd=str(Path.cwd()),
+            stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True, cwd=str(Path.cwd()),
         )
     return int(proc.pid)
 
@@ -299,8 +298,7 @@ def _run_foreground(args: argparse.Namespace, parser: argparse.ArgumentParser, r
     repo_root_path, enterprise_root_path = gui_server.resolve_server_roots(args.repo_root, args.enterprise_root)
     if repo_root_path is None:
         parser.error(
-            "No --repo-root given, ARCH_REPO_ROOT not set, and no .arch/init-state.yaml found. Run arch-init first."
-        )
+            "No --repo-root given, ARCH_REPO_ROOT not set, and no .arch/init-state.yaml found. Run arch-init first.")
 
     repo = _initialise_repo(repo_root_path, enterprise_root_path, args)
     _run_startup_validations(repo)
@@ -326,6 +324,7 @@ def _initialise_repo(
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
     from src.infrastructure.artifact_index import combined_artifact_index, shared_artifact_index
     from src.infrastructure.backend._group_registry_startup import repair_group_registries
+    from src.infrastructure.backend._profile_registry_startup import validate_profile_registries
     from src.infrastructure.write.artifact_write.m4_transaction import recover_transactions
 
     roots = [p for p in (repo_root_path, enterprise_root_path) if p is not None]
@@ -345,6 +344,10 @@ def _initialise_repo(
         if recovered:
             logger.warning("Recovered %s durable transaction(s) in %s", recovered, root)
     repair_group_registries(repo_root_path, enterprise_root_path)
+    # Class A profile-registry validation before the index build: a malformed registry or an
+    # undefined binding makes the profile subsystem untrustworthy (engagement aborts,
+    # enterprise warns) — mirrors the group-registry posture above (WU-Q1).
+    validate_profile_registries(repo_root_path, enterprise_root_path)
     repo = ArtifactRepository(
         index,
         excluded_entity_types=build_runtime_catalogs(get_module_registry()).ontology.entity_types_with_class(

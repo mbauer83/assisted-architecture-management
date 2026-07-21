@@ -11,8 +11,16 @@ from src.domain.profile_registry import (
     classify_profile_conflicts,
     merge_profile_registries,
     profile_registry_from_mapping,
+    unresolved_profile_bindings,
 )
 from src.domain.profiles import merge_property_schemas
+
+
+def _registry(**profiles: int):
+    return profile_registry_from_mapping(
+        {"profile_schema": 1, "profiles": {name: {"version": v} for name, v in profiles.items()}},
+        label="test",
+    )
 
 
 def _valid_mapping() -> dict[str, object]:
@@ -146,3 +154,27 @@ def test_both_classes_are_assigned_in_one_pass() -> None:
     assert {c.conflict_class for c in conflicts} == {"structural", "scoped"}
     # Structural is reported first (it subsumes the scoped one: the schema is indeterminable).
     assert conflicts[0].conflict_class == "structural"
+
+
+# --- overlay + undefined-binding detection (WU-Q1 helpers) -------------------------------
+
+
+def test_overlay_lets_repo_override_shipped_by_name() -> None:
+    shipped = _registry(shared=1, only_shipped=1)
+    repo = _registry(shared=9, only_repo=1)
+    effective = shipped.overlay(repo)
+    assert effective.get("shared").version == 9  # repo wins
+    assert effective.get("only_shipped") is not None
+    assert effective.get("only_repo") is not None
+
+
+def test_unresolved_bindings_reports_only_undefined_names() -> None:
+    registry = _registry(known=1)
+    bindings = [("spec app/service", ("known", "ghost")), ("spec app/module", ("known",))]
+    findings = unresolved_profile_bindings(bindings, registry)
+    assert len(findings) == 1
+    assert "ghost" in findings[0] and "spec app/service" in findings[0]
+
+
+def test_unresolved_bindings_clean_when_all_defined() -> None:
+    assert unresolved_profile_bindings([("s", ("known",))], _registry(known=1)) == ()

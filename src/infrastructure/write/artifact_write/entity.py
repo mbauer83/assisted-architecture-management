@@ -5,6 +5,7 @@ from typing import Any
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.identifier_allocator import get_default_allocator
 from src.application.modeling.artifact_write import format_entity_markdown
+from src.application.profile_quarantine import assert_not_quarantined
 from src.application.repo_path_helpers import model_root_legacy
 from src.application.verification.artifact_verifier import ArtifactVerifier
 from src.domain.groups import UNCATEGORIZED
@@ -82,12 +83,14 @@ def create_entity(
 
     from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
-    if is_internal_entity_type(artifact_type, build_runtime_catalogs(get_module_registry()).ontology):
+    catalogs = build_runtime_catalogs(get_module_registry())
+    if is_internal_entity_type(artifact_type, catalogs.ontology):
         raise ValueError(
             "global-artifact-reference entities may not be created directly. "
             "Use ensure_global_artifact_reference (MCP) or "
             "POST /api/global-entity-reference (GUI) instead."
         )
+    assert_not_quarantined(repo_root, artifact_type, [specialization or ""], catalogs=catalogs)
 
     info = get_module_registry().find_entity_type(EntityTypeName(artifact_type))
     if info is None:

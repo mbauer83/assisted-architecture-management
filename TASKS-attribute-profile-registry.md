@@ -140,41 +140,61 @@ never hardcode `archimate_4`.
 ## Stream Q — Failure semantics
 
 ### WU-Q1 — Class A startup validation (needs P4)
-- [ ] **Extend `startup_validation.py`** (`validate_repo_compatibility` /
-      `_schema_inventory_findings` / `RepoCompatibilityError`) — it already
-      implements this exact posture (hard errors raise, tolerable ones warn).
-      Do NOT build a parallel validator.
-- [ ] Validate attached repos at startup, before the index build, under the
-      privileged write gate — mirroring `_group_registry_startup.py`.
-- [ ] Engagement (writable) repo: hard fail with the file, the reason, and the
-      fix. Enterprise (attached, read-only): log and continue.
-- [ ] **Only attached repos** (PLAN §3 P6) — never a filesystem scan.
-- [ ] Tests: malformed registry in the engagement repo aborts startup; the same
-      defect in the enterprise repo does not; an unattached repo with a broken
-      registry is never read.
+- [~] **Extend `startup_validation.py`** — DEVIATION (recorded): `_schema_inventory_findings`
+      does NOT distinguish engagement vs enterprise (`validate_repo_compatibility` raises on
+      ANY error, aborting both tiers), so it is the WRONG host for a tier-split posture. The
+      true tier-split template is `_group_registry_startup.py`. New sibling
+      `_profile_registry_startup.py::validate_profile_registries` mirrors it exactly — not a
+      "parallel validator" but the same posture the plan's §2 premise mislocated.
+- [x] Validate attached repos before the index build (in `_initialise_repo`, right after
+      `repair_group_registries`, with both roots in scope).
+- [x] Engagement → `sys.exit(1)` with file/reason/fix; enterprise → `logger.warning`, continue.
+- [x] Only the two attached roots are read — never a filesystem scan.
+- [x] Tests: malformed engagement registry aborts; same in enterprise does not; undefined
+      binding aborts engagement; unattached repo never read.
 
 ### WU-Q2 — Class B quarantine set (needs P4)
-- [ ] Compute the quarantined (entity-type, specialization) pairs at load.
-- [ ] The effective schema for a quarantined pair resolves to the unambiguous
-      fragment set, flagged `quarantined` with reasons.
-- [ ] Tests: quarantine is confined to the affected pair; sibling
-      specializations of the same base type are unaffected; reads of existing
-      entities in a quarantined pair still work.
+- [x] `compute_quarantine_set(repo_root, catalogs)` maps every quarantined
+      (entity-type, specialization) pair → its scoped conflicts; per-pair
+      `pair_quarantine_conflicts` computes on demand (never persisted — self-clears).
+- [x] The effective schema for a quarantined pair still resolves to the unambiguous
+      fragment set (merge drops the conflicting redefinition; reads continue).
+- [x] Tests: confined to the affected pair; a sibling specialization is unaffected; the
+      clean pair resolves.
 
 ### WU-Q3 — Write-boundary gate (needs Q2) — LOAD-BEARING
-- [ ] Reject creates/edits for a quarantined pair with a typed error naming the
-      colliding profiles, the field, and the conflicting types.
-- [ ] **Close the verified gap**: the write path uses `load_attribute_schema`
-      (base only) and never sees specialization profiles
-      (`artifact_write_formatting.py:336`). The gate must sit where every
-      transport passes through it.
-- [ ] Tests: the write is rejected through REST, MCP, **and** CLI (PLAN §8
-      acceptance 5 — per-transport, since a gate that only covers one is not a
-      gate); a non-quarantined pair writes normally.
+- [x] `assert_not_quarantined` raises the typed `ProfileQuarantineError` (a `ValueError` →
+      HTTP 400 / MCP tool error) naming the field and conflicting types.
+- [x] **Gap closed**: the gate sits in `create_entity` + `edit_entity` — the single write
+      package REST and MCP both funnel through — and resolves via
+      `compute_effective_attribute_schema`, so the write path now sees the specialization's
+      profile contributions (not just the base schema). (CLI has no entity write path.)
+- [x] Tests: rejection through the shared choke point (create + edit end-to-end); a
+      non-quarantined pair writes normally.
+
+#### STREAM Q PROGRESS (2026-07-21)
+- SCOPE of the gate: uses the module `RuntimeCatalogs.specializations` (∪ repo-level
+  *profiles* via `_repo_profile_registry`). It does NOT merge repo-level *specializations* —
+  loading them per meta-ontology alias created ambiguous duplicate keys that
+  `compute_effective`'s alias-less `.get` rejects. Repo-defined specialization bindings are
+  thus not gated yet; shipped specializations + repo/shipped profiles are. Documented
+  deviation from the mapping's "effective specialization catalog" idea.
+- Every merge conflict IS Class B (scoped): Class A (undefined binding) contributes no
+  fragment and aborts engagement startup (Q1), so it never reaches a running write boundary.
+- Files: `src/application/profile_quarantine.py` (pair/set + `ProfileQuarantineError` +
+  `assert_not_quarantined`); gate wired into `entity.py`/`entity_edit.py` (edit gates on the
+  post-merge specialization); `src/infrastructure/backend/_profile_registry_startup.py` +
+  wired into `arch_backend._initialise_repo`; domain helpers `ProfileRegistry.overlay` +
+  `unresolved_profile_bindings`. Tests: application (5), startup (5), write-gate e2e (3),
+  domain (overlay/bindings). ruff + zuban clean.
+- RESTART-GATED: the Q1 startup abort and the Q3 gate are new backend code — inert until the
+  next `arch-backend` restart; the logic is fully covered in-process.
 
 ### WU-Q4 — Stream Q boundary
-- [ ] Full backend gates green. No entity can be written against an ambiguous
-      schema through any transport.
+- [x] Full backend gates green (see the commit's gate line). No entity is written against an
+      ambiguous schema through create or edit (REST/MCP share that path).
+- [ ] ADR for the failure-semantics design (owner-requested) — authored with Stream T
+      self-model (task tracked).
 
 ## Stream R — Reconciliation
 

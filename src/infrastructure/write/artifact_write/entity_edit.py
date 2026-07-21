@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from src.application.modeling.artifact_write import format_entity_markdown, slugify
+from src.application.profile_quarantine import assert_not_quarantined
 from src.application.verification.artifact_verifier import ArtifactRegistry, ArtifactVerifier
 from src.domain.module_types import EntityTypeName
 
@@ -147,7 +148,7 @@ def edit_entity(
 
     parsed = parse_entity_file(entity_file)
     artifact_type = str(parsed.frontmatter.get("artifact-type", ""))
-    from src.infrastructure.app_bootstrap import get_module_registry  # noqa: PLC0415
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
 
     get_module_registry().get_entity_type(EntityTypeName(artifact_type))
 
@@ -162,6 +163,12 @@ def edit_entity(
         properties=properties,
         attribute_types=attribute_types,
         notes=notes,
+    )
+    # Gate on the EFFECTIVE (post-merge) specialization: an edit that moves an entity onto a
+    # quarantined profile pair must be refused just like a create (WU-Q3).
+    assert_not_quarantined(
+        repo_root, artifact_type, [str(merged.specialization or "")],
+        catalogs=build_runtime_catalogs(get_module_registry()),
     )
     effective_artifact_id, target_entity_file = _resolve_target_identity(
         repo_root=repo_root,

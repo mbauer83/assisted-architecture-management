@@ -19,7 +19,7 @@ separate; nothing here resolves or merges attributes.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Literal
@@ -67,6 +67,12 @@ class ProfileRegistry:
 
     def get(self, name: str) -> NamedProfile | None:
         return self.profiles.get(name)
+
+    def overlay(self, other: "ProfileRegistry") -> "ProfileRegistry":
+        """The effective registry when *other* (a repo-level registry) may OVERRIDE this
+        (shipped) one by name — the resolution-layer override P3 alludes to, distinct from
+        the collision-rejecting cross-module ``merge_profile_registries``."""
+        return ProfileRegistry(PROFILE_SCHEMA_VERSION, MappingProxyType({**self.profiles, **other.profiles}))
 
 
 def merge_profile_registries(registries: Iterable[ProfileRegistry]) -> ProfileRegistry:
@@ -117,6 +123,20 @@ def classify_profile_conflicts(
     ]
     conflicts.extend(ProfileConflict("scoped", message) for message in merge_conflicts)
     return tuple(conflicts)
+
+
+def unresolved_profile_bindings(
+    bindings: Iterable[tuple[str, Sequence[str]]], registry: ProfileRegistry
+) -> tuple[str, ...]:
+    """Structural (Class A) findings: every ``(label, bound_names)`` binding naming a profile
+    the effective registry does not define. Pure — the caller supplies the labelled bindings
+    (typically one per specialization) and the effective (shipped ∪ repo) registry."""
+    return tuple(
+        f"{label} binds undefined named profile {name!r}"
+        for label, names in bindings
+        for name in names
+        if registry.get(name) is None
+    )
 
 
 def profile_registry_from_mapping(raw: object, *, label: str) -> ProfileRegistry:
