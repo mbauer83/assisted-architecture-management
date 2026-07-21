@@ -27,9 +27,15 @@ from src.application.artifact_schema import (
     compute_effective_connection_metadata_schema,
 )
 from src.application.repository_upgrade.ports import RepoUpgradeView, RepoUpgradeWriter
+from src.domain.profile_conflict_resolution import propose_conflict_resolution, resolution_instructions
 from src.domain.profile_registry import ProfileRegistry
 from src.domain.repository_upgrade import AppliedFinding, ScannedSurface, UpgradeFinding
-from src.domain.specializations import ConceptKind, SpecializationCatalog, specialization_catalog_from_mapping
+from src.domain.specializations import (
+    ConceptKind,
+    SpecializationCatalog,
+    SpecializationInfo,
+    specialization_catalog_from_mapping,
+)
 
 _SPECIALIZATIONS = ".arch-repo/specializations.yaml"
 
@@ -64,28 +70,34 @@ class ProfileReconciliationScanStep:
                 profile_registry=ProfileRegistry.empty(),  # repo profiles.yaml is read internally
             )
             for index, message in enumerate(conflicts):
-                pair = f"{entry.parent_type}/{entry.slug}"
-                subjects = "Entities" if entry.concept_kind == "entity" else "Connections"
-                findings.append(
-                    UpgradeFinding(
-                        step_id=self.id,
-                        # The kind is part of the identity: an entity and a connection may
-                        # each declare the same parent-type/slug pair.
-                        finding_id=f"profile-conflict:{entry.concept_kind}:{pair}:{index}",
-                        location=_SPECIALIZATIONS,
-                        description=(
-                            f"{entry.concept_kind} {pair} is quarantined by a profile conflict — {message}"
-                        ),
-                        severity="warning",
-                        auto_migratable=False,
-                        manual_instructions=(
-                            "Resolve the conflicting named profiles (rename the attribute, align its "
-                            f"type, or unbind one profile from this specialization), then re-run. {subjects} "
-                            f"of {pair} cannot be created or edited until the conflict is cleared."
-                        ),
-                    )
-                )
+                findings.append(self._finding(entry, index, message))
         return findings
+
+    def _finding(self, entry: SpecializationInfo, index: int, message: str) -> UpgradeFinding:
+        pair = f"{entry.parent_type}/{entry.slug}"
+        subjects = "Entities" if entry.concept_kind == "entity" else "Connections"
+        blocked = f"{subjects} of {pair} cannot be created or edited until the conflict is cleared."
+        resolution = propose_conflict_resolution(message, bound_profiles=entry.bound_profiles)
+        proposals = resolution_instructions(
+            resolution,
+            fallback=(
+                "Resolve the conflicting named profiles (rename the attribute, align its type, or "
+                "unbind one profile from this specialization), then re-run."
+            ),
+        )
+        # ``propose_conflict_resolution`` never auto-migrates (no shipped baseline exists to
+        # advance from), so every finding stays manual — the report-only contract.
+        return UpgradeFinding(
+            step_id=self.id,
+            # The kind is part of the identity: an entity and a connection may each declare
+            # the same parent-type/slug pair.
+            finding_id=f"profile-conflict:{entry.concept_kind}:{pair}:{index}",
+            location=_SPECIALIZATIONS,
+            description=f"{entry.concept_kind} {pair} is quarantined by a profile conflict — {message}",
+            severity="warning",
+            auto_migratable=False,
+            manual_instructions=f"{proposals} {blocked}",
+        )
 
     def apply(
         self, view: RepoUpgradeView, writer: RepoUpgradeWriter, findings: list[UpgradeFinding]

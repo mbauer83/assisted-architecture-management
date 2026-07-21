@@ -57,6 +57,28 @@ def test_conflicting_bound_profile_is_reported_as_quarantined(tmp_path: Path) ->
     assert "Score" in finding.description
 
 
+def test_finding_carries_the_three_proposed_resolutions(tmp_path: Path) -> None:
+    # WU-R2: rename / align-type / unbind, named concretely and numbered, plus the
+    # bound-profile name so the operator knows what to unbind.
+    root = _repo(tmp_path, base_score_type="string", bind=True)
+    finding = ProfileReconciliationScanStep().detect(FilesystemRepoUpgradeView(root))[0]
+    instructions = finding.manual_instructions or ""
+    assert "Resolve by one of: (1)" in instructions
+    assert "Rename" in instructions
+    assert "Align the type" in instructions
+    assert "'metrics'" in instructions  # the bound profile is named in the unbind proposal
+    assert "cannot be created or edited" in instructions  # the consequence still stated
+
+
+def test_conflicts_are_never_auto_migrated(tmp_path: Path) -> None:
+    # WU-R2's load-bearing guarantee: an ambiguous, operator-authored conflict is never
+    # rewritten automatically — every finding is manual, with no rewrite_summary.
+    root = _repo(tmp_path, base_score_type="string", bind=True)
+    for finding in ProfileReconciliationScanStep().detect(FilesystemRepoUpgradeView(root)):
+        assert finding.auto_migratable is False
+        assert finding.rewrite_summary is None
+
+
 def test_connection_specialization_conflicts_are_reported_too(tmp_path: Path) -> None:
     """WU-W2: a connection specialization binds profiles on the same terms as an entity
     one, so scanning only entities would report half the repo's conflicts."""

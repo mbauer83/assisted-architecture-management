@@ -230,10 +230,33 @@ never hardcode `archimate_4`.
   hence the deferral above.
 
 ### WU-R2 — Proposed resolutions (needs R1)
-- [ ] Propose rename / align-type / unbind as manual instructions.
-- [ ] Auto-migrate only where unambiguous (operator file byte-identical to an
-      older shipped version).
-- [ ] Tests: ambiguous cases are never auto-migrated.
+- [x] Propose rename / align-type / unbind as manual instructions.
+- [~] Auto-migrate only where unambiguous (operator file byte-identical to an
+      older shipped version). DEFERRED with R1's drift check for the same reason: the ONLY
+      unambiguous auto-migration the plan sanctions is advancing a file byte-identical to an
+      older SHIPPED profile version (§5), and no reusable profiles ship yet — so there is no
+      shipped baseline and every conflict is operator-authored. `is_auto_migratable` is a
+      hard False. When shipped profiles land, the byte-identical branch activates alongside
+      the drift comparison (both need the same shipped registry via `RepoUpgradeView`).
+- [x] Tests: ambiguous cases are never auto-migrated.
+
+#### WU-R2 PROGRESS (2026-07-22)
+- New pure domain module `src/domain/profile_conflict_resolution.py`: parses a
+  `merge_property_schemas` conflict message (the one shape it emits) into a
+  `ProfileConflictResolution` with the attribute, both types, and three ordered
+  least-destructive-first proposals — rename, align-type, unbind — filled in with the real
+  attribute name and the specialization's bound-profile list. `is_auto_migratable` is a hard
+  `False` the reconciliation step relies on. `resolution_instructions` renders numbered
+  proposals, or a caller-supplied fallback when the message is not a recognised
+  type-conflict (never invents a resolution for a shape it does not understand).
+- `ProfileReconciliationScanStep._finding` now composes those proposals into each finding's
+  `manual_instructions` (still stating the create/edit-blocked consequence), for both
+  concept kinds. `apply` still returns `[]`.
+- Tests: `tests/domain/test_profile_conflict_resolution.py` (parsing, all three proposals,
+  bound-profile naming, numbered rendering, and the never-auto-migrate guarantee) +
+  scan-step assertions that the proposals reach the finding and no finding is
+  auto-migratable / carries a rewrite_summary.
+- Gates: backend 6341 passed / 5 skipped; ruff + zuban clean. (Backend-only WU.)
 
 ## Stream S — Surfaces
 
