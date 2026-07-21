@@ -2908,8 +2908,20 @@ only existing nodes cannot measure a missing one".
   · assurance_ingest_security_signals · LIVE-VERIFIED (throwaway anchor
     APP@live-check-ingest-tool → RUN@1e149a72dcc9405f, 3 components / 1 finding; directness
     "direct" dep-graph classified; advisory matched to urllib3 and NOT to the sibling attrs).
-  · STILL QUEUED: the REST /api/assurance/security-ingest route (added AFTER the restart, so
-    restart-gated); the GUI surfaces.
+  · REST POST /api/assurance/security-ingest · LIVE-VERIFIED on the re-restarted backend
+    (present in /openapi.json; 129 paths). Full outcome→status mapping witnessed against the
+    running server, matching the unit tests: 200 activated (RUN@718e048a1b9644d6, 2 components
+    / 1 finding) · 200 replayed on the same request_id + payload, same snapshot_id · 409
+    conflict on the same request_id with a different payload ("nothing was written") · 422
+    invalid on a blank anchor. Read-back via GET /security-findings returned the ingested
+    finding with directness "direct" (dep-graph classified) — so ingest and the list surface
+    agree across transports.
+  · STILL QUEUED: the GUI surfaces (backlog 5).
+  · HOUSEKEEPING: live verification left two throwaway anchors in the dev store
+    (APP@live-check-ingest-tool, APP@live-check-rest-ingest). There is NO snapshot-delete
+    capability on ANY surface (MCP/REST/CLI) — they cannot be removed without recreating the
+    store. Harmless pre-alpha (the seed work in backlog 3 recreates it), but "ingest is
+    irreversible" is a real gap worth a decision.
 
   · **NEW DEFECT — ingest reports the SUBMITTED finding count, not the PERSISTED one.**
     Found by reconciling the live numbers rather than assuming the verification was clean:
