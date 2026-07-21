@@ -51,6 +51,11 @@ class SpecializationInfo:
     restrict_relationships: tuple[RelationshipRestriction, ...] = ()
     restrict_endpoints: tuple[EndpointRestriction, ...] = ()
     attributes: Mapping[str, Any] = field(default_factory=dict)
+    bound_profiles: tuple[str, ...] = ()
+    """Names of reusable profiles this specialization binds, in declaration order (PLAN
+    §3 P2). Resolution folds them between the base schema and this specialization's own
+    profile. A name with no matching registry entry is a Class A structural error, checked
+    at startup (WU-Q1) — never silently ignored here."""
     create_when: str = ""
     never_create_when: str = ""
 
@@ -226,6 +231,7 @@ def _info_from_mapping(
         restrict_relationships=_relationship_restrictions(raw.get("restrict_relationships")),
         restrict_endpoints=_endpoint_restrictions(raw.get("restrict_endpoints")),
         attributes=_attributes_from_mapping(raw.get("attributes")),
+        bound_profiles=_bound_profiles(raw.get("profiles")),
         create_when=str(raw.get("create_when") or ""),
         never_create_when=str(raw.get("never_create_when") or ""),
     )
@@ -246,6 +252,17 @@ def _notation_from_mapping(raw: object) -> SpecializationNotation:
 
 def _attributes_from_mapping(raw: object) -> Mapping[str, Any]:
     return dict(raw) if isinstance(raw, Mapping) else {}
+
+
+def _bound_profiles(raw: object) -> tuple[str, ...]:
+    """Named-profile bindings in declaration order, de-duplicated (a repeated name adds
+    nothing). A non-list value yields no bindings."""
+    if not isinstance(raw, (list, tuple)):
+        return ()
+    seen: dict[str, None] = {}
+    for item in raw:
+        seen.setdefault(str(item), None)
+    return tuple(seen)
 
 
 def _relationship_restrictions(raw: object) -> tuple[RelationshipRestriction, ...]:

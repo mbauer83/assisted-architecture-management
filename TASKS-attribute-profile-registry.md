@@ -67,10 +67,23 @@ never hardcode `archimate_4`.
   (6, incl. the shipped-empty regression guard through `build_runtime_catalogs`). ruff + zuban clean.
 
 ### WU-P2 — Binding declaration (needs P1)
-- [ ] A specialization may bind named profiles by name, in declaration order.
-- [ ] A binding to an undefined profile is Class A (structural) — see WU-Q1.
-- [ ] Tests: single binding; multiple bindings; binding the same profile to
+- [x] A specialization may bind named profiles by name, in declaration order.
+- [~] A binding to an undefined profile is Class A (structural) — see WU-Q1.
+      (The binding is STORED here; the undefined-name check is WU-Q1's startup
+      validation, per the ledger's own cross-reference — not enforced in P2.)
+- [x] Tests: single binding; multiple bindings; binding the same profile to
       several (type, specialization) pairs contributes to all of them.
+
+#### WU-P2 PROGRESS (2026-07-21)
+- `SpecializationInfo.bound_profiles: tuple[str, ...]` (declaration order, de-duplicated),
+  parsed from a specialization entry's `profiles: [name, ...]` list by `_bound_profiles`
+  in `specialization_infos_from_mapping`. `overlay_specialization_guidance` preserves it
+  (uses `replace`); there is no write-back serializer to update (specializations.yaml is
+  hand-authored / scan-detected, not round-tripped through a to-mapping).
+- The undefined-name → Class A check is deferred to WU-Q1 (startup validation) exactly as
+  the box cross-references; storing an unresolvable name here is intentional so load never
+  fails on it.
+- Tests: `tests/domain/test_specialization_profile_bindings.py` (6). ruff + zuban clean.
 
 ### WU-P3 — Resolution order (needs P2)
 - [ ] Extend `compute_effective_attribute_schema` to append bound-profile
