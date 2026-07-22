@@ -232,7 +232,15 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
   ANCHORED VIEWPOINT anchored on AI components that renders coverage. Optional/unavailable
   info must be handled sensibly — this coverage's required(blocking) / recommended(advisory) /
   optional(untracked) tiers are the data model for exactly that. Carry into WU-F3 (coverage
-  view) and WU-D1; consider the anchored-viewpoint approach there.
+  view) and WU-D1.
+- **DECISION (owner, 2026-07-22): coverage is ENGINE ONLY — no anchored viewpoint.** After a
+  critical evaluation (viewpoints suit graph-structure predicates + presentation; AIBOM
+  coverage is schema-relative "required by this spec's effective schema", binding-relative
+  "linked via a bound role", and repo-wide "unbound role" — none of them graph-structure
+  predicates — and the exporter/endpoint need a TYPED verdict a viewpoint cannot supply), the
+  owner chose dedicated code end to end. WU-F3's coverage view renders findings DIRECTLY from
+  `evaluate_coverage`; NO anchored coverage viewpoint is built. Any neighborhood exploration
+  is a bespoke panel, not a reusable viewpoint.
 
 ### WU-B4 — Stream B boundary
 - [x] Backend gates green; derivation + coverage covered by unit tests with no store
