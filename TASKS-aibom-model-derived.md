@@ -155,17 +155,33 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
 - Gates: backend 6393 passed / 5 skipped; ruff + zuban clean.
 
 ### WU-A4 — Upgrade path (needs A2)
-- [ ] Verify `DefaultSchemataEnsureStep` picks up the new entries with no code
-      change (expected — it iterates `DEFAULT_SCHEMATA`).
-- [ ] Regression test: an existing repo without AIBOM schemata gains them on
-      upgrade; a customised AIBOM schema is preserved and reported, never
-      overwritten.
-- [ ] Confirm and record: a repo with no AI specializations in use is a
+- [x] Verify `DefaultSchemataEnsureStep` picks up the new entries with no code
+      change (it iterates `DEFAULT_SCHEMATA`; the data-object base is now an entry).
+- [x] Regression test: an existing repo without the schema gains it on upgrade;
+      a customised copy is preserved and reported, never overwritten.
+- [x] Confirm and record: a repo with no AI specializations in use is a
       *truthful empty* AIBOM state, requiring no migration.
 
+#### WU-A4 PROGRESS (2026-07-22)
+- The only shipped-schema-file addition is the `data-object` base (A2); the AIBOM attributes
+  themselves live in the module (profiles.yaml + inline specializations), so there are NO AI
+  attachment files to ensure and NO per-repo migration for the attribute layer. The ensure
+  step needed zero code change — confirmed it iterates `DEFAULT_SCHEMATA`.
+- Truthful-empty confirmed by test: a repo carrying the defaults but using no AI
+  specialization writes no `ai-*` schema files and a second ensure run is clean — no AI
+  content is invented; absence of AI specializations simply means no AI components.
+- Tests: `tests/application/test_default_schemata_ensure_step.py::TestAibomUpgradePath` (4).
+
 ### WU-A5 — Stream A boundary
-- [ ] Full backend gates green. Fresh-repo scaffolding and upgraded-repo paths
+- [x] Full backend gates green. Fresh-repo scaffolding and upgraded-repo paths
       both verified.
+
+#### WU-A5 PROGRESS (2026-07-22)
+- Stream A complete: eight specializations (A1), shared+inline profiles with typed arrays
+  (A2), the data-object base + upgrade path (A4), and the derivation-role vocabulary+bindings
+  (A3). Fresh-repo scaffolding ships the schemata via `DEFAULT_SCHEMATA`; the upgrade path
+  adds them to existing repos and preserves customisations — both test-covered.
+- Gates: backend 6397 passed / 5 skipped; ruff + zuban clean.
 
 ## Stream B — Derivation engine
 

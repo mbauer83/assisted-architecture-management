@@ -84,6 +84,49 @@ class TestApply:
         assert step.detect(FilesystemRepoUpgradeView(root)) == []
 
 
+class TestAibomUpgradePath:
+    """WU-A4: the AIBOM ships its attributes in the MODULE (profiles.yaml + inline
+    specializations), so the ONLY DEFAULT_SCHEMATA addition is the data-object base schema
+    (so ai-dataset inherits Sensitivity, D3a). The ensure step picks it up with no code
+    change — it iterates DEFAULT_SCHEMATA — so an existing repo gains it on upgrade and a
+    customised copy is preserved."""
+
+    _DATA_OBJECT = "attributes.data-object.schema.json"
+
+    def test_data_object_base_is_a_shipped_default(self) -> None:
+        assert self._DATA_OBJECT in DEFAULT_SCHEMATA
+        props = DEFAULT_SCHEMATA[self._DATA_OBJECT]["properties"]
+        assert "Sensitivity" in props  # what ai-dataset inherits per D3a
+
+    def test_existing_repo_without_it_gains_it_on_upgrade(self, tmp_path: Path) -> None:
+        root = _repo(tmp_path)  # no data-object schema present
+        step = DefaultSchemataEnsureStep()
+        view = FilesystemRepoUpgradeView(root)
+        findings = step.detect(view)
+        assert any(f.finding_id == f"missing-default-schema:{self._DATA_OBJECT}" for f in findings)
+        step.apply(view, FilesystemRepoUpgradeWriter(root), [f for f in findings if f.auto_migratable])
+        assert (root / ".arch-repo" / "schemata" / self._DATA_OBJECT).is_file()
+
+    def test_customised_data_object_schema_is_preserved_not_overwritten(self, tmp_path: Path) -> None:
+        root = _repo(tmp_path, present={self._DATA_OBJECT: '{"type": "object", "mine": true}\n'})
+        findings = DefaultSchemataEnsureStep().detect(FilesystemRepoUpgradeView(root))
+        custom = [f for f in findings if f.finding_id == f"customized-default-schema:{self._DATA_OBJECT}"]
+        assert len(custom) == 1 and not custom[0].auto_migratable
+
+    def test_no_ai_specializations_is_a_truthful_empty_aibom_needing_no_migration(self, tmp_path: Path) -> None:
+        # A repo carrying the shipped defaults but USING no AI specialization has no AI
+        # components — a valid empty AIBOM, requiring no migration. The ensure step adds
+        # only shipped schema files; it never invents AI content, so a second run is clean.
+        root = _repo(tmp_path)
+        step = DefaultSchemataEnsureStep()
+        view = FilesystemRepoUpgradeView(root)
+        step.apply(view, FilesystemRepoUpgradeWriter(root), [f for f in step.detect(view) if f.auto_migratable])
+        # No AI attachment schema files were written — AIBOM attributes live in the module.
+        written = {p.name for p in (root / ".arch-repo" / "schemata").glob("*.schema.json")}
+        assert not any("ai-" in name for name in written)
+        assert step.detect(FilesystemRepoUpgradeView(root)) == []
+
+
 class TestShippedResourcePayload:
     def test_investment_level_contract(self) -> None:
         schema = DEFAULT_SCHEMATA[_RESOURCE_SCHEMA]
