@@ -138,6 +138,22 @@ cross-document consistency, current live MCP stats, all gates over the integrate
     map to the role-functional name at the read boundary. Exposure-filter the entity list.
 - **Non-blocking:** Starlette 1.3 deprecates `httpx` with `starlette.testclient` (20 test
   warnings) — future test-client migration.
+- **PUBLICATION BLOCKER (owner decision):** the committed `arch-workspace.yaml` is the ONLY tracked
+  file leaking an internal identifier — it carries the private `TECHNOLOGY_ARCHITECTURE` engagement
+  and its Azure DevOps URL (`git@ssh.dev.azure.com:v3/BAMDigitalServices/...`). On a fresh PUBLIC
+  clone `arch-init` reads it and tries to validate/clone that private repo (credential prompt /
+  failure), so the shipped default is neither clean nor "ENG-ARCH-REPO-only". Fix before publishing:
+  make the committed default reference ONLY the public ENG-ARCH-REPO self-model — either (A) edit
+  the committed file to ENG-ARCH-REPO-only, or (B) `git rm --cached arch-workspace.yaml` + gitignore
+  it + ship `arch-workspace.example.yaml` (ENG-ARCH-REPO-only) and have arch-init/docs use it. (No
+  private ENGAGEMENT CONTENT is tracked — only ENG-ARCH-REPO is in git; this is a one-file fix.)
+- **Assurance seed / fresh-install UX (done 2026-07-22):** `seed-assurance.json` regenerated from
+  the self-model store (now includes the STPA-Sec analysis; signal_anchors preserved). Fresh
+  install: `arch-assurance init && arch-assurance seed --with-signals` (defaults to
+  seed-assurance.json). `arch-assurance export` now preserves authored `signal_anchors`.
+- **STPA-Sec self-model (done 2026-07-22):** analysis `STPA@1784721732.pflr.3e4395` "PlantUML
+  Preprocessor Untrusted-Input Disclosure" — valid, all STPA coverage checks pass, bound to the
+  Architecture Backend; captures the PUML file-read finding + its two shipped constraints.
 
 ## Gates before every commit — ONE AT A TIME (concurrent heavy jobs hang the WSL2 host)
 
