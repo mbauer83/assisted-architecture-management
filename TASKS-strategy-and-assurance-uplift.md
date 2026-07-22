@@ -795,6 +795,31 @@ job (uv + node) runs both `--check`s.
       note only if a new legal capability/decision warrants an entity (guidance-first — prefer
       a description/ADR over new entities).
 
+#### Minimus / base-image hardening evaluation (2026-07-22, owner-requested)
+Evaluated Minimus hardened images as a base-image swap. **Conclusion: not a warranted adaptation
+for this image now** (recorded, not silently skipped).
+- Minimus images are single-purpose, distroless, built-from-source (no apt/OS base); no Graphviz
+  image exists in the catalog. Our runtime is deliberately a *multi-tool* image (Python app + JVM +
+  Graphviz + git + fonts) because diagram rendering shells `java -jar plantuml.jar` → `dot`. A
+  migration would require multi-stage-copying several distroless tool closures (with deep transitive
+  shared-lib trees) into one image — fragile, high-maintenance, and self-defeating vs. the single
+  verified-image model.
+- **Evidence gathered** (`osv-scanner scan image`): the built image carries **541 Debian:12
+  package findings (311 distinct; 11 HIGH / 7 moderate / 5 low / rest unrated)**. The bulk is the
+  transitive closure of the two tools the image exists to run — **Graphviz** (cairo/pango/gd/aom)
+  and the **OpenJDK JRE** (libcups/libasound/avahi, pulled even headless). (41 PyPI findings in that
+  scan are a STALE-image artifact: `architectonic:local` predates the 2026-07-22 dep remediation; a
+  rebuild on the current lock → 0, as verified in the L5 build.)
+- **Effective reductions are all behavior/rendering-affecting** — drop Graphviz via PlantUML's
+  Smetana (pure-Java) layout engine after a diagram-parity check; shrink/replace the JRE; bump to a
+  newer Debian base (graphviz version drift). Each is the same class of change the owner required we
+  not make blindly for PlantUML → surfaced as **owner-gated follow-ups**, not applied unilaterally.
+- Cheap, non-fidelity-risk hygiene already in place: runtime `apt-get install --no-install-
+  recommends`; non-root runtime user; multi-stage (build-only node/uv images not shipped).
+- RECOMMENDATION (owner decision): a dedicated base-image-hardening effort — most impact from a
+  Smetana parity check (removing Graphviz's entire Debian closure) paired with a rendering sidecar
+  or a slimmer JRE; optionally a Debian-trixie base bump. Not this session.
+
 #### WU-L5 PROGRESS (2026-07-22) — Stream L COMPLETE
 - Backend gates: `pytest` 6457 passed / 4 skipped / 0 failures; `ruff check src/ tests/` clean;
   `zuban check` clean (706 files). Frontend gates: full `npm run lint` (type-aware, ~7–8 min)
