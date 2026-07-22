@@ -7,7 +7,6 @@ from functools import lru_cache
 from pathlib import Path
 
 from src.application.verification.artifact_verifier_types import Issue, Severity
-from src.config.settings import configured_java_path
 
 
 @lru_cache(maxsize=1)
@@ -52,14 +51,16 @@ def resolve_java_executable() -> str:
 
     Honours, in priority order:
       1. the ``ARCH_JAVA`` environment variable (explicit executable path),
-      2. the ``diagrams.java_path`` setting,
-      3. ``JAVA_HOME`` (→ ``$JAVA_HOME/bin/java``),
-      4. ``java`` on ``PATH`` (the bundled default JRE).
+      2. ``JAVA_HOME`` (→ ``$JAVA_HOME/bin/java``),
+      3. ``java`` on ``PATH`` (the bundled default JRE).
 
-    The override (1/2) is consulted only when explicitly set, so the compatible
+    The override (1) is consulted only when explicitly set, so the compatible
     bundled OpenJDK default is never silently replaced by an incompatible one.
+    This mirrors the ``GRAPHVIZ_DOT`` escape hatch used by ``find_graphviz_dot``
+    for the sibling diagram-runtime binary — an environment channel, so the
+    application layer stays free of a configuration-module dependency.
     """
-    explicit = os.environ.get("ARCH_JAVA", "").strip() or configured_java_path()
+    explicit = os.environ.get("ARCH_JAVA", "").strip()
     if explicit:
         return str(Path(explicit).expanduser())
     java_home = os.environ.get("JAVA_HOME", "").strip()

@@ -658,12 +658,16 @@ titleless MIT body). Copyright line: `Michael Bauer <mbauer.mphil@googlemail.com
       `uv:python3.13-bookworm-slim` builder resolves to `openjdk-17-jre-headless` = OpenJDK
       (GPLv2 + Classpath Exception). Kept as the bundled default. User-settable JRE escape hatch
       added: `resolve_java_executable()` in `artifact_verifier_syntax.py` honours, in order,
-      `ARCH_JAVA` env → `diagrams.java_path` setting → `JAVA_HOME` → `java` on PATH; the override
-      is consulted only when explicitly set (I-L4 — never silently replaces the compatible
-      default). All FIVE PlantUML `java` invocations routed through it (2× artifact_verifier_
-      syntax, 2× diagram_render, 1× puml_runtime) + the check_diagram_runtime diagnostic. 10
-      targeted tests (test_resolve_java_executable.py precedence/tilde/blank; test_java_path_
-      settings.py accessor). RESTART-GATED: backend code change is inert until an owner restart.
+      `ARCH_JAVA` env → `JAVA_HOME` → `java` on PATH; the override is consulted only when
+      explicitly set (I-L4 — never silently replaces the compatible default). Env-only by design:
+      it mirrors the sibling `GRAPHVIZ_DOT` escape hatch (`find_graphviz_dot`, same module), so
+      the application layer takes no configuration-module dependency (the hexagonal dependency
+      policy forbids application→config; a settings-key variant was tried and reverted for that
+      reason). Docker operators set it via `.env`/compose env. All FIVE PlantUML `java`
+      invocations routed through it (2× artifact_verifier_syntax, 2× diagram_render, 1×
+      puml_runtime) + the check_diagram_runtime diagnostic. 6 targeted tests
+      (test_resolve_java_executable.py: precedence/tilde/blank). RESTART-GATED: backend code
+      change is inert until an owner restart.
 - [x] **Graphviz / git / base image / fonts**: recorded in the §10b.2 table below (Graphviz
       EPL-1.0; git GPLv2 — both arm's-length/aggregation; Debian bookworm main = DFSG-free;
       fonts-dejavu-core = Bitstream Vera / DejaVu permissive-with-notice). No modification →

@@ -1,14 +1,15 @@
 """Unit tests for resolve_java_executable() — the user-settable JRE resolver.
 
-Precedence (highest first): ARCH_JAVA env > diagrams.java_path setting >
-JAVA_HOME > "java" on PATH. The override is consulted only when explicitly set,
-so the bundled OpenJDK default is never silently replaced by an incompatible one.
+Precedence (highest first): ARCH_JAVA env > JAVA_HOME > "java" on PATH. The
+override is consulted only when explicitly set, so the bundled OpenJDK default is
+never silently replaced by an incompatible one. This mirrors the GRAPHVIZ_DOT
+escape hatch for the sibling diagram-runtime binary — an environment channel,
+keeping the application layer free of a configuration-module dependency.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -23,39 +24,29 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(key, raising=False)
 
 
-def _no_configured_path() -> object:
-    return patch.object(mod, "configured_java_path", return_value="")
-
-
 class TestResolveJavaExecutable:
     def test_default_is_bare_java(self, clean_env: None) -> None:
-        with _no_configured_path():
-            assert mod.resolve_java_executable() == "java"
+        assert mod.resolve_java_executable() == "java"
 
     def test_java_home_used_when_set(self, clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("JAVA_HOME", "/usr/lib/jvm/openjdk-17")
-        with _no_configured_path():
-            assert mod.resolve_java_executable() == str(Path("/usr/lib/jvm/openjdk-17") / "bin" / "java")
+        assert mod.resolve_java_executable() == str(Path("/usr/lib/jvm/openjdk-17") / "bin" / "java")
 
-    def test_settings_path_overrides_java_home(self, clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("JAVA_HOME", "/usr/lib/jvm/openjdk-17")
-        with patch.object(mod, "configured_java_path", return_value="/opt/custom/bin/java"):
-            assert mod.resolve_java_executable() == "/opt/custom/bin/java"
-
-    def test_arch_java_env_overrides_everything(self, clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_arch_java_env_overrides_java_home(self, clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("JAVA_HOME", "/usr/lib/jvm/openjdk-17")
         monkeypatch.setenv("ARCH_JAVA", "/explicit/jre/bin/java")
-        with patch.object(mod, "configured_java_path", return_value="/opt/custom/bin/java"):
-            assert mod.resolve_java_executable() == "/explicit/jre/bin/java"
+        assert mod.resolve_java_executable() == "/explicit/jre/bin/java"
 
     def test_arch_java_is_tilde_expanded(self, clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ARCH_JAVA", "~/jdk/bin/java")
-        with _no_configured_path():
-            resolved = mod.resolve_java_executable()
+        resolved = mod.resolve_java_executable()
         assert "~" not in resolved
         assert resolved.endswith("/jdk/bin/java")
 
-    def test_blank_arch_java_falls_through(self, clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_blank_arch_java_falls_through_to_default(self, clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ARCH_JAVA", "   ")
-        with _no_configured_path():
-            assert mod.resolve_java_executable() == "java"
+        assert mod.resolve_java_executable() == "java"
+
+    def test_blank_java_home_falls_through_to_default(self, clean_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("JAVA_HOME", "  ")
+        assert mod.resolve_java_executable() == "java"
