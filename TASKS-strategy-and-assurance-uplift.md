@@ -39,14 +39,37 @@ incomplete. (A prior session missed Stream R entirely by capping a grep with
 | U0a — Upgrade foundation | 4 | **STALE.** U0a itself is COMPLETE (2026-07-19). All four open boxes are co-landing hooks, and all four are verified registered: `SignalsRefreshRunSchemaStep`, `GuidanceCacheFormatStep`, `ViewpointDeclarationScanStep`, `DefaultSchemataEnsureStep`. |
 | U0b — Previous-release, partial-failure, Docker | 3 (`[~]`) | **SUBSTANTIALLY DONE (2026-07-22, commits `c074156`+`e0ea65c`).** Previous-release CLI coverage + FORMAT_CONTRACT_VERSION bump + §9.4 self-model delta DONE; Docker startup-ORDER guard DONE. Three `[~]`: legacy-row "quarantine once" has no step to test (recorded); live Docker "reaches healthy" DEFERRED (needs current-image rebuild — queued in PROMPT); config-settings migration DEFERRED (owner — C0/C1-owned, runtime tolerates `encrypted`, post-release export/re-import path). |
 
-**Genuinely remaining (as of 2026-07-22):** **Stream L (Licensing & legal readiness) —
-NEW, added 2026-07-22, PRECEDES Stream E** (a publication gate; native setup check first,
-then package sweeps, then notices). Then E1 (2, docs), E2 (3, dev-server media), G2's e2e
-walk (1, dev-server). U0b substantially done — its `[~]` remainders (live Docker smoke,
-config-settings migration) are queued/deferred, not open work. D1 DONE (commit `6abb3cb`).
-Restart/dev-server-gated: aibom G3 (3 boxes), security-signals item 7 GUI walk, WU-X1
-(LAST). All queued in PROMPT-next-session for the consolidated post-restart run.
-(Stream R COMPLETE 2026-07-21.)
+**Genuinely remaining (as of 2026-07-22, end of the licensing/security session):**
+- **E1 — documentation content (owner-deferred to a DEDICATED session).** Not started here by
+  owner direction; PROMPT-next-session.md is now a documentation-evaluation-first brief.
+- **Restart/dev-server-gated batch** (needs an owner `arch-backend` restart + `npm run dev`):
+  E2 deterministic screenshots (3), G2's crit-21b e2e walk (1), aibom G3 live (3),
+  security-signals item 7 GUI walk, U0b live Docker smoke. Also queued: the MCP
+  `assessed_entity` read-surface change (implemented this session, restart-gated for live exposure).
+- **WU-X1 — integrated closure (LAST).** Depends on E1 + the restart batch.
+
+**DONE this session (2026-07-22), all committed with gates green:**
+- **Stream L (Licensing & legal readiness) COMPLETE** (WU-L0–L5): MIT license finalized; GPLv3
+  PlantUML kept + discharged (notice + source offer) with a user-settable JRE (`ARCH_JAVA`);
+  committed Python (74) + npm (57) license inventories + a CI license gate; generated
+  `THIRD-PARTY-NOTICES.md` shipped in source tree + image + wheel; `docs/reference/licensing.md`
+  stub. See STREAM L PROGRESS.
+- **Owner-added hardening/remediation** (adjacent to Stream L): all backend+frontend dependency
+  CVEs remediated to 0 (osv-scanner-verified); Docker base bumped `slim-bookworm`→`slim-trixie`
+  (OpenJDK 21; OS CVEs 311→214 distinct); self-model backend MCP-version attribute refreshed; live
+  assurance signals re-ingested (0 findings); Minimus evaluated + declined (recorded); MCP
+  `assessed_entity` role-functional read surface implemented.
+- **Security review** of the ingestion paths: confirmed + FIXED a severe PlantUML preprocessor
+  file-read/SSRF via user-submitted PUML (boundary validator + name sanitization + regression
+  tests); OWASP-adjacent sweep otherwise clean (XXE defused, YAML safe_load, no shell/eval, SQL
+  parameterized, SSRF low). Captured as a coverage-complete **STPA-Sec self-model analysis**
+  (`STPA@1784721732.pflr.3e4395`).
+- **Assurance seed** regenerated to include the STPA-Sec analysis (+ `signal_anchors` preserved);
+  fresh-install UX confirmed (`arch-assurance init && arch-assurance seed --with-signals`).
+- **Publication hygiene:** tracked `arch-workspace.yaml` reduced to ENG-ARCH-REPO-only (private
+  `TECHNOLOGY_ARCHITECTURE` engagement moved to gitignored `arch-workspace.private.yaml`); the
+  `enterprise.git.url` personal-repo default flagged for owner review in PROMPT-next-session.
+- **D1 DONE** (commit `6abb3cb`). **Stream R COMPLETE 2026-07-21.**
 
 ### Cross-plan sequencing (owner-agreed 2026-07-21)
 
