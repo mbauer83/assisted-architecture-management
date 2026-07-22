@@ -8,8 +8,3 @@ engagements:
   available:
     ENG-ARCH-REPO:
       local: engagements/ENG-ARCH-REPO/architecture-repository
-    TECHNOLOGY_ARCHITECTURE:
-      git:
-        url: git@ssh.dev.azure.com:v3/BAMDigitalServices/Architecture/up2parts-technology-architecture
-        branch: main
-        path: engagements/TECHNOLOGY_ARCHITECTURE/architecture-repository

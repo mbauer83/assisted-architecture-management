@@ -84,3 +84,6 @@ test-results/
 /engagements/TECHNOLOGY_ARCHITECTURE/architecture-repository/
 # Agent auto-memory working store (not project content)
 /memory/
+
+# Local, private workspace config (personal engagements / enterprise remotes)
+arch-workspace.private.yaml
