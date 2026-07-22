@@ -40,6 +40,7 @@ New here? Start with the [Quickstart in the README](../README.md#quickstart), th
 - [Methods](04-assurance/methods.md)
 - [Diagrams](04-assurance/diagrams.md)
 - [Storage & confidentiality](04-assurance/storage-and-confidentiality.md)
+- [AI-BOM](04-assurance/aibom.md)
 - [MCP tools](04-assurance/mcp-tools.md)
 
 &nbsp;

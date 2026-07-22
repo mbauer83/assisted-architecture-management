@@ -437,10 +437,14 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
       bundled motivation entities.
 
 ### WU-G2 — Documentation
-- [ ] `docs/04-assurance/aibom.md`: what an AIBOM is, why model-derived beats
-      manifest-scanned, how to mark components and author model cards, and what
-      the coverage report means.
-- [ ] README touch deferred to the owner (PLAN §7).
+- [x] `docs/04-assurance/aibom.md`: what an AIBOM is, why model-derived beats
+      manifest-scanned, marking, model-card authoring, derivation roles, coverage tiers,
+      and export. Linked into the assurance nav (index + docs/index) and the Next-chain.
+- [~] README touch deferred to the owner (PLAN §7) — not done, owner-gated.
+
+#### WU-G2 PROGRESS (2026-07-22)
+- New page; the documentation-claims drift test passes (every tool/endpoint/specialization
+  it names resolves in code). No README edit (owner-gated per PLAN §7).
 
 ### WU-G3 — Dogfooding export
 - [ ] Mark this repository's own AI components (MCP servers, agent-facing tool

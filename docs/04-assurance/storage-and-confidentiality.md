@@ -203,4 +203,4 @@ the recovery key in separate, durable locations.
 
 ---
 
-*Next: [Assurance MCP tools →](mcp-tools.md)*
+*Next: [AI-BOM →](aibom.md)*

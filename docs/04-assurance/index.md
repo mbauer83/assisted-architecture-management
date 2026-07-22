@@ -40,6 +40,7 @@ work traceable without building a dedicated assurance department.
 | [Diagrams](diagrams.md) | Bowtie, STAMP control structure, GSN assurance cases, UCA matrix; unified assurance viewer; GSN dual-home |
 | [Security signals](security-signals.md) | SBOM ingest, signal snapshots, vulnerability identity, directness, impact analysis, VEX |
 | [Storage & confidentiality](storage-and-confidentiality.md) | Store vs. archive, backends, credential storage, TLP ceiling, withheld content, WORM, WAL, CLI reference |
+| [AI-BOM](aibom.md) | Model-derived CycloneDX ML-BOM: marking, model cards, derivation roles, coverage, export |
 | [MCP tools](mcp-tools.md) | The assurance MCP server surface for AI agents |
 
 &nbsp;
