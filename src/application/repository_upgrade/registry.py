@@ -34,7 +34,12 @@ from src.application.repository_upgrade.steps.viewpoint_selection_mode_stamp imp
 from src.application.repository_upgrade.steps.viewpoint_style_value_upgrade import ViewpointStyleValueUpgradeStep
 from src.domain.repository_upgrade import StepIdentity
 
-FORMAT_CONTRACT_VERSION = "1"
+# Advanced when the shipped format surface grows enough that an already-upgraded repo
+# should record it has been re-evaluated against the new contract. Step detection runs
+# every time regardless, so this is a completeness stamp, not a gate: bumping it forces a
+# re-stamp of a repo that had nothing else to migrate. "2" covers the named attribute
+# profiles, multiple specializations, connection metadata, and the AI-BOM default schemata.
+FORMAT_CONTRACT_VERSION = "2"
 
 
 class StepRegistry:
