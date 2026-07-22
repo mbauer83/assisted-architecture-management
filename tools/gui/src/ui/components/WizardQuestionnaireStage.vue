@@ -11,7 +11,7 @@ import WizardEntityStage from './WizardEntityStage.vue'
  * jump anywhere, and a step accepts several entities ("+ Add another") — so "a requirement
  * without a stakeholder" or "three affected processes" are one click away. Only answered steps
  * feed the spine's proximity anchors. Completion offers every goal-labeled bridge the domain
- * has (omnidirectional spine, decision D-7).
+ * has (an omnidirectional spine — no fixed next domain).
  */
 const props = defineProps<{
   questionnaire: DomainQuestionnaire
@@ -108,6 +108,15 @@ const chipText = (index: number, entityType: string) => {
         class="type-guidance"
       >
         <summary>When to use a {{ currentStep.entityType }}</summary>
+        <!-- Broader-level context (e.g. the domain's framing) from the guidance `context`
+             array, broadest first, labelled by level and shown once per view. -->
+        <p
+          v-for="layer in currentTypeGuidance.context ?? []"
+          :key="layer.node"
+          class="type-guidance__context"
+        >
+          <span class="type-guidance__level">{{ layer.level }}:</span> {{ layer.text }}
+        </p>
         <p v-if="currentTypeGuidance.create_when">
           {{ currentTypeGuidance.create_when }}
         </p>
@@ -187,6 +196,8 @@ const chipText = (index: number, entityType: string) => {
 .type-guidance summary { cursor: pointer; color: #2563eb; font-weight: 600; }
 .type-guidance p { margin: 6px 0 0; line-height: 1.5; }
 .type-guidance__never { color: #b45309; }
+.type-guidance__context { color: #6b7280; }
+.type-guidance__level { font-weight: 600; text-transform: capitalize; color: #374151; }
 .bridge { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #f3f4f6; padding-top: 10px; }
 .bridge-prompt { font-size: 13px; color: #374151; line-height: 1.5; margin: 0; }
 .btn-primary {

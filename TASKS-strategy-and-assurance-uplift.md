@@ -564,30 +564,34 @@ verbatim; re-verify by name on mismatch), §4.9 (witness chain W1).
   authoring-guidance.ts accepts optional context + Vitest. STILL TODO: GUI
   *presentation* of context in the wizard; (5) extract edit + re-import; (6) U0
   guidance_cache v2 migrator.
-- [ ] Hierarchy model contract per PLAN §7.1 (validated level ids — registry-
-      checked strings, labels, ordering, node identity, ancestry, uniqueness/
-      missing-parent/cycle validation, deterministic serialization, disabled
-      modules; **OntologyModules only**).
-- [ ] Parser: additive context levels alongside v1 entries; composition along
-      the ancestry path (I-D3); v1 fixtures unchanged (I-D2); portable redacted
-      fixtures — no dependency on `~/.arch-guidance-extract/` (F4.8).
-- [ ] Import CLI: format 2; `--strict` validates against the owning module's
-      declaration (undeclared level = error); unit matrix over §7.2 incl. a
-      different-tree-depth module (F4.4).
-- [ ] Canonical v2 wire shape per §7.1 (declared broader-level maps + v1 nested
-      leaf slots adapted by the parser; no generic `levels` map); registry-kind
-      test (disabled OntologyModules dormant; DiagramTypeModules ignored —
-      F4.9).
-- [ ] Serving per §7.6: one composition use case; MCP additive section with
-      **structural** v1-subset pin (F4.6); GUI consumer inventory (verified at
-      code, recorded here) + labeled/collapsible/once-per-view presentation
-      (F4.5/F4.7); Vitest (D-S1b).
-- [ ] Guidance-cache v1→v2 upgrade step per §9.2 (header/sidecar TEXT PATCH,
-      exact sidecar key set, re-import recommendation; blocking on
-      malformed/newer) — detector/migrator handed to U0; synthetic
-      before/after fixtures precede the owner checkpoint.
-- [ ] **Owner checkpoint:** restructure the real extract (hoist §4.2 framing to
-      `domains.*`), bump format, re-import `--strict`; record the summary.
+- [x] Hierarchy model contract per PLAN §7.1 (guidance_hierarchy.py — step 1; 19 tests).
+- [x] Parser: additive context levels alongside v1 entries; composition along
+      the ancestry path (steps 4a/4b — guidance_composition.py; portable fixtures).
+- [x] Import CLI: format 2; `--strict` validates against the owning module's
+      declaration (step 3; import 27 + CLI matrix incl. different-tree-depth module).
+- [x] Canonical v2 wire shape per §7.1 (declared broader-level maps + v1 leaf slots;
+      no generic `levels` map); registry-kind test (steps 1–3).
+- [x] Serving per §7.6: one composition use case; MCP additive section (structural
+      v1-subset pin); GUI consumer inventory + labeled/collapsible/once-per-view
+      presentation (F4.5/F4.7); Vitest (D-S1b). (Steps 4c/4d + the GUI presentation below.)
+- [x] Guidance-cache v1→v2 upgrade step per §9.2 (step 6 — GuidanceCacheFormatStep,
+      registered; 7 tests; blocks on malformed/newer).
+- [x] **Owner checkpoint:** real extract restructured to v2 + `domain:` context, re-imported
+      `--strict` (51 matched / 0 unmatched) — step 5.
+
+#### WU-D1 FINAL (2026-07-22): GUI context presentation + reconciliation
+- The 7 boxes above lagged the step-level progress (steps 1–6 + 4a–4d were all recorded DONE
+  in the PROGRESS notes). The one genuine remainder was the GUI PRESENTATION of the v2
+  `context` array. Landed: `WizardQuestionnaireStage.vue`'s collapsible "When to use a
+  {type}" block now renders the composed context layers (labelled by level, broadest first,
+  once per view) above create_when — exactly F4.5/F4.7. The context DATA contract is already
+  vitest-covered (`authoring-guidance.test.ts` v2) and the template is vue-tsc type-checked
+  against `GuidanceContextLayer`; mounting the session-heavy stage for a one-line v-for would
+  be disproportionate to the codebase's helpers-test convention.
+- **RESTART-GATED (queued for WU-X1):** the runtime serves the composed `context` array only
+  after a backend restart re-reads the v2 extract (step 5's CLI note); until then
+  get_type_guidance returns empty context and the block simply shows create_when as before.
+- Gates: frontend typecheck + vitest (117/1187) green; line-length policy green.
 
 ### WU-D2 — Default attribute schemata on the existing convention
 - [x] Payloads per the §7.1b normative table (exact keys/titles/types/enums/
