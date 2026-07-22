@@ -12,6 +12,83 @@ DEFAULT_PUML_SIZE_WARNING_THRESHOLD = 8_000
 _LEADING_FRONTMATTER_RE = re.compile(r"\A---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|$)", re.DOTALL)
 _STARTUML_NAME_RE = re.compile(r"@startuml[^\n]*")
 
+# ── User-submitted PUML safety (untrusted-input hardening) ──────────────────────
+#
+# PlantUML's preprocessor can read local files and fetch URLs (`!include`,
+# `!includeurl`, `!import`, `!theme … from …`, `%load_json`, `%getenv`). With the
+# default security profile these succeed and their result is embedded in the
+# rendered output, so a submitted body such as `!include /etc/passwd` exfiltrates
+# a server file into the returned SVG. PlantUML's own profiles are all-or-nothing
+# for our include model (SANDBOX blocks even our trusted macros; ALLOWLIST could
+# not be configured to allow relative macro includes while blocking absolutes),
+# so the enforceable control is at OUR trust boundary: reject any I/O-capable
+# directive a user-submitted body contains, except the exact managed includes our
+# own renderers emit (relative `../_*.puml` macros + bundled `<…>` stdlib). Our
+# renderers inject the trusted includes themselves — a user body never needs an
+# arbitrary one.
+
+_MANAGED_INCLUDE_BASENAMES = frozenset({
+    "_archimate-stereotypes.puml",
+    "_archimate-glyphs.puml",
+    "_archimate-relations.puml",
+    "_macros.puml",
+})
+# Preprocessor directives that read a file or fetch a URL. `!include` is special-cased
+# (it has a safe managed form); the rest have no legitimate use in a user body.
+_INCLUDE_DIRECTIVE_RE = re.compile(r"^\s*!(include|includeurl|includesub|import|importurl)\b\s*(.*)$", re.IGNORECASE)
+_THEME_FROM_RE = re.compile(r"^\s*!theme\b.*\bfrom\b", re.IGNORECASE)
+_IO_BUILTIN_RE = re.compile(r"%(?:load_json|loadjson|get_?env|getenv)\b", re.IGNORECASE)
+_MANAGED_INCLUDE_RE = re.compile(
+    r"^(?:\.\./)*(" + "|".join(re.escape(b) for b in _MANAGED_INCLUDE_BASENAMES) + r")$"
+)
+
+
+class UnsafePumlError(ValueError):
+    """A user-submitted PUML body contains a forbidden file/network directive."""
+
+
+def find_unsafe_puml_directives(puml_body: str) -> list[str]:
+    """Return the offending lines of a user-submitted PUML body (empty when safe).
+
+    Safe: any content plus `!include <…>` (bundled stdlib) and `!include ../_*.puml`
+    for our managed macros. Unsafe: `!include` of an absolute path / arbitrary
+    relative path / URL, and any `!includeurl`/`!includesub`/`!import`/`%load_json`/
+    `%getenv`/`!theme … from …`.
+    """
+    offenders: list[str] = []
+    for raw in puml_body.splitlines():
+        line = raw.strip()
+        if _THEME_FROM_RE.match(line) or _IO_BUILTIN_RE.search(line):
+            offenders.append(line)
+            continue
+        match = _INCLUDE_DIRECTIVE_RE.match(line)
+        if match is None:
+            continue
+        directive = match.group(1).lower()
+        target = match.group(2).strip().strip('"').strip("'").strip()
+        if directive != "include":
+            offenders.append(line)  # includeurl/includesub/import/importurl: never legitimate
+            continue
+        if target.startswith("<") and target.endswith(">"):
+            continue  # bundled stdlib include — no filesystem/network access
+        low = target.lower()
+        is_absolute = target.startswith(("/", "\\")) or bool(re.match(r"^[a-z]:[\\/]", low))
+        if "://" in low or is_absolute or not _MANAGED_INCLUDE_RE.match(target):
+            offenders.append(line)
+    return offenders
+
+
+def assert_user_puml_safe(puml_body: str) -> None:
+    """Raise UnsafePumlError if a user-submitted PUML body reads files or fetches URLs."""
+    offenders = find_unsafe_puml_directives(puml_body)
+    if offenders:
+        joined = "; ".join(offenders[:5])
+        raise UnsafePumlError(
+            "PUML body contains forbidden file/network preprocessor directives "
+            f"({len(offenders)}): {joined}. Only diagram content and the renderer's own "
+            "managed includes are permitted; includes/imports of arbitrary files or URLs are not."
+        )
+
 
 def strip_leading_puml_frontmatter(puml_body: str) -> str:
     """Remove an optional YAML frontmatter block from the start of a PUML body."""

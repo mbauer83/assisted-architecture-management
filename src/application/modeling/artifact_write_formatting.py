@@ -227,6 +227,11 @@ def format_diagram_puml(
     diagram_format_version: int | None = None,
     viewpoint: dict[str, object] | None = None,
 ) -> str:
+    # A diagram name is a single-line label. Collapse control characters in the
+    # (user-controlled) name so it cannot break out of the frontmatter `name:` value
+    # or the `title` line into a standalone preprocessor directive that the renderer
+    # would execute (e.g. "x\n!include /etc/passwd" reading a server file into the SVG).
+    name = re.sub(r"[\r\n\t]+", " ", name).strip()
     frontmatter: dict[str, object] = {
         "artifact-id": artifact_id,
         "artifact-type": "diagram",

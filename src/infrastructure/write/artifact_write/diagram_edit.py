@@ -293,6 +293,12 @@ def edit_diagram(
         eff_entity_ids_used = _merge_reference_ids(eff_entity_ids_used, collected_entity_ids)
         eff_connection_ids_used = _merge_reference_ids(eff_connection_ids_used, collected_connection_ids)
     elif puml is not None:
+        # Untrusted input: reject file/network preprocessor directives before the body is
+        # prepared, rendered (verification renders it), or stored — a submitted
+        # `!include /etc/passwd` would otherwise exfiltrate a server file into the SVG.
+        from src.infrastructure.rendering.puml_safety import assert_user_puml_safe  # noqa: PLC0415
+
+        assert_user_puml_safe(puml)
         puml_body = puml.strip("\n") + "\n"
         puml_body = _prepare_diagram_puml_body(puml_body, repo_root, diagram_type)
         # optimize_puml_layout is idempotent: it skips when [hidden] links are
