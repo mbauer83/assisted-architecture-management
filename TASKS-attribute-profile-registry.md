@@ -623,12 +623,31 @@ on the P/Q resolved-schema at the write boundary (landed).
 ## Stream U — AIBOM handoff
 
 ### WU-U1 — Unblock the AIBOM plan
-- [ ] Confirm `PLAN-aibom-model-derived.md` D3 can be executed on named
+- [x] Confirm `PLAN-aibom-model-derived.md` D3 can be executed on named
       profiles: one shared `ai-provenance` profile bound to the AI
       specializations, plus small per-specialization profiles for what genuinely
       differs.
-- [ ] Verify the AIBOM schemata no longer redeclare attributes inherited from
+- [x] Verify the AIBOM schemata no longer redeclare attributes inherited from
       their base types (inheritance already works — PLAN §2).
+
+#### WU-U1 PROGRESS (2026-07-22)
+- Confirmed by EXECUTABLE proof, not prose: `tests/application/test_aibom_profile_feasibility.py`
+  constructs the exact D3 shape — one shared `ai-provenance` profile bound to `ai-model`
+  (application-component) AND `ai-dataset` (data-object), plus a small per-spec `ai-model-card`
+  profile bound only to `ai-model` — and drives `compute_effective_attribute_schema`:
+  - the shared profile's attributes merge into BOTH specializations, across different base
+    types, once each (D3 — reusable profile bound to several pairs);
+  - the per-spec attribute reaches only the spec that bound it (`Architecture Family` is on
+    `ai-model`, absent from `ai-dataset`);
+  - base `data-object` attributes (`Sensitivity`, `Provenance`) are INHERITED into the
+    effective schema without the AI profile redeclaring them (D3a — inheritance already
+    delivers them; `componentData.classification`/`sensitiveData` derive from the existing
+    base `Sensitivity`);
+  - and the guardrail: an AI profile that DID redeclare an inherited attribute with a
+    clashing type surfaces as a merge conflict — the mistake cannot pass silently.
+- Conclusion: the AIBOM plan's Stream A schema design executes on the landed registry with
+  no re-declared inherited attributes and no near-duplicate schema files. **AIBOM unblocked.**
+- Gates: backend green; ruff + zuban clean. (Backend-only WU.)
 
 ## Restart-gated live verification queue
 
