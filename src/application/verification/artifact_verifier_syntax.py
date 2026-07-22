@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from src.application.verification.artifact_verifier_types import Issue, Severity
+from src.config.settings import configured_java_path
 
 
 @lru_cache(maxsize=1)
@@ -46,6 +47,27 @@ def find_graphviz_dot() -> Path | None:
     return Path(which_dot) if which_dot else None
 
 
+def resolve_java_executable() -> str:
+    """Resolve the java binary used to run the bundled PlantUML jar.
+
+    Honours, in priority order:
+      1. the ``ARCH_JAVA`` environment variable (explicit executable path),
+      2. the ``diagrams.java_path`` setting,
+      3. ``JAVA_HOME`` (→ ``$JAVA_HOME/bin/java``),
+      4. ``java`` on ``PATH`` (the bundled default JRE).
+
+    The override (1/2) is consulted only when explicitly set, so the compatible
+    bundled OpenJDK default is never silently replaced by an incompatible one.
+    """
+    explicit = os.environ.get("ARCH_JAVA", "").strip() or configured_java_path()
+    if explicit:
+        return str(Path(explicit).expanduser())
+    java_home = os.environ.get("JAVA_HOME", "").strip()
+    if java_home:
+        return str(Path(java_home) / "bin" / "java")
+    return "java"
+
+
 def resolve_worker_count() -> int:
     cpu = os.cpu_count() or 1
     return max(1, min(32, cpu + 4))
@@ -66,8 +88,7 @@ def check_puml_syntax(path: Path, loc: str) -> list[Issue]:
             )
         ]
 
-    java = os.environ.get("JAVA_HOME", "")
-    java_exe = (Path(java) / "bin" / "java") if java else Path("java")
+    java_exe = resolve_java_executable()
     env = os.environ.copy()
     dot = find_graphviz_dot()
     if dot is not None:
@@ -77,7 +98,7 @@ def check_puml_syntax(path: Path, loc: str) -> list[Issue]:
         with tempfile.TemporaryDirectory() as tmp_out:
             proc = subprocess.run(
                 [
-                    str(java_exe),
+                    java_exe,
                     "-Djava.awt.headless=true",
                     "-jar",
                     str(jar),
@@ -143,8 +164,7 @@ def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict
             )
         return issues_by_path
 
-    java = os.environ.get("JAVA_HOME", "")
-    java_exe = (Path(java) / "bin" / "java") if java else Path("java")
+    java_exe = resolve_java_executable()
     env = os.environ.copy()
     dot = find_graphviz_dot()
     if dot is not None:
@@ -156,7 +176,7 @@ def check_puml_syntax_batch(paths: list[Path], *, chunk_size: int = 120) -> dict
             with tempfile.TemporaryDirectory() as tmp_out:
                 proc = subprocess.run(
                     [
-                        str(java_exe),
+                        java_exe,
                         "-Djava.awt.headless=true",
                         "-jar",
                         str(jar),

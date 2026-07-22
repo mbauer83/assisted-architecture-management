@@ -24,6 +24,18 @@ import urllib.request
 from pathlib import Path
 
 # ── Pinned release ────────────────────────────────────────────────────────────
+#
+# License note (intentional): this fetches the plain `net.sourceforge.plantuml`
+# artifact, which is GPLv3. That is deliberate, not an oversight. PlantUML is
+# invoked strictly arm's-length (a separate `java -jar` subprocess), so under
+# GPLv3's aggregation clause it does not affect the license of this project's own
+# (MIT-licensed) code. Redistributing the unmodified jar in the image carries a
+# notice + corresponding-source obligation, which is discharged in
+# THIRD-PARTY-NOTICES (exact version + upstream source URL below). The permissive
+# Maven editions (plantuml-mit/-epl/-lgpl) were evaluated and declined: they lag a
+# release (max 1.2025.4 vs the pin here) and structural parity cannot guarantee
+# subtle render fidelity for a dependency this central. Do not swap the artifact
+# without re-opening that decision.
 
 PLANTUML_VERSION = "1.2026.3"
 

@@ -28,7 +28,11 @@ def _render(
     fmt: str,
     diagram_type: str | None,
 ) -> tuple[str | None, list[str]]:
-    from src.application.verification.artifact_verifier_syntax import find_graphviz_dot, find_plantuml_jar
+    from src.application.verification.artifact_verifier_syntax import (
+        find_graphviz_dot,
+        find_plantuml_jar,
+        resolve_java_executable,
+    )
     from src.config.settings import plantuml_limit_size, render_dpi
 
     diag_dir = repo_root / DIAGRAM_CATALOG / DIAGRAMS
@@ -54,7 +58,7 @@ def _render(
         with tempfile.TemporaryDirectory() as out_dir:
             env = {**os.environ, "GRAPHVIZ_DOT": str(dot)} if (dot := find_graphviz_dot()) else None
             cmd = [
-                "java",
+                resolve_java_executable(),
                 "-Djava.awt.headless=true",
                 f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}",
                 "-jar",

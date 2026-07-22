@@ -6,7 +6,11 @@ import tempfile
 from pathlib import Path
 
 from src.application.repo_path_helpers import rendered_dir_for_diagram, repo_root_for_diagram_path
-from src.application.verification.artifact_verifier_syntax import find_graphviz_dot, find_plantuml_jar
+from src.application.verification.artifact_verifier_syntax import (
+    find_graphviz_dot,
+    find_plantuml_jar,
+    resolve_java_executable,
+)
 from src.config.settings import plantuml_limit_size, render_dpi
 from src.infrastructure.rendering.native_svg import render_native_svg
 from src.infrastructure.rendering.puml_safety import strip_leading_puml_frontmatter, strip_startuml_name
@@ -128,7 +132,7 @@ def _render_diagram_png(puml_path: Path, warnings: list[str]) -> Path | None:
         dpi = render_dpi()
         result = subprocess.run(
             [
-                "java",
+                resolve_java_executable(),
                 "-Djava.awt.headless=true",
                 f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}",
                 "-jar",
@@ -210,7 +214,7 @@ def _render_diagram_svg(puml_path: Path, warnings: list[str]) -> Path | None:
             env = {**os.environ, "GRAPHVIZ_DOT": str(dot)}
         result = subprocess.run(
             [
-                "java",
+                resolve_java_executable(),
                 "-Djava.awt.headless=true",
                 f"-DPLANTUML_LIMIT_SIZE={plantuml_limit_size()}",
                 "-jar",

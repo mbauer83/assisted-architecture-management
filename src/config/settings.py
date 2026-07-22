@@ -33,6 +33,7 @@ _DEFAULTS: dict[str, dict[str, object]] = {
         "sprite_scale": 1.5,
         "render_dpi": 150,
         "plantuml_limit_size": 16384,
+        "java_path": "",
     },
     "repo_init": {
         "default_branch": "main",
@@ -236,6 +237,18 @@ def plantuml_limit_size() -> int:
         return max(4096, int(value))
     except (TypeError, ValueError):
         return 16384
+
+
+def configured_java_path() -> str:
+    """Explicit java executable configured via ``diagrams.java_path`` in settings.
+
+    Empty string when unset (the resolver then falls back to ``JAVA_HOME`` / the
+    ``java`` on ``PATH``). This is the settings half of the user-settable JRE
+    escape hatch; the environment half (``ARCH_JAVA``) is honoured by the
+    resolver that consumes this value.
+    """
+    value = load_settings()["diagrams"].get("java_path", "")
+    return value.strip() if isinstance(value, str) else ""
 
 
 def datatype_type_references_blocking() -> bool:

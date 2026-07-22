@@ -650,21 +650,65 @@ titleless MIT body). Copyright line: `Michael Bauer <mbauer.mphil@googlemail.com
   `MIT`. Not legal advice; ambiguous inbound licenses are flagged for counsel in L2/L3.
 
 ### WU-L1 — Setup / native runtime dependencies (the gating check)
-- [ ] **PlantUML**: switch the bundled jar from the GPL `plantuml` artifact to a permissive/
-      weak-copyleft Maven variant (`plantuml-mit-light` / `plantuml-lgpl` / `plantuml-epl` /
-      `plantuml-bsd`) after verifying every diagram type we render is byte/visually equivalent;
-      pin the variant + version in `get_plantuml.py` and the Dockerfile; keep the arm's-length
-      subprocess invocation. If no variant covers a needed feature, record the GPL-redistribution
-      discharge (notice + source offer) as the explicit fallback decision.
-- [ ] **JRE**: confirm `default-jre-headless` resolves to OpenJDK (GPLv2 + Classpath Exception)
-      on our base image; keep it as the bundled default; add a **user-settable JRE** (honour an
-      explicit java path via env/settings) that overrides the bundled one without reintroducing
-      an incompatible default. Test both paths select the right binary.
-- [ ] **Graphviz / git / base image / fonts**: record license (Graphviz EPL-1.0; git GPLv2 —
-      both arm's-length/aggregation) + confirm the Debian base pulls only DFSG-free packages and
-      inventory the fonts' licenses (ship OFL/etc. notices). No modification → notice-only.
-- [ ] §10b.2 table dispositioned with evidence (the exact artifact/version/source URL each
-      component is fetched or installed from).
+- [x] **PlantUML**: DECIDED — KEEP the GPLv3 `plantuml` artifact 1.2026.3; do NOT swap. Discharge
+      the redistribution obligation (notice + unmodified-source offer) in WU-L4. Rationale +
+      parity evidence below. License decision pinned in `get_plantuml.py` so it is not silently
+      reverted.
+- [x] **JRE**: `default-jre-headless` on our `python:3.13-slim-bookworm` runtime + the
+      `uv:python3.13-bookworm-slim` builder resolves to `openjdk-17-jre-headless` = OpenJDK
+      (GPLv2 + Classpath Exception). Kept as the bundled default. User-settable JRE escape hatch
+      added: `resolve_java_executable()` in `artifact_verifier_syntax.py` honours, in order,
+      `ARCH_JAVA` env → `diagrams.java_path` setting → `JAVA_HOME` → `java` on PATH; the override
+      is consulted only when explicitly set (I-L4 — never silently replaces the compatible
+      default). All FIVE PlantUML `java` invocations routed through it (2× artifact_verifier_
+      syntax, 2× diagram_render, 1× puml_runtime) + the check_diagram_runtime diagnostic. 10
+      targeted tests (test_resolve_java_executable.py precedence/tilde/blank; test_java_path_
+      settings.py accessor). RESTART-GATED: backend code change is inert until an owner restart.
+- [x] **Graphviz / git / base image / fonts**: recorded in the §10b.2 table below (Graphviz
+      EPL-1.0; git GPLv2 — both arm's-length/aggregation; Debian bookworm main = DFSG-free;
+      fonts-dejavu-core = Bitstream Vera / DejaVu permissive-with-notice). No modification →
+      notice-only; notices shipped in WU-L4.
+- [x] §10b.2 table dispositioned with evidence below.
+
+#### STREAM L PROGRESS
+
+**WU-L1 — PlantUML swap evaluation (evidence for the KEEP decision).** A structural
+diagram-parity harness rendered all **78** top-level `.puml` files across four jars —
+current `plantuml` GPLv3 **1.2026.3**, and `plantuml`/`plantuml-epl`/`plantuml-mit` all at
+**1.2025.4** (the newest version any permissive edition is published at on Maven Central; no
+1.2026.x edition exists). Results:
+- **Edition axis (same version 1.2025.4): 0 mismatches** — the EPL and even the feature-stripped
+  MIT edition (13 MB vs 22 MB) render every one of our diagrams *structurally identically* to
+  GPL. Our diagrams use only core PlantUML (component/class/sequence) with inline SVG sprites and
+  local `!include` macros — none of the GPL-only features the MIT edition strips.
+- **Version axis (1.2025.4 vs current 1.2026.3): 13/78 cosmetic drift** — a swap *also* forces a
+  ~1-year downgrade, changing 13 diagrams.
+- 24 identical "render failures" across ALL four jars = standalone-harness include artifacts
+  (ENG-001 fixtures), not jar-specific.
+
+**Decision: KEEP GPLv3 1.2026.3.** A swap is *functionally* viable but (a) structural parity
+cannot prove subtle render fidelity for a central dependency, (b) it forces an unwanted version
+downgrade, and (c) it is unnecessary: PlantUML is invoked arm's-length (separate `java -jar`
+process), so under GPLv3's aggregation clause the GPL does not touch this project's MIT code. The
+only obligation — ship a notice + corresponding-source offer for the redistributed jar — is
+trivial (unmodified official binary from a pinned, SHA-verified source) and is discharged in
+WU-L4. This is exactly the plan's sanctioned fallback. (Owner-confirmed 2026-07-22.)
+
+**§10b.2 setup-level determinations (dispositioned with evidence).** SPDX project id: `MIT`.
+
+| Component | Version | Fetched/installed from | License (as used) | Exposure | Disposition |
+|---|---|---|---|---|---|
+| PlantUML | 1.2026.3 | Maven Central `net/sourceforge/plantuml/plantuml/1.2026.3/plantuml-1.2026.3.jar` (SHA-256 sidecar verified by `get-plantuml`); GitHub Releases fallback | **GPLv3** | Redistributed in image (unmodified); invoked arm's-length | KEEP + discharge: GPLv3 text + written source offer in THIRD-PARTY-NOTICES |
+| JRE | openjdk-17-jre-headless (via `default-jre-headless` 2:1.17-74) | Debian bookworm apt | **GPLv2 + Classpath Exception** | Bundled + run | Keep (CE designed for this); user-settable JRE escape hatch added; notice |
+| Graphviz | Debian bookworm `graphviz` | Debian bookworm apt | **EPL-1.0** (weak copyleft) | Bundled + invoked (`dot`), unmodified | Compatible; ship EPL-1.0 notice + attribution |
+| git | Debian bookworm `git` | Debian bookworm apt | **GPLv2** | Invoked arm's-length for repo sync | Aggregation; notice in inventory |
+| openssh-client | Debian bookworm | Debian bookworm apt | **BSD-style / SSH** (permissive) | Invoked (ssh transport) | Notice |
+| curl | Debian bookworm | Debian bookworm apt | **curl (MIT/X-style)** | Invoked (healthcheck) | Notice |
+| ca-certificates | Debian bookworm | Debian bookworm apt | **MPL-2.0** (bundle) + public-domain certs | Bundled | Notice |
+| fonts-dejavu-core | Debian bookworm | Debian bookworm apt | **Bitstream Vera + DejaVu** (permissive, notice-required) | Bundled, rendered by PlantUML | Ship font license notice |
+| libfontconfig1 / libharfbuzz0b | Debian bookworm | Debian bookworm apt | fontconfig (MIT-style) / HarfBuzz "Old MIT" | Bundled runtime libs | Notice |
+| Runtime base image | `python:3.13-slim-bookworm` | Docker Hub official | PSF (Python) + Debian bookworm **main = DFSG-free** | Redistributed | Confirmed no non-free apt packages pulled; notice via inventory |
+| Build-only images | `node:20-alpine`, `ghcr.io/astral-sh/uv:python3.13-bookworm-slim` | — | — | **NOT shipped** (multi-stage; only `dist/` + `.venv` + jar copied to runtime) | Out of redistribution scope |
 
 ### WU-L2 — Python dependency license sweep
 - [ ] Generate a reproducible Python license inventory (tool-based, e.g. `uv`/`pip-licenses`),
