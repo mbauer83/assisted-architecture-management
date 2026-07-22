@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import type { EntityAttributeDescriptor } from '../../domain'
+
+// Async to break the TypedPropertyInput ⇄ ArrayPropertyInput import cycle (an array's items
+// are themselves typed inputs). The recursion terminates — item types are never `array`.
+const ArrayPropertyInput = defineAsyncComponent(() => import('./ArrayPropertyInput.vue'))
 
 const props = defineProps<{
   modelValue: string
@@ -89,14 +93,12 @@ const validationError = computed((): string | null => {
       <span class="bool-value">{{ modelValue === 'true' ? 'true' : 'false' }}</span>
     </label>
 
-    <!-- array → JSON textarea -->
-    <textarea
+    <!-- array → add/remove/reorder list editor, each item typed by the item schema -->
+    <ArrayPropertyInput
       v-else-if="isArray"
-      class="prop-value prop-value--array"
-      rows="2"
-      :value="modelValue"
-      :placeholder="placeholder ?? 'JSON array'"
-      @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
+      :model-value="modelValue"
+      :descriptor="descriptor"
+      @update:model-value="emit('update:modelValue', $event)"
     />
 
     <!-- integer / number → number input -->

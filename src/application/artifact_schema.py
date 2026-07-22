@@ -331,6 +331,17 @@ def attribute_descriptors(schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
         constraints = {key: prop_schema[key] for key in _CONSTRAINT_KEYS if key in prop_schema}
         if constraints:
             descriptor["constraints"] = constraints
+        # An array's item schema, so a list editor can type each element rather than falling
+        # back to a free-text JSON box. Kept to the fields a per-item input needs.
+        item_schema = prop_schema.get("items")
+        if descriptor["type"] == "array" and isinstance(item_schema, dict):
+            item: dict[str, Any] = {"type": item_schema.get("type", "string")}
+            if "enum" in item_schema:
+                item["enum"] = [str(v) for v in item_schema["enum"]]
+            item_constraints = {key: item_schema[key] for key in _CONSTRAINT_KEYS if key in item_schema}
+            if item_constraints:
+                item["constraints"] = item_constraints
+            descriptor["items"] = item
         out[name] = descriptor
     return out
 

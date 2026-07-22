@@ -573,17 +573,52 @@ See PLAN §6 (Stream Y). Pairs naturally with WU-S2 (both touch the entity form)
 on the P/Q resolved-schema at the write boundary (landed).
 
 ### WU-Y1 — Create-page list widgets
-- [ ] A `list`-typed profile attribute renders as a real add / remove / reorder list editor,
+- [x] A `list`-typed profile attribute renders as a real add / remove / reorder list editor,
       not the single "JSON-Array" free-text box it is today — typed per the item schema,
       reusing the `TypedPropertyInput` path the other attribute kinds use.
-- [ ] Vitest coverage for the list editor.
+- [x] Vitest coverage for the list editor.
+
+#### WU-Y1 PROGRESS (2026-07-22)
+- The attribute descriptor now carries the array's item schema: `attribute_descriptors`
+  extracts `items` (type/enum/constraints) for `array`-typed properties, and the GUI
+  `EntityAttributeDescriptor` schema gained an optional `items`.
+- `ArrayPropertyInput.vue` replaces the JSON-array `<textarea>`: an add/remove/reorder list
+  whose each element renders through `TypedPropertyInput` typed by the item schema (so a
+  `list<enum>` gets per-item dropdowns, `list<integer>` number inputs). `TypedPropertyInput`
+  delegates `array` to it, importing it async to break the mutual-recursion import cycle
+  (item types are never `array`, so the recursion terminates). Both the create and edit
+  forms get the widget for free — they already route array attributes through
+  `TypedPropertyInput`.
+- The parse/serialize/mutate logic is a pure module `ui/lib/arrayPropertyValue.ts` (JSON
+  string ⇄ `string[]`, item typing on serialize, empty-list → `""` so an optional array
+  stays absent). Vitest `arrayPropertyValue.test.ts` covers parse (incl. malformed → []),
+  serialize (typed scalars, blank-drop, empty→""), and add/remove/move (incl. end clamps).
+  Backend: `test_gui_entity_schemata_endpoint` asserts the array descriptor carries `items`.
 
 ### WU-Y2 — Edit-page profile fields with merge semantics
-- [ ] The entity EDIT page renders the specialization's attribute-profile fields (today only
+- [x] The entity EDIT page renders the specialization's attribute-profile fields (today only
       create does) and re-renders on a specialization change, applying MERGE semantics for
       already-present values (keep an existing value where the new profile still declares its
       attribute; drop/quarantine only where the attribute is gone).
-- [ ] Vitest coverage; the resolved schema comes from `GET /api/entity-schemata` (WU-S1).
+- [x] Vitest coverage; the resolved schema comes from `GET /api/entity-schemata` (WU-S1).
+
+#### WU-Y2 PROGRESS (2026-07-22)
+- The edit form's `loadEffectiveSchema` no longer merely appends missing-required keys; it
+  now reconciles through the SAME `reconcileRowsWithSchema` the create form uses, tracking
+  the previous schema keys. On a specialization change: a value survives where the new
+  profile still declares its attribute, a hand-added or filled-in row is carried, and a row
+  that existed only because the old profile listed it (still empty) is dropped — exactly the
+  Y2 merge semantics. `startEdit` resets the tracked keys so the entity's current properties
+  are treated as real data on entry, not leftovers from a prior edit.
+- The edit-form card already renders each row through `TypedPropertyInput` with the
+  descriptor + required flag (identical to create), so profile fields — including the Y1 list
+  widget — now show on the edit page and re-render on a specialization change.
+- Vitest: the merge engine is the pure `reconcileRowsWithSchema`, already covered
+  comprehensively by `schemaPropertyRows.test.ts` (keep-value-on-change, drop-empty-gone,
+  carry-filled, keep-ad-hoc) — the same tests now govern the edit path. The resolved schema
+  is `GET /api/entity-schemata` (WU-S1), including the multi-specialization comma form.
+- Gates: backend 6364 passed / 5 skipped; ruff + zuban clean; frontend lint + typecheck +
+  vitest (117 files / 1187 tests) green.
 
 ## Stream U — AIBOM handoff
 

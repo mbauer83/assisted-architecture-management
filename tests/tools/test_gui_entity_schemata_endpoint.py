@@ -108,6 +108,19 @@ class TestEntitySchemataEndpoint:
         assert body["properties"] == []
         assert body["descriptors"] == {}
 
+    def test_array_descriptor_carries_the_item_schema(self, client, engagement_root: Path) -> None:
+        # WU-Y1: a list-typed attribute exposes its item schema so the GUI can type each
+        # element instead of falling back to a free-text JSON box.
+        _write_schema(
+            engagement_root,
+            "attributes.collaboration.schema.json",
+            {"properties": {"tags": {"type": "array", "items": {"type": "string", "enum": ["x", "y"]}}}},
+        )
+        body = client.get("/api/entity-schemata", params={"artifact_type": "collaboration"}).json()
+        tags = body["descriptors"]["tags"]
+        assert tags["type"] == "array"
+        assert tags["items"] == {"type": "string", "enum": ["x", "y"]}
+
     def test_clean_pair_is_not_quarantined(self, client, engagement_root: Path) -> None:
         _write_schema(
             engagement_root, "attributes.collaboration.schema.json", {"properties": {"scope": {"type": "string"}}}

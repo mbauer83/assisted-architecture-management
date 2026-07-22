@@ -154,11 +154,22 @@ const EntityAttributeConstraintsSchema = Schema.Struct({
   pattern: Schema.optional(Schema.String),
 })
 
+// An array attribute's per-item schema, so a list editor can type each element. One level
+// deep — array-of-array is not an authoring shape we support — so this is not the recursive
+// descriptor type but a flat item type.
+export const EntityAttributeItemDescriptorSchema = Schema.Struct({
+  type: Schema.String,
+  enum: Schema.optional(Schema.Array(Schema.String)),
+  constraints: Schema.optional(EntityAttributeConstraintsSchema),
+})
+export type EntityAttributeItemDescriptor = typeof EntityAttributeItemDescriptorSchema.Type
+
 export const EntityAttributeDescriptorSchema = Schema.Struct({
   type: Schema.String,
   enum: Schema.optional(Schema.Array(Schema.String)),
   default: Schema.optional(Schema.String),
   constraints: Schema.optional(EntityAttributeConstraintsSchema),
+  items: Schema.optional(EntityAttributeItemDescriptorSchema),
 })
 export type EntityAttributeDescriptor = typeof EntityAttributeDescriptorSchema.Type
 

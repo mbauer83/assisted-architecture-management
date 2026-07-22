@@ -5,6 +5,7 @@ import type { AuthoringGuidance, EntityAttributeDescriptor, EntityDetail } from 
 import { readErrorMessage } from '../lib/errors'
 import { specializationOptionsForEntityType } from '../lib/specializationOptions'
 import { NO_QUARANTINE, quarantineFromSchemaInfo } from '../lib/schemaQuarantine'
+import { reconcileRowsWithSchema } from '../lib/schemaPropertyRows'
 
 type AdHocType = 'string' | 'integer' | 'number' | 'boolean' | 'array'
 const ADHOC_VALID = new Set<string>(['string', 'integer', 'number', 'boolean', 'array'])
@@ -72,6 +73,10 @@ export function useEntityEditForm(options: {
 
   // Guards against out-of-order schema responses when the specialization changes quickly.
   let schemaRequestSeq = 0
+  // The schema keys from the previous load, so a specialization change reconciles rather than
+  // appends: a value survives where the new profile still declares its attribute, and a row
+  // that existed only because the old profile listed it (and is still empty) is dropped.
+  let previousSchemaKeys: string[] = []
 
   const loadEffectiveSchema = (artifactType: string, specialization: string): void => {
     const requestId = ++schemaRequestSeq
@@ -81,22 +86,15 @@ export function useEntityEditForm(options: {
         editSchemaDescriptors.value = info.descriptors
         editSchemaRequired.value = new Set(info.required)
         editQuarantine.value = quarantineFromSchemaInfo(info)
-        const present = new Set(editProperties.value.map((row) => row.key))
-        const missing = info.required.filter((key) => !present.has(key))
-        editProperties.value = [
-          ...editProperties.value,
-          ...missing.map((key) => ({
-            key,
-            value: info.descriptors[key]?.default ?? '',
-            adHocType: 'string' as const,
-          })),
-        ]
+        editProperties.value = reconcileRowsWithSchema(editProperties.value, previousSchemaKeys, info)
+        previousSchemaKeys = [...info.properties]
       })
       .catch(() => {
         if (requestId !== schemaRequestSeq) return
         editSchemaDescriptors.value = {}
         editSchemaRequired.value = new Set()
         editQuarantine.value = NO_QUARANTINE
+        previousSchemaKeys = []
       })
   }
 
@@ -118,6 +116,9 @@ export function useEntityEditForm(options: {
   const startEdit = (): void => {
     const d = detail.value
     if (!d) return
+    // Fresh transaction: the reconcile must treat the entity's current properties as real
+    // data, not rows left over from a prior edit's schema.
+    previousSchemaKeys = []
     editName.value = d.name
     editSummary.value = d.summary ?? ''
     editKeywords.value = (d.keywords ?? []).join(', ')
