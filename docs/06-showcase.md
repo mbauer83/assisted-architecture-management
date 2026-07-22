@@ -36,6 +36,7 @@ The full strategy layer is one view:
 [Strategy Overview](http://localhost:8000/diagram?id=ARC%401784483951.yBNaaU.strategy-overview).
 
 <!-- media: docs/media/strategy-overview.png — captured by the deterministic media suite -->
+![Strategy overview connecting the platform motivation, courses of action, capabilities, resources, and value streams](media/strategy-overview.png)
 
 **4. The value it delivers.** That capability serves the value stream
 [*Model & Validate the Architectural Design*](http://localhost:8000/entity?id=VS%401784483014.xrSjjJ) —
@@ -46,7 +47,11 @@ The [Resource Investment Map](http://localhost:8000/diagram?id=ARC%401784488894.
 renders the same strategy layer as a heat map over each resource's modeled
 `investment_level`.
 
-<!-- media: docs/media/value-stream-deliver-change.png · docs/media/resource-investment-map.png -->
+<!-- media: docs/media/value-stream-deliver-change.png -->
+![Deliver an Architecture-Aligned Change value stream with its five sequential stages](media/value-stream-deliver-change.png)
+
+<!-- media: docs/media/resource-investment-map.png -->
+![Resource investment map connecting architecture resources to the capabilities they support](media/resource-investment-map.png)
 
 **5. Down to the running system.** The C4 progression describes the platform's own
 runtime, model-backed at every level:
@@ -54,7 +59,14 @@ runtime, model-backed at every level:
 [Containers](http://localhost:8000/diagram?id=CC%401780829785.Z_fI-N.amp-containers) →
 [Architecture Backend — Components](http://localhost:8000/diagram?id=CC%401780829793.K3l46j.architecture-backend-components).
 
-<!-- media: docs/media/c4-context.png · docs/media/c4-containers.png · docs/media/c4-backend-components.png -->
+<!-- media: docs/media/c4-context.png -->
+![C4 system context for the Architecture Management Platform and its users and external systems](media/c4-context.png)
+
+<!-- media: docs/media/c4-containers.png -->
+![C4 container view of the Architecture Management Platform](media/c4-containers.png)
+
+<!-- media: docs/media/c4-backend-components.png -->
+![C4 component view of the Architecture Backend](media/c4-backend-components.png)
 
 **6. And into its decisions.** From the
 [Architecture Backend](http://localhost:8000/entity?id=APP%401777293133.OYEmP1) entity,
@@ -62,12 +74,16 @@ document backlinks lead to the ADRs that shaped it — for instance
 [*One Unified Backend Authority; Every Write Through the Same Verified Pipeline*](http://localhost:8000/documents/ADR%401783406851.pGCuZn.one-unified-backend-authority-every-write-through-the-same-verified-pipeline) —
 decisions authored as structured documents, linked to the entities they govern.
 
+<!-- media: docs/media/guidance-wizard-context.png -->
+![Guided modeling wizard with the application-component guidance and composed application-domain context expanded](media/guidance-wizard-context.png)
+
 **Honesty checkpoint.** The same model that shows what exists also shows what's missing:
 executing the [motivation-coverage](03-modeling/coverage-semantics.md) viewpoint against
 this very model reports real, current gaps — goals whose branches do not all terminate
 in realized requirements. The self-model is a working model, not a brochure.
 
-<!-- media: docs/media/motivation-coverage-gaps.png — dedicated two-branch fixture; the live model is cited here as evidence, not pixels -->
+<!-- media: docs/media/motivation-coverage-gaps.png — live model fallback with pinned scope and group -->
+![Motivation coverage table showing passing and incomplete realization branches](media/motivation-coverage-gaps.png)
 
 &nbsp;
 
@@ -86,6 +102,10 @@ loss scenario → constraint; the control-structure binding lands on the Archite
 Backend, the same entity you reached in Part 1.
 
 <!-- media: docs/media/assurance-graph-explore.png -->
+![Assurance graph centered on the PlantUML untrusted-input hazard with connected losses and unsafe control action](media/assurance-graph-explore.png)
+
+<!-- media: docs/media/assurance-method-workflow.png -->
+![STPA-Sec wizard review for the PlantUML preprocessor analysis with all coverage checks passing](media/assurance-method-workflow.png)
 
 **8. Supply-chain posture on the same entities.** The backend's and the GUI's own SBOMs
 are ingested as [security signals](04-assurance/security-signals.md) against their
@@ -93,7 +113,14 @@ self-model entities, and the `security-posture` viewpoint renders the result ove
 application layer — with the fail-closed locked state and the stamped export path the
 capability guarantees.
 
-<!-- media: docs/media/security-posture-viewpoint.png · docs/media/security-metrics-locked.png · docs/media/security-export-stamped.png — synthetically seeded findings carry a visible marker; the live self-model snapshots currently report 0 open findings -->
+<!-- media: docs/media/security-posture-viewpoint.png — synthetic documentation findings are visibly marked -->
+![Security posture viewpoint comparing three application components at synthetic CVSS scores 0.0, 5.4, and 9.1](media/security-posture-viewpoint.png)
+
+<!-- media: docs/media/security-metrics-locked.png -->
+![Architecture Backend entity page when assurance metrics are unavailable because the store is locked](media/security-metrics-locked.png)
+
+<!-- media: docs/media/security-export-stamped.png — synthetic documentation findings are visibly marked -->
+![Stamped TLP WHITE security posture export preserving its synthetic basis and three color-coded component scores](media/security-export-stamped.png)
 
 &nbsp;
 

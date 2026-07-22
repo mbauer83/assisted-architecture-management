@@ -2,6 +2,7 @@
 
 Contract (exit non-zero on any violation):
 - every relative Markdown link/image target in the checked set resolves to an existing file;
+- every Markdown image has non-empty, descriptive alt text;
 - every intra-docs anchor (``page.md#heading`` and in-page ``#heading``) resolves to a real
   heading in the target file (GitHub slugification);
 - every file under ``docs/media/`` is referenced by at least one checked file (no orphans).
@@ -24,6 +25,7 @@ DOCS = REPO_ROOT / "docs"
 CHECKED_FILES = sorted(DOCS.rglob("*.md")) + [REPO_ROOT / "README.md"]
 
 _LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)\)")
+_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)\)")
 _HEADING_RE = re.compile(r"^#{1,6}\s+(.*)$", re.MULTILINE)
 _MEDIA_COMMENT_RE = re.compile(r"<!--\s*media:\s*([^\s—-]+(?:[^\s]*)?)")
 
@@ -54,6 +56,12 @@ def _check_file(md: Path, anchor_cache: dict[Path, set[str]], referenced: set[Pa
     errors: list[str] = []
     text = md.read_text(encoding="utf-8")
     rel = md.relative_to(REPO_ROOT)
+
+    generic_alt_text = {"diagram", "figure", "image", "photo", "screenshot"}
+    for match in _IMAGE_RE.finditer(text):
+        alt_text = match.group(1).strip()
+        if not alt_text or alt_text.casefold() in generic_alt_text:
+            errors.append(f"{rel}: image needs meaningful alt text -> {match.group(2)}")
 
     for match in _MEDIA_COMMENT_RE.finditer(text):
         for token in match.group(1).split("·"):
@@ -88,7 +96,7 @@ def main() -> int:
     if media_dir.is_dir():
         orphans = [
             f for f in sorted(media_dir.iterdir())
-            if f.is_file() and f.resolve() not in referenced
+            if f.is_file() and f.name != "manifest.json" and f.resolve() not in referenced
         ]
         errors.extend(
             f"docs/media/{f.name}: orphaned media file (referenced from no checked document)"

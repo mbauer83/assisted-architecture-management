@@ -907,15 +907,53 @@ for this image now** (recorded, not silently skipped).
       All relative links verified to resolve. Written WITHOUT plan-section citations.
 
 ### WU-E2 — Deterministic screenshots (needs the B/C/D UI surfaces it captures)
-- [ ] Fail-closed capture harness per I-E1: block all live `/api/assurance/**`,
+- [x] Fail-closed capture harness per I-E1: block all live `/api/assurance/**`,
       declared TLP:WHITE fixture routes only, fail on unexpected requests, temp
       workspace/store, assert production connector never constructed (no
       production bypass — F5.3).
-- [ ] Capture the PLAN §8.1 E2 list with stable entity IDs + visible synthetic
+- [x] Capture the PLAN §8.1 E2 list with stable entity IDs + visible synthetic
       marker on assurance/metrics shots; media provenance manifest; alt-text
       document test (I-E2/I-E3).
-- [ ] Denylist text scan + manual/OCR review (F5.1); manual visual review at
+- [x] Denylist text scan + manual/OCR review (F5.1); manual visual review at
       desktop + narrow widths; §8.4 checklist recorded here.
+
+  Evidence (2026-07-22):
+  - Policy amendment: I-E2 in `PLAN-strategy-and-assurance-uplift.md` §8.2, as
+    amended by `PLAN-docs-rework.md` §3.0, supersedes the older synthetic-only
+    wording above. ENG-ARCH-REPO's owner-declared TLP:WHITE self-model and seeded
+    assurance content were captured live. Finding-bearing views were augmented
+    only through Playwright route interception and carry the visible `Synthetic
+    documentation data` banner. The locked-state route was intercepted; the real
+    assurance store was not locked or written. No production bypass was added.
+  - Capture result: `cd tools/gui && npm run media` passed 32/32 named tests with
+    one worker. All 32 PNGs are 2880×1800 (1440×900 at 2×). The run-generated
+    `docs/media/manifest.json` has 32 entries with stable artifact IDs, explicit
+    viewpoint/parameter snapshots, installed Playwright version, paths, and
+    SHA-256 digests; every recorded digest was rechecked with `sha256sum -c`.
+    Group parameters are arrays. `graph-explore.gif` was not touched.
+  - Documentation: `uv run python tools/check_doc_links.py` reports 42 files and
+    96 referenced targets with no broken links, orphaned media, or missing/generic
+    image alt text. The checker owns the typed alt-text validation.
+  - Review and denylist: every capture was inspected at desktop size, followed by
+    a narrow-width contact review. Tesseract OCR plus binary `strings` scans over
+    all 32 final PNGs found no credentials, tokens, private-key markers, or private
+    user paths. CVE identifiers and dependency versions were intentionally allowed
+    under the amended media policy.
+  - Closure gates, run sequentially with no overlapping work before each of the
+    three coherent commits: `uv run python -m pytest -q`; `uv run ruff check src/
+    tests/`; `uv run zuban check`; from `tools/gui/`, `npm run lint`, then `npm run
+    typecheck && npx vitest run`; `uv run python tools/check_doc_links.py`.
+  - Deviation — motivation coverage: a dedicated fixture repository was judged
+    disproportionate, so the permitted live-model fallback was used with pinned
+    `scope=[goal,outcome,requirement]`, `group=[motivation-narrative]`, and
+    `gaps_only=true`. The harness normalizes one missing optional diagnostic status
+    field at capture time to bridge the current response-decoder drift; it does not
+    alter verdicts or model data.
+  - Deviation — assurance graph: the requested STPA analysis is a real seeded
+    analysis but is not itself accepted by the graph node endpoint. The capture
+    deep-links the real hazard `HAZ@1784721764.wra3.48aefe` belonging to analysis
+    `STPA@1784721732.pflr.3e4395`; both IDs are recorded in provenance.
+  - Skipped: none.
 
 ---
 
