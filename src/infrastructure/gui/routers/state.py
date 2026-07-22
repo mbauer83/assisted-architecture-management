@@ -188,6 +188,9 @@ def connection_to_dict(c: ConnectionRecord) -> dict[str, Any]:
         "associated_entities": list(c.associated_entities),
         "src_multiplicity": c.src_multiplicity,
         "tgt_multiplicity": c.tgt_multiplicity,
+        "specialization": c.specialization,
+        "specializations": list(c.specializations),
+        "metadata": dict(c.attributes),
         "source_name": src_name,
         "target_name": tgt_name,
     }
@@ -213,7 +216,7 @@ def search_hit_to_dict(h: SearchHit) -> dict[str, Any]:
     }
     match rec:
         case EntityRecord():
-            return {
+            entity = {
                 **base,
                 "name": rec.name,
                 "artifact_type": rec.artifact_type,
@@ -221,6 +224,10 @@ def search_hit_to_dict(h: SearchHit) -> dict[str, Any]:
                 "subdomain": rec.subdomain,
                 "is_global": is_global(rec.path),
             }
+            if rec.host_diagram_id is not None:
+                entity["host_diagram_id"] = rec.host_diagram_id
+                entity["diagram_internal"] = True
+            return entity
         case DiagramRecord():
             return {**base, "name": rec.name, "artifact_type": rec.artifact_type, "diagram_type": rec.diagram_type}
         case DocumentRecord():

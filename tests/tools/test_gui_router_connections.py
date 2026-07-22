@@ -78,6 +78,11 @@ last-updated: '2026-01-01'
 
 ### {conn_type} → {target}
 
+```yaml
+polarity: positive
+weight: 2
+```
+
 Description.
 """
 
@@ -188,6 +193,11 @@ class TestGetConnections:
     def test_with_conn_type_filter(self, sync_client) -> None:
         r = sync_client.get(f"/api/connections?entity_id={SRC_ID}&conn_type=archimate-association")
         assert r.status_code == 200
+
+    def test_returns_typed_relationship_metadata(self, sync_client) -> None:
+        response = sync_client.get(f"/api/connections?entity_id={SRC_ID}&direction=outbound")
+        connection = response.json()[0]
+        assert connection["metadata"] == {"polarity": "positive", "weight": 2}
 
     def test_empty_entity(self, sync_client) -> None:
         r = sync_client.get("/api/connections?entity_id=REQ@9.ZZZ.no-such-entity")
@@ -322,6 +332,21 @@ class TestEditConnection:
         r = sync_client.post("/api/connection/edit", json=payload)
         assert r.status_code == 200
         assert "wrote" in r.json()
+
+    def test_typed_metadata_is_accepted_without_clearing_description(self, sync_client) -> None:
+        payload = {
+            "source_entity": SRC_ID,
+            "connection_type": "archimate-association",
+            "target_entity": TGT_ID,
+            "metadata": {"weight": 3, "enabled": True},
+            "dry_run": True,
+        }
+        response = sync_client.post("/api/connection/edit", json=payload)
+        assert response.status_code == 200
+        preview = response.json()["content"]
+        assert "weight: 3" in preview
+        assert "enabled: true" in preview
+        assert "Description." in preview
 
 
 class TestRemoveConnection:

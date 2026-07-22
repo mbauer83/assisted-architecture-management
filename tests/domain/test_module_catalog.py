@@ -498,6 +498,18 @@ class TestCatalogDiagramOnlyEntityTypes:
         assert cat.is_diagram_entity_type(EntityTypeName("special-dt-type")) is True
         assert cat.is_diagram_entity_type(EntityTypeName("other-type")) is False
 
+    def test_global_search_requires_an_explicit_opt_in(self) -> None:
+        hidden = DiagramOwnEntityTypeUiConfig(entity_type="hidden", label="Hidden", plural="Hidden")
+        visible = DiagramOwnEntityTypeUiConfig(
+            entity_type="visible", label="Visible", plural="Visible", include_in_global_search=True
+        )
+        dt = _StubDiagramType("dt-search")
+        type(dt).ui_config = property(lambda self: self._ui_config)
+        dt._ui_config = DiagramTypeUiConfig(label="dt-search", diagram_only_types=(hidden, visible))
+        catalog = _build(diagram_types=[dt])
+
+        assert catalog.diagram_entity_types_in_global_search() == frozenset({EntityTypeName("visible")})
+
 
 # ── Catalog: all_element_classes duplicate detection ────────────────────────
 

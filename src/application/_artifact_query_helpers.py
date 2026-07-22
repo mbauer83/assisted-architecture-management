@@ -180,6 +180,7 @@ def read_entity(rec: EntityRecord, *, mode: Literal["summary", "full"]) -> dict[
         "group": rec.group,
         "specialization": rec.specialization,
         "specializations": list(rec.specializations),
+        "attributes": dict(rec.attributes),
     }
     if rec.host_diagram_id is not None:
         data["host_diagram_id"] = rec.host_diagram_id
@@ -204,6 +205,7 @@ def read_connection(rec: ConnectionRecord, *, mode: Literal["summary", "full"]) 
         "group": rec.group,
         "specialization": rec.specialization,
         "specializations": list(rec.specializations),
+        "attributes": dict(rec.attributes),
     }
     if mode == "full":
         data["content_text"] = rec.content_text

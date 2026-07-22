@@ -25,7 +25,11 @@ guidance:
   when_not_to_use: "…"
 ui:
   label: "Application View"
-  diagram_only_types: []                   # types that live only in the diagram
+  diagram_only_types:
+    - entity_type: local-note
+      label: Local note
+      plural: Local notes
+      include_in_global_search: false       # default; diagram pickers still include it
 ```
 
 Only `name` is required; every other field falls back to a built-in default.
@@ -52,6 +56,9 @@ Some types exist only inside a diagram's `diagram-entities:` frontmatter and are
 to the model store (swimlanes, sequence participants, C4 boundaries). They are declared in
 `ontology.yaml` (structure and semantics) plus `config.yaml` (UI label and plural). Structural
 links between them live in the diagram's `connections:` list, not as entity properties.
+They are excluded from global search by default so model entities retain priority. Set
+`include_in_global_search: true` on the UI entry only when the diagram-owned construct is
+meaningful outside its host diagram; opted-in entries still sort below model entities.
 
 &nbsp;
 

@@ -81,7 +81,7 @@ test.describe('create/edit lifecycle with scope + query round-trip', () => {
     await conditionRow.locator('select.val').selectOption('motivation')
 
     await page.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Viewpoints' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '+ Create viewpoint' })).toBeVisible()
     await expect(page.locator('tr', { hasText: slug })).toBeVisible()
 
     const entry = await findEntry(request, slug)
@@ -145,8 +145,9 @@ test.describe('non-engagement tiers are read-only', () => {
   test('viewing a module-tier definition shows no Save button and explains why', async ({ page }) => {
     await page.goto('/viewpoints')
     await page.locator('tr', { hasText: 'capability-map' }).getByRole('button', { name: 'Customize…' }).click()
-    await expect(page.getByText(/module-tier definition — only engagement-tier definitions can be edited here/)).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Save/ })).toHaveCount(0)
+    await expect(page.getByText(/module-tier definition and cannot be changed in place/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Save as…', exact: true })).toBeVisible()
   })
 })
 

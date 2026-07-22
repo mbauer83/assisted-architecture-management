@@ -17,6 +17,7 @@ import {
   connectionMetadataSchema, specializationOptionsForConnectionType, specializationOptionLabel,
 } from '../lib/specializationOptions'
 import type { SchemaQuarantine } from '../lib/schemaQuarantine'
+import { metadataWireValues } from '../lib/connectionMetadataValues'
 import EntitySearchInput from './EntitySearchInput.vue'
 import SchemaQuarantineBanner from './SchemaQuarantineBanner.vue'
 import TypedPropertyInput from './TypedPropertyInput.vue'
@@ -82,9 +83,9 @@ const metadataRequiredMissing = computed(() =>
 )
 
 /** Only non-empty values are sent: an untouched optional attribute is absent, not blank. */
-const metadataBody = computed((): Record<string, string> | undefined => {
-  const filled = Object.entries(metadataValues.value).filter(([, value]) => value.trim() !== '')
-  return filled.length ? Object.fromEntries(filled) : undefined
+const metadataBody = computed((): Record<string, unknown> | undefined => {
+  const values = metadataWireValues(metadataValues.value, metadataSchema.value?.descriptors ?? {})
+  return Object.keys(values).length ? values : undefined
 })
 
 const MULTIPLICITY_RE = /^\d+$|^\d+\.\.\d+$|^\d+\.\.\*$|^\*$/

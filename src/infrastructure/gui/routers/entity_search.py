@@ -13,6 +13,11 @@ from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._entity_filter import EntityFilter
+from src.infrastructure.gui.routers._global_search import (
+    filter_global_hits,
+    hidden_diagram_entity_types,
+    prioritize_global_hits,
+)
 from src.infrastructure.gui.routers._openapi import TAG_DOCUMENTS, TAG_ENTITIES, TAG_TAXONOMY, OpenMapResponse
 
 logger = logging.getLogger(__name__)
@@ -76,18 +81,21 @@ def search_artifacts(
     include_connections: bool = False,
     include_diagrams: bool = True,
     include_documents: bool = True,
+    catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
 ) -> dict[str, Any]:
     repo = s.get_repo()
     result = repo.search_artifacts(
         q,
-        limit=limit,
+        limit=limit * 3,
         include_entities=include_entities,
         include_connections=include_connections,
         include_diagrams=include_diagrams,
         include_documents=include_documents,
+        excluded_entity_types=hidden_diagram_entity_types(catalogs),
     )
     hits: list[dict[str, Any]] = []
-    for h in result.hits:
+    visible_hits = filter_global_hits(result.hits, catalogs)
+    for h in prioritize_global_hits(visible_hits)[:limit]:
         aid = getattr(h.record, "artifact_id", "")
         hits.append({
             "score": h.score,

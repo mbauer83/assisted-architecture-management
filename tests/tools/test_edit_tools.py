@@ -286,8 +286,37 @@ last-updated: '2026-04-20'
 
 
 # ---------------------------------------------------------------------------
-# model_remove_connection (via edit_tools)
+# connection updates and removal (via edit_tools)
 # ---------------------------------------------------------------------------
+
+
+class TestUpdateConnection:
+    def test_typed_metadata_update_preserves_description(self, repo: Path) -> None:
+        source = _make_entity(repo, "requirement", "Metadata Source")
+        target = _make_entity(repo, "outcome", "Metadata Target")
+        added = mcp.artifact_add_connection(
+            source_entity=source,
+            connection_type="archimate-realization",
+            target_entity=target,
+            description="Existing relationship description",
+            dry_run=False,
+            repo_root=str(repo),
+        )
+        assert added["wrote"] is True
+
+        result = mcp.artifact_edit_connection(
+            source_entity=source,
+            connection_type="archimate-realization",
+            target_entity=target,
+            metadata={"weight": 2, "enabled": True},
+            dry_run=True,
+            repo_root=str(repo),
+        )
+
+        preview = str(result["content"])
+        assert "weight: 2" in preview
+        assert "enabled: true" in preview
+        assert "Existing relationship description" in preview
 
 
 class TestRemoveConnection:

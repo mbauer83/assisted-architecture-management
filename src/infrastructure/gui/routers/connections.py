@@ -38,7 +38,7 @@ class AddConnectionBody(BaseModel):
     tgt_multiplicity: str | None = None
     specialization: str | None = None
     specializations: list[str] | None = None
-    metadata: dict[str, str] | None = None
+    metadata: dict[str, object] | None = None
     dry_run: bool = True
 
     @field_validator("src_multiplicity", "tgt_multiplicity")
@@ -167,7 +167,7 @@ class EditConnectionBody(BaseModel):
     tgt_multiplicity: str | None = None
     specialization: str | None = None
     specializations: list[str] | None = None
-    metadata: dict[str, str] | None = None
+    metadata: dict[str, object] | None = None
     dry_run: bool = True
 
     @field_validator("src_multiplicity", "tgt_multiplicity")
@@ -203,7 +203,7 @@ def edit_connection(body: EditConnectionBody) -> dict[str, Any]:
             source_entity=body.source_entity,
             connection_type=body.connection_type,
             target_entity=body.target_entity,
-            description=body.description,
+            description=body.description if "description" in provided else _UNSET,
             src_multiplicity=body.src_multiplicity if "src_multiplicity" in provided else _UNSET,
             tgt_multiplicity=body.tgt_multiplicity if "tgt_multiplicity" in provided else _UNSET,
             specialization=body.specialization if "specialization" in provided else _UNSET,

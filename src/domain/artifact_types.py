@@ -122,6 +122,8 @@ class ConnectionRecord:
     specializations: tuple[str, ...] = ()
     """Every applied connection specialization slug, in declaration order; kept consistent
     with ``specialization`` in ``__post_init__``."""
+    attributes: Mapping[str, object] = field(default_factory=dict)
+    """Typed values from the connection's metadata block, excluding specialization."""
 
     def __post_init__(self) -> None:
         _reconcile_specializations(self)

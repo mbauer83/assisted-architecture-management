@@ -39,12 +39,12 @@ def edit_connection(
     source_entity: str,
     target_entity: str,
     connection_type: str,
-    description: str | None = None,
+    description: str | None | object = _UNSET,
     src_multiplicity: str | None | object = _UNSET,
     tgt_multiplicity: str | None | object = _UNSET,
     specialization: str | None | object = _UNSET,
     specializations: Sequence[str] | None | object = _UNSET,
-    metadata: dict[str, str] | None | object = _UNSET,
+    metadata: dict[str, object] | None | object = _UNSET,
     dry_run: bool,
 ) -> WriteResult:
     """Update an existing connection (description, multiplicities, and/or specialization).
@@ -74,7 +74,8 @@ def edit_connection(
     for conn in parsed.connections:
         if (conn["connection_type"] == connection_type
                 and stable_id(str(conn["target_entity"])) == stable_id(target_entity)):
-            conn["description"] = description or ""
+            if description is not _UNSET:
+                conn["description"] = str(description) if description else ""
             if src_multiplicity is not _UNSET:
                 if src_multiplicity:
                     conn["src_multiplicity"] = str(src_multiplicity)
@@ -103,8 +104,8 @@ def edit_connection(
     if not found:
         raise ValueError(f"Connection '{connection_type} -> {target_entity}' not found in {outgoing_path.name}")
 
-    # Gate on the EFFECTIVE (post-merge) specialization set: an edit that moves a connection
-    # onto a quarantined pair must be refused just like an add (WU-Q3).
+    # Gate on the effective post-merge specialization set: an edit that moves a connection
+    # onto a quarantined pair must be refused just like an add.
     _assert_pair_writable(repo_root, connection_type, None, effective)
 
     content = format_outgoing_markdown(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 
 def display_connection_label(conn_type: str) -> str:
@@ -56,4 +56,16 @@ def format_multiplicity_label(src_multiplicity: str, tgt_multiplicity: str) -> s
         return f"{src_multiplicity} ->"
     if has_tgt:
         return f"-> {tgt_multiplicity}"
+    return ""
+
+
+def format_influence_polarity(conn_type: str, attributes: Mapping[str, object]) -> str:
+    """Return the colored ArchiMate influence sign declared by relationship metadata."""
+    if conn_type != "archimate-influence":
+        return ""
+    polarity = str(attributes.get("polarity", "")).strip().lower()
+    if polarity == "positive":
+        return "<color:#15803d><b>+</b></color>"
+    if polarity == "negative":
+        return "<color:#b91c1c><b>-</b></color>"
     return ""

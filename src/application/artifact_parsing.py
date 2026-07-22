@@ -292,6 +292,7 @@ def parse_outgoing_file(path: Path) -> list[ConnectionRecord]:
                 src_multiplicity=decl.src_multiplicity,
                 tgt_multiplicity=decl.tgt_multiplicity,
                 specializations=specializations,
+                attributes={str(k): v for k, v in decl.metadata.items() if str(k) != "specialization"},
             )
         )
     return records

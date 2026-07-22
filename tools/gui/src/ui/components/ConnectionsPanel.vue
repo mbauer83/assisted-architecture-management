@@ -13,6 +13,7 @@ import type { RepoError } from '../../ports/ModelRepository'
 import { useQuery } from '../composables/useQuery'
 import ConnectionAssociationsPanel from './ConnectionAssociationsPanel.vue'
 import ConnectionAddForm from './ConnectionAddForm.vue'
+import ConnectionEditForm from './ConnectionEditForm.vue'
 import ConnectionRemoveModal from './ConnectionRemoveModal.vue'
 
 const props = defineProps<{
@@ -138,12 +139,17 @@ const titleLabel = computed(() => {
 // ── Association expand ───────────────────────────────────────────────────────
 
 const expandedAssoc = ref<Set<string>>(new Set())
+const editingConnection = ref<string | null>(null)
 
 const toggleAssoc = (connId: string) => {
   const next = new Set(expandedAssoc.value)
   if (next.has(connId)) next.delete(connId)
   else next.add(connId)
   expandedAssoc.value = next
+}
+
+const toggleEdit = (connId: string) => {
+  editingConnection.value = editingConnection.value === connId ? null : connId
 }
 
 // ── Add connection ─────────────────────────────────────────────────────────────
@@ -155,6 +161,10 @@ const startAdd = (typeKey: string) => {
 }
 const onAdded = () => {
   addingFor.value = null
+  emit('refresh')
+}
+const onEdited = () => {
+  editingConnection.value = null
   emit('refresh')
 }
 
@@ -238,6 +248,15 @@ const removeModal = ref<InstanceType<typeof ConnectionRemoveModal> | null>(null)
                   <span class="conn-info-tip">{{ c.content_text.trim() }}</span>
                 </span>
                 <button
+                  v-if="!readonly && !adminMode"
+                  class="icon-btn edit-btn"
+                  :class="{ 'edit-btn--active': editingConnection === c.artifact_id }"
+                  :title="editingConnection === c.artifact_id ? 'Close relationship editor' : 'Edit relationship'"
+                  @click="toggleEdit(c.artifact_id)"
+                >
+                  ✎
+                </button>
+                <button
                   v-if="!readonly"
                   class="icon-btn assoc-btn"
                   :class="{ 'assoc-btn--active': expandedAssoc.has(c.artifact_id) }"
@@ -260,6 +279,13 @@ const removeModal = ref<InstanceType<typeof ConnectionRemoveModal> | null>(null)
                 v-if="!readonly && expandedAssoc.has(c.artifact_id)"
                 :connection="c"
                 @refresh="emit('refresh')"
+              />
+              <ConnectionEditForm
+                v-if="!readonly && !adminMode && editingConnection === c.artifact_id"
+                :connection="c"
+                :guidance="guidanceQuery.data.value"
+                @saved="onEdited"
+                @cancel="editingConnection = null"
               />
             </li>
           </ul>
@@ -296,66 +322,4 @@ const removeModal = ref<InstanceType<typeof ConnectionRemoveModal> | null>(null)
   </div>
 </template>
 
-<style scoped>
-.conn-panel { background: white; border-radius: 8px; border: 1px solid #e5e7eb; padding: 16px; }
-.conn-title {
-  font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 12px;
-  text-transform: uppercase; letter-spacing: .05em;
-}
-
-.state-msg { color: #6b7280; padding: 4px 0; font-size: 13px; }
-.state-msg--error { color: #dc2626; }
-
-.type-group { margin-bottom: 12px; }
-.group-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.group-type-badge {
-  padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
-  background: #f0f0f0; color: #374151; text-transform: uppercase;
-}
-.group-count { font-size: 11px; color: #9ca3af; }
-
-.conn-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-.conn-item-wrap { display: flex; flex-direction: column; gap: 2px; }
-.conn-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-.conn-type-badge {
-  padding: 1px 6px; border-radius: 4px; font-size: 11px;
-  background: #f3f4f6; color: #374151; white-space: nowrap;
-}
-.conn-target { font-weight: 500; }
-.conn-spec-badge { font-size: 11px; font-style: italic; color: #6d28d9; white-space: nowrap; }
-.conn-mult-badge {
-  font-size: 10px; color: #6b7280; font-family: monospace; white-space: nowrap;
-  background: #f3f4f6; padding: 1px 4px; border-radius: 3px;
-}
-
-.conn-info-wrap {
-  position: relative; display: inline-flex; align-items: center; margin-left: 2px;
-}
-.conn-info-btn {
-  font-size: 12px; color: #6b7280; cursor: default; user-select: none; line-height: 1;
-}
-.conn-info-tip {
-  display: none; position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
-  margin-left: 6px; background: #1e293b; color: #f1f5f9; font-size: 11px; line-height: 1.4;
-  padding: 6px 10px; border-radius: 6px; white-space: pre-wrap; max-width: 280px;
-  z-index: 60; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,.3);
-}
-.conn-info-wrap:hover .conn-info-tip,
-.conn-info-wrap:focus-within .conn-info-tip { display: block; }
-
-.icon-btn {
-  width: 22px; height: 22px; border-radius: 4px; border: 1px solid #d1d5db;
-  background: white; cursor: pointer; font-size: 14px; line-height: 1;
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.icon-btn:hover { background: #f3f4f6; }
-.add-btn { color: #16a34a; border-color: #bbf7d0; }
-.add-btn:hover { background: #f0fdf4; }
-.remove-btn { color: #dc2626; border-color: #fecaca; margin-left: auto; }
-.remove-btn:hover { background: #fef2f2; }
-.assoc-btn {
-  color: #2563eb; border-color: #bfdbfe; font-size: 10px; font-weight: 600;
-}
-.assoc-btn:hover { background: #eff6ff; }
-.assoc-btn--active { background: #eff6ff; }
-</style>
+<style scoped src="./ConnectionsPanel.css"></style>

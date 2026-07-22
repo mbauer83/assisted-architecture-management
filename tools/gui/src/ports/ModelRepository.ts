@@ -118,7 +118,7 @@ export interface ModelRepository {
     description?: string; src_multiplicity?: string; tgt_multiplicity?: string;
     specialization?: string;
     /** Attributes declared by the pair's effective metadata schema. */
-    metadata?: Record<string, string>;
+    metadata?: Record<string, unknown>;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly editConnection: (body: {
@@ -126,7 +126,7 @@ export interface ModelRepository {
     description?: string; src_multiplicity?: string; tgt_multiplicity?: string;
     specialization?: string;
     /** Replaces the schema-declared attributes wholesale; {} clears them. */
-    metadata?: Record<string, string>;
+    metadata?: Record<string, unknown>;
     dry_run?: boolean;
   }) => Effect.Effect<WriteResult, RepoError>
   readonly removeConnection: (body: {

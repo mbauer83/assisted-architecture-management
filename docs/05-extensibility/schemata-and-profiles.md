@@ -164,6 +164,10 @@ attributes exactly as an entity one does —
 quarantine rules. Like the other schemata here, this one is opt-in per connection type —
 absent any schema, the metadata block validates freely.
 
+The shipped ArchiMate influence schema provides an optional `polarity` property with
+`positive` and `negative` values. ArchiMate diagrams render these as a green plus or red
+minus on the relationship; omitting the property preserves the standard unmarked notation.
+
 &nbsp;
 
 ## Promotion superset rule

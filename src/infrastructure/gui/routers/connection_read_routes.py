@@ -11,6 +11,11 @@ from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._global_search import (
+    filter_global_hits,
+    hidden_diagram_entity_types,
+    prioritize_global_hits,
+)
 from src.infrastructure.gui.routers._openapi import TAG_CONNECTIONS, TAG_ENTITIES, TAG_TAXONOMY, OpenMapResponse
 from src.infrastructure.gui.routers.connection_neighbors import DerivationLimitError, derive_neighbor_response
 
@@ -60,9 +65,20 @@ def register_connection_read_routes(router: APIRouter) -> None:
 
     @router.get("/api/search", tags=[TAG_ENTITIES], summary="Keyword search over artifacts",
         response_model=OpenMapResponse)
-    def search(q: str, limit: int = 20) -> dict[str, Any]:
-        result = s.get_repo().search_artifacts(q, limit=limit, include_connections=False)
-        return {"query": result.query, "hits": [s.search_hit_to_dict(hit) for hit in result.hits]}
+    def search(
+        q: str,
+        limit: int = 20,
+        catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
+    ) -> dict[str, Any]:
+        result = s.get_repo().search_artifacts(
+            q,
+            limit=limit * 3,
+            include_connections=False,
+            excluded_entity_types=hidden_diagram_entity_types(catalogs),
+        )
+        visible_hits = filter_global_hits(result.hits, catalogs)
+        hits = prioritize_global_hits(visible_hits)[:limit]
+        return {"query": result.query, "hits": [s.search_hit_to_dict(hit) for hit in hits]}
 
     @router.get("/api/ontology", tags=[TAG_CONNECTIONS], summary="Ontology classification / permitted pairs",
         response_model=OpenMapResponse)

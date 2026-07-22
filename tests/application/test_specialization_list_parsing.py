@@ -1,4 +1,4 @@
-"""WU-V1: a concept may carry several specializations (ArchiMate §15.2). Frontmatter and
+"""A concept may carry several specializations (ArchiMate §15.2). Frontmatter and
 the per-connection metadata block accept a list; a bare scalar keeps working and reads as a
 one-element set, so no existing repo needs migration.
 """
@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from src.application._artifact_query_helpers import read_connection
 from src.application.artifact_parsing import parse_entity, parse_outgoing_file
 from src.domain.artifact_types import ConnectionRecord, EntityRecord
 
@@ -77,6 +78,18 @@ class TestConnectionMetadata:
         )
         recs = parse_outgoing_file(tmp_path / "c.outgoing.md")
         assert recs[0].specializations == ("responsibility-assignment", "behavior-assignment")
+
+    def test_schema_metadata_is_available_on_the_record(self, tmp_path: Path) -> None:
+        self._outgoing(
+            tmp_path / "c.outgoing.md",
+            "specialization: responsibility-assignment\npolarity: positive\nweight: 2\n",
+        )
+        record = parse_outgoing_file(tmp_path / "c.outgoing.md")[0]
+        assert record.attributes == {"polarity": "positive", "weight": 2}
+        assert read_connection(record, mode="summary")["attributes"] == {
+            "polarity": "positive",
+            "weight": 2,
+        }
 
 
 class TestRecordInvariant:

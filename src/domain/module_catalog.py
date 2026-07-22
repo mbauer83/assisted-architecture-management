@@ -219,6 +219,14 @@ class ModuleCatalog:
                 names.add(EntityTypeName(oe.entity_type))
         return frozenset(names)
 
+    def diagram_entity_types_in_global_search(self) -> frozenset[EntityTypeName]:
+        names: set[EntityTypeName] = set()
+        for diagram_type in self._diagram_types.values():
+            for own_type in diagram_type.ui_config.diagram_only_types:
+                if own_type.include_in_global_search:
+                    names.add(EntityTypeName(own_type.entity_type))
+        return frozenset(names)
+
     def is_diagram_entity_type(self, name: EntityTypeName) -> bool:
         return name in self.all_diagram_entity_types()
 

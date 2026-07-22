@@ -91,6 +91,23 @@ BASE_DOCUMENT_SCHEMAS: dict[str, dict] = {
 DEFAULT_SCHEMATA: dict[str, dict] = {
     **ASSURANCE_ATTRIBUTE_SCHEMATA,
     **ARCHIMATE_ATTRIBUTE_SCHEMATA,
+    "connection-metadata.archimate-influence.schema.json": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "connection-metadata.archimate-influence.schema.json",
+        "title": "Influence Relationship Properties",
+        "description": "Optional presentation properties for ArchiMate influence relationships.",
+        "type": "object",
+        "required": [],
+        "properties": {
+            "polarity": {
+                "type": "string",
+                "title": "Polarity",
+                "description": "Show whether the source has a positive or negative influence on the target.",
+                "enum": ["positive", "negative"],
+            },
+        },
+        "additionalProperties": True,
+    },
     "attributes.capability.schema.json": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "attributes.capability.schema.json",

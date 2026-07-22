@@ -135,9 +135,15 @@ ui:
     - entity_type: swimlane   # must match an entity_type declared in ontology.yaml
       label: Swimlane         # display label shown in the UI
       plural: Swimlanes       # plural form (for UI lists)
+      include_in_global_search: false  # opt in only when useful outside its host diagram
 ```
 
-The `config.yaml` entry intentionally contains **only** `entity_type`, `label`, and `plural`. All other fields (`min`, `max`, `create_when`, `never_create_when`, `permitted_mappings`, `mapping_required`, `classes`, `properties`, `required_connections`) belong in `ontology.yaml` and are merged in at load time.
+The `config.yaml` entry contains the UI fields `entity_type`, `label`, `plural`, and the
+optional `include_in_global_search` flag. The flag defaults to `false`: diagram-owned
+constructs remain available in diagram pickers, but do not displace model entities in global
+search unless a module explicitly opts them in. All structural fields (`min`, `max`,
+`create_when`, `never_create_when`, `permitted_mappings`, `mapping_required`, `classes`,
+`properties`, `required_connections`) belong in `ontology.yaml` and are merged at load time.
 
 ## `ontology.yaml` schema
 

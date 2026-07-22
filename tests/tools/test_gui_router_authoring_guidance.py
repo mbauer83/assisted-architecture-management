@@ -78,7 +78,7 @@ class TestEntityTypeAndDomainFilters:
     def test_connection_types_carry_the_effective_metadata_schema(
         self, client: TestClient, engagement_root: Path
     ) -> None:
-        """WU-W3: connections have no schema endpoint of their own, so the guidance payload
+        """Connections have no schema endpoint of their own, so the guidance payload
         carries the effective merged metadata schema each pair authors against."""
         from src.application.artifact_schema import clear_schema_cache
 
@@ -94,6 +94,22 @@ class TestEntityTypeAndDomainFilters:
         assert assignment["metadata_schema"]["quarantined"] is False
         # Every declared specialization carries its own merged schema, not just the type.
         assert all("metadata_schema" in s for s in assignment["specializations"])
+
+    def test_base_schema_is_included_without_specializations(
+        self, client: TestClient, engagement_root: Path
+    ) -> None:
+        from src.application.artifact_schema import clear_schema_cache
+
+        schemata = engagement_root / ".arch-repo" / "schemata"
+        schemata.mkdir(parents=True, exist_ok=True)
+        (schemata / "connection-metadata.archimate-influence.schema.json").write_text(
+            '{"properties": {"polarity": {"type": "string"}}}', encoding="utf-8"
+        )
+        clear_schema_cache()
+        body = client.get("/api/authoring-guidance", params={"entity_type": "goal"}).json()
+        influence = next(e for e in body["connection_types"] if e["name"] == "archimate-influence")
+        assert influence["specializations"] == []
+        assert influence["metadata_schema"]["properties"] == ["polarity"]
 
     def test_no_params_returns_all_entity_types(self, client: TestClient) -> None:
         resp = client.get("/api/authoring-guidance")

@@ -362,7 +362,7 @@ test('assurance traceability matrix links model entities and wraps at word bound
   const serviceLink = page.getByRole('link', { name: 'Assurance Service', exact: true })
   await expect(serviceLink).toHaveAttribute(
     'href',
-    '/entity?id=SRV@1780656241.ooK3YN.assurance-service',
+    `/entity?id=${encodeURIComponent('SRV@1780656241.ooK3YN.assurance-service')}`,
   )
   const header = serviceLink.locator('xpath=ancestor::th')
   expect(await header.evaluate((element) => getComputedStyle(element).wordBreak)).toBe('normal')

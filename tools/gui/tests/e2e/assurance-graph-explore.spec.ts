@@ -18,6 +18,10 @@ test('a real assurance neighborhood supports deep-linking, expansion, selection,
 
   await unsafeControlAction.click()
   await expect(page.locator('.graph-sidebar')).toContainText(UCA_NAME)
+  const detailsLink = page.locator('.graph-sidebar').getByRole('link', { name: UCA_NAME, exact: true })
+  await expect(detailsLink).toHaveAttribute('href', /^\/assurance\/node\//)
   await page.getByRole('button', { name: 'Zoom in' }).click()
   await page.getByRole('button', { name: 'Fit to view' }).click()
+  await detailsLink.click()
+  await expect(page).toHaveURL(/\/assurance\/node\//)
 })

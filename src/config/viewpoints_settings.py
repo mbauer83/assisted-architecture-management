@@ -76,7 +76,7 @@ def viewpoints_diagram_render_max_entities() -> int:
     """Pre-flight ceiling for the ad-hoc diagram representation: beyond this many
     entities PlantUML rendering degenerates (or fails outright), so the surface refuses
     with a friendly, actionable message instead of a renderer stack error."""
-    return _viewpoints_positive_integer("diagram_render_max_entities", 150)
+    return _viewpoints_positive_integer("diagram_render_max_entities", 250)
 
 
 def viewpoints_legibility_budget() -> int:

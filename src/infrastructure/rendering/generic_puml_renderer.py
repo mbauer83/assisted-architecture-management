@@ -11,6 +11,7 @@ from typing import Any
 from src.application.artifact_parsing import normalize_puml_alias
 from src.domain.archimate_relation_rendering import (
     display_connection_label,
+    format_influence_polarity,
     format_multiplicity_label,
     format_specializations_guillemet,
 )
@@ -232,6 +233,9 @@ class GenericPumlRenderer:
                 label = override
             else:
                 visible_label = self.visible_connection_label(conn, diagram_connections)
+                polarity = format_influence_polarity(conn.conn_type, conn.attributes)
+                if polarity:
+                    visible_label = f"{polarity} {visible_label}".strip()
                 if conn_spec is not None and conn_spec.notation.label_marker:
                     visible_label = f"{conn_spec.notation.label_marker} {visible_label}".strip()
                 show_stereo = conn_info.show_stereotype if conn_info is not None else True

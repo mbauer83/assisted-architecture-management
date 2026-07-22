@@ -43,12 +43,10 @@ def connection_type_guidance(
     repo_root: Path | None = None,
     connection_type_names: tuple[str, ...],
 ) -> list[dict[str, object]]:
-    """Per-connection-type specialization enumeration, restricted to types that have any.
+    """Per-connection-type specialization and effective metadata-schema guidance.
 
-    Unlike entity types (each already gets its own guidance entry, so an empty
-    ``specializations`` list costs nothing extra), connection types have no other guidance
-    entry here; listing every known connection type regardless of specialization would add a
-    long, mostly-empty block to every guidance response.
+    Types without specializations remain omitted unless they declare a base metadata schema,
+    keeping the response compact while ensuring every editable schema reaches authoring clients.
 
     With ``repo_root``, each entry also carries the effective metadata schema: the
     type-level one under ``metadata_schema``, and each specialization's merged schema under
@@ -59,7 +57,12 @@ def connection_type_guidance(
     entries: list[dict[str, object]] = []
     for name in connection_type_names:
         specializations = specialization_catalog.for_type("connection", name)
-        if not specializations:
+        base_schema = (
+            _schema_block(repo_root, name, "", specialization_catalog, profile_registry)
+            if repo_root is not None
+            else None
+        )
+        if not specializations and not (base_schema and base_schema["schema"] is not None):
             continue
         entry: dict[str, object] = {
             "name": name,
@@ -68,10 +71,8 @@ def connection_type_guidance(
                 for info in specializations
             ],
         }
-        if repo_root is not None:
-            entry["metadata_schema"] = _schema_block(
-                repo_root, name, "", specialization_catalog, profile_registry
-            )
+        if base_schema is not None:
+            entry["metadata_schema"] = base_schema
         entries.append(entry)
     return entries
 

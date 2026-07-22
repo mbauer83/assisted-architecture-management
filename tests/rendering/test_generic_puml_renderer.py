@@ -53,6 +53,7 @@ def _conn(
     content_text: str = "",
     src_multiplicity: str = "",
     tgt_multiplicity: str = "",
+    attributes: dict[str, object] | None = None,
 ) -> ConnectionRecord:
     return ConnectionRecord(
         artifact_id=f"{source}---{target}@@{conn_type}",
@@ -66,6 +67,7 @@ def _conn(
         content_text=content_text,
         src_multiplicity=src_multiplicity,
         tgt_multiplicity=tgt_multiplicity,
+        attributes=attributes or {},
     )
 
 
@@ -282,6 +284,30 @@ def test_archimate_connections_use_ontology_arrow_styles_not_macros(tmp_path: Pa
         assert f"<<{conn_type.removeprefix('archimate-')}>>" not in puml, (
             f"{conn_type!r} must not emit stereotype label — arrow style conveys the type"
         )
+
+
+def test_influence_polarity_renders_as_colored_sign(tmp_path: Path) -> None:
+    renderer = GenericPumlRenderer(_ARCHIMATE_CONFIG)
+    source = _entity("DRV@1.a.driver", "driver", "Driver", "DRV_A", subdomain="drivers")
+    target = _entity("GOL@1.a.goal", "goal", "Goal", "GOL_A", subdomain="goals")
+
+    positive = renderer.render_body(
+        "Positive influence",
+        [source, target],
+        [_conn(source.artifact_id, target.artifact_id, "archimate-influence", attributes={"polarity": "positive"})],
+        "archimate-motivation",
+        tmp_path,
+    )
+    negative = renderer.render_body(
+        "Negative influence",
+        [source, target],
+        [_conn(source.artifact_id, target.artifact_id, "archimate-influence", attributes={"polarity": "negative"})],
+        "archimate-motivation",
+        tmp_path,
+    )
+
+    assert "<color:#15803d><b>+</b></color>" in positive
+    assert "<color:#b91c1c><b>-</b></color>" in negative
 
 
 def test_render_body_renders_junction_inside_nested_parent(tmp_path: Path) -> None:

@@ -66,7 +66,7 @@ _DEFAULTS: dict[str, dict[str, object]] = {
         "derivation_max_hops": 4,
         "derivation_max_relationships": 20000,
         "derivation_time_budget_seconds": 2.0,
-        "diagram_render_max_entities": 150,
+        "diagram_render_max_entities": 250,
         "legibility_budget": 100,
     },
     "exchange": {

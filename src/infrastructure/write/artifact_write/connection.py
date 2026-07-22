@@ -137,7 +137,7 @@ def _assert_pair_writable(
     repo_root: Path, connection_type: str, specialization: str | None,
     specializations: Sequence[str] | None = None,
 ) -> None:
-    """The connection side of the WU-Q3 write gate: refuse a write onto a quarantined
+    """Refuse a write onto a quarantined
     ``(connection-type, specialization)`` pair, exactly as the entity paths do. Kept at the
     write boundary both transports funnel through, so REST and MCP cannot diverge."""
     from src.application.profile_quarantine import assert_not_quarantined  # noqa: PLC0415
@@ -151,7 +151,7 @@ def _assert_pair_writable(
 
 
 def _connection_metadata(
-    specialization: str | None, metadata: dict[str, str] | None, specializations: Sequence[str] | None = None
+    specialization: str | None, metadata: dict[str, object] | None, specializations: Sequence[str] | None = None
 ) -> dict[str, object]:
     """One per-connection metadata block from the inputs that feed it. ``specialization`` is
     authoritative for its own key — it selects which schema applies, so it is never something
@@ -199,7 +199,7 @@ def _build_content(
     tgt_multiplicity: str | None = None,
     specialization: str | None = None,
     specializations: Sequence[str] | None = None,
-    metadata: dict[str, str] | None = None,
+    metadata: dict[str, object] | None = None,
 ) -> str:
     applied = normalize_specializations(specialization, specializations)
     if outgoing_path.exists():
@@ -339,7 +339,7 @@ def add_connection(
     tgt_multiplicity: str | None = None,
     specialization: str | None = None,
     specializations: Sequence[str] | None = None,
-    metadata: dict[str, str] | None = None,
+    metadata: dict[str, object] | None = None,
     extra_known_ids: frozenset[str] = frozenset(),
 ) -> WriteResult:
     """Add a connection to the source entity's .outgoing.md file.

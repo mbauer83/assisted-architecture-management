@@ -14,6 +14,8 @@ export const ConnectionRecordSchema = Schema.Struct({
   src_multiplicity: Schema.optional(Schema.String),
   tgt_multiplicity: Schema.optional(Schema.String),
   specialization: Schema.optional(Schema.String),
+  specializations: Schema.optional(Schema.Array(Schema.String)),
+  metadata: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
   associated_entities: Schema.optional(Schema.Array(Schema.String)),
 })
 export type ConnectionRecord = typeof ConnectionRecordSchema.Type

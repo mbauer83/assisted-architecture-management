@@ -55,6 +55,7 @@ export const DiagramOwnEntityTypeUiConfigSchema = Schema.Struct({
   max: Schema.NullOr(Schema.Number),
   permitted_mappings: PermittedMappingSpecSchema,
   mapping_required: Schema.Boolean,
+  include_in_global_search: Schema.optional(Schema.Boolean),
   properties: Schema.Array(DiagramOwnEntityTypePropertySpecSchema),
 })
 export type DiagramOwnEntityTypeUiConfig = typeof DiagramOwnEntityTypeUiConfigSchema.Type

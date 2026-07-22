@@ -47,6 +47,7 @@ class DiagramOwnEntityTypeUiConfig:
     managed_fields: tuple[tuple[str, str], ...] | None = None
     identity_scope: Literal["diagram", "workspace"] = "diagram"
     id_prefix: str | None = None
+    include_in_global_search: bool = False
 
 
 @dataclass(frozen=True)
@@ -117,6 +118,7 @@ def _own_entity_ui_config_from_mapping(config: Mapping[str, Any]) -> DiagramOwnE
         managed_fields=_parse_managed_fields(config.get("managed_fields")),
         identity_scope=str(config.get("identity_scope") or "diagram"),  # type: ignore[arg-type]
         id_prefix=(str(config["id_prefix"]) if config.get("id_prefix") else None),
+        include_in_global_search=bool(config.get("include_in_global_search", False)),
     )
 
 

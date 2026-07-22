@@ -1,7 +1,7 @@
-"""Tests for ``persist_viewpoint_definition``/``delete_viewpoint_definition`` (companion
-plan §10): version-bump enforcement, slug uniqueness, enterprise/module read-only,
-delete-blocked-while-referenced, and referencer discovery. Pure functions — no file I/O;
-callers own loading ``local_catalog`` and persisting ``result.catalog_to_write``.
+"""Tests for viewpoint persistence lifecycle and referencer discovery.
+
+Pure functions only: callers own loading the local catalog and persisting the returned
+catalog.
 """
 
 from __future__ import annotations
@@ -16,7 +16,12 @@ from src.application.viewpoints.persist_definition import (
 from src.domain.concept_scope import ConceptScope
 from src.domain.module_types import EntityTypeName
 from src.domain.viewpoint_lineage import definition_digest
-from src.domain.viewpoints import ForkLineage, ViewpointCatalog, ViewpointDefinition
+from src.domain.viewpoints import (
+    ExecutableViewpointQuery,
+    ForkLineage,
+    ViewpointCatalog,
+    ViewpointDefinition,
+)
 from tests.application.viewpoints._fixtures import REGISTRIES
 
 
@@ -151,6 +156,27 @@ class TestCreate:
         assert result.ok is False
         assert any(i.code == "unknown-type" for i in result.issues)
         assert result.catalog_to_write is None
+
+    def test_warning_is_reported_without_blocking_persistence(self) -> None:
+        definition = _definition(
+            scope=ConceptScope(
+                entity_types=frozenset({EntityTypeName("application-component")})
+            ),
+            query=ExecutableViewpointQuery(),
+            selection_mode="query",
+        )
+
+        result = persist_viewpoint_definition(
+            "create",
+            definition,
+            local_catalog=ViewpointCatalog.empty(),
+            merged_catalog=ViewpointCatalog.empty(),
+            registries=REGISTRIES,
+        )
+
+        assert result.ok is True
+        assert [item.code for item in result.issues] == ["selection-layers-diverge"]
+        assert result.catalog_to_write is not None
 
 
 class TestEdit:

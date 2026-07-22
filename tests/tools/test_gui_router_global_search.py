@@ -14,6 +14,7 @@ import pytest
 from fastapi import FastAPI
 
 from src.application.artifact_query import ArtifactRepository
+from src.infrastructure.app_bootstrap import install_module_registry
 from src.infrastructure.artifact_index import shared_artifact_index
 from src.infrastructure.gui.routers import state as gui_state
 from src.infrastructure.gui.routers.connections import router as connections_router
@@ -24,6 +25,7 @@ DOC_ID = "STD@1000000050.GblDoc.coding-conventions"
 SRC_ID = "REQ@1000000050.GblSrc.alpha-requirement"
 TGT_ID = "REQ@1000000050.GblTgt.beta-requirement"
 _CONN_TOKEN = "zephyrlink"
+DIAGRAM_ID = "ACT@1000000050.GblAct.alpha-workflow"
 
 
 def _write(path: Path, text: str) -> None:
@@ -103,6 +105,26 @@ These conventions cover {_CONN_TOKEN} naming and style.
 """
 
 
+def _activity_diagram() -> str:
+    return f"""\
+---
+artifact-id: {DIAGRAM_ID}
+artifact-type: diagram
+name: "Alpha Workflow"
+diagram-type: activity
+version: 0.1.0
+status: draft
+last-updated: '2026-01-01'
+diagram-entities:
+  action:
+    - id: alpha
+      label: Alpha Requirement
+---
+@startuml alpha-workflow
+@enduml
+"""
+
+
 @pytest.fixture()
 def search_client(tmp_path: Path):
     from starlette.testclient import TestClient
@@ -112,10 +134,12 @@ def search_client(tmp_path: Path):
     _write(root / "model" / "motivation" / "requirement" / f"{TGT_ID}.md", _entity_md(TGT_ID, "Beta Requirement"))
     _write(root / "model" / "motivation" / "requirement" / f"{SRC_ID}.outgoing.md", _connection_md())
     _write(root / "docs" / "standard" / f"{DOC_ID}.md", _doc_md())
+    _write(root / "diagram-catalog" / "diagrams" / f"{DIAGRAM_ID}.puml", _activity_diagram())
 
     repo = ArtifactRepository(shared_artifact_index([root]))
     gui_state.init_state(repo, root, None)
     app = FastAPI()
+    install_module_registry(app)
     app.include_router(connections_router)
     return TestClient(app), repo
 
@@ -147,3 +171,11 @@ class TestGlobalSearchExcludesConnections:
         _, repo = search_client
         result = repo.search_artifacts(_CONN_TOKEN, limit=20, include_connections=True)
         assert any(h.record_type == "connection" for h in result.hits)
+
+
+class TestGlobalSearchEntityPriority:
+    def test_diagram_owned_match_does_not_displace_model_entity(self, search_client) -> None:
+        client, _ = search_client
+        hits = client.get("/api/search?q=Alpha%20Requirement").json()["hits"]
+        assert hits[0]["artifact_id"] == SRC_ID
+        assert not any("#action/" in hit["artifact_id"] for hit in hits)

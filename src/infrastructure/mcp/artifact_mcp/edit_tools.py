@@ -115,7 +115,7 @@ def artifact_edit_connection(
     tgt_multiplicity: str | None = None,
     specialization: str | None = None,
     specializations: list[str] | None = None,
-    metadata: dict[str, str] | None = None,
+    metadata: dict[str, object] | None = None,
     dry_run: bool = True,
     repo_root: str | None = None,
 ) -> dict[str, object]:
@@ -154,7 +154,7 @@ def artifact_edit_connection(
             source_entity=source_entity,
             target_entity=target_entity,
             connection_type=connection_type,
-            description=description,
+            description=description if description is not None else _UNSET,
             src_multiplicity=src_multiplicity if src_multiplicity is not None else _UNSET,
             tgt_multiplicity=tgt_multiplicity if tgt_multiplicity is not None else _UNSET,
             specialization=specialization if specialization is not None else _UNSET,

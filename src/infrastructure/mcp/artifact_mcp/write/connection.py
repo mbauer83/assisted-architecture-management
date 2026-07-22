@@ -34,7 +34,7 @@ def _add_connection_impl(
     clear_repo_caches=None,
     specialization: str | None = None,
     specializations: list[str] | None = None,
-    metadata: dict[str, str] | None = None,
+    metadata: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Internal implementation shared by the MCP tool and bulk_write."""
     scope: Literal["engagement", "both"] = "engagement" if repo_root else "both"
@@ -145,7 +145,7 @@ def artifact_add_connection(
     tgt_multiplicity: str | None = None,
     specialization: str | None = None,
     specializations: list[str] | None = None,
-    metadata: dict[str, str] | None = None,
+    metadata: dict[str, object] | None = None,
     version: str = "0.1.0",
     status: str = "draft",
     from_diagram_element: dict[str, object] | None = None,

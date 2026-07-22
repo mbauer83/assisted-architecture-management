@@ -17,9 +17,8 @@ export function specializationOptionsForEntityType(
 
 /**
  * Available specializations for one connection type, sourced from the top-level
- * `connection_types` block — unlike entity types, connection types with no specializations are
- * omitted from that block entirely (see `_connection_type_guidance` in `type_guidance.py`), so
- * absence here means "none declared", not "not yet loaded".
+ * `connection_types` block. A type can appear solely because it declares a base metadata
+ * schema; an empty specializations list therefore means "none declared".
  */
 export function specializationOptionsForConnectionType(
   guidance: AuthoringGuidance | null,

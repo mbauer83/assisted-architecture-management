@@ -58,6 +58,12 @@ class TestFtsBranch:
         ids = _hit_ids(repo.search_artifacts(QUERY, limit=10, domain="strategy", include_documents=False))
         assert ids == [CAP_ID]
 
+    def test_call_specific_exclusions_are_combined_with_repository_policy(self, tmp_path: Path) -> None:
+        repo = _repo(build_engagement_repo(tmp_path))
+        ids = _hit_ids(repo.search_artifacts(QUERY, limit=10, excluded_entity_types=frozenset({"requirement"})))
+        assert REQ_ID not in ids
+        assert GAR_ID not in ids
+
 
 class TestExplicitHiddenTypeQuery:
     def test_explicit_gar_type_query_returns_zero_entity_hits(self, tmp_path: Path) -> None:

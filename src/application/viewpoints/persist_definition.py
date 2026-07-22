@@ -160,7 +160,7 @@ def persist_viewpoint_definition(
         prior_definition = local_definition
 
     issues = _validate(definition, registries=registries, prior_definition=prior_definition, catalog=merged_catalog)
-    if issues:
+    if any(item.severity == "error" for item in issues):
         return ViewpointPersistResult(
             ok=False, action=action, slug=definition.slug, version=definition.version, issues=issues
         )
@@ -168,7 +168,12 @@ def persist_viewpoint_definition(
     remaining = tuple(d for d in local_catalog.entries if d.slug != definition.slug)
     new_catalog = ViewpointCatalog(remaining + (definition,))
     return ViewpointPersistResult(
-        ok=True, action=action, slug=definition.slug, version=definition.version, catalog_to_write=new_catalog
+        ok=True,
+        action=action,
+        slug=definition.slug,
+        version=definition.version,
+        issues=issues,
+        catalog_to_write=new_catalog,
     )
 
 
