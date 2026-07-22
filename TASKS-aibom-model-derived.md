@@ -27,9 +27,23 @@ immediately. WU-A1 (specializations) has no such dependency and can proceed.
 
 All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs):
 
-- **Q1 (gated WU-A1) — Specialization breadth → ALL NINE** (PLAN §4 D2). The named-profile
-  registry (landed) removes the near-duplicate-schema cost, so nine ≈ three in effort and
-  avoids a second migration. WU-A1 ships the full D2 set.
+- **Q1 (gated WU-A1) — Specialization breadth → EIGHT** (D2 refined with the owner
+  2026-07-22). Originally "all nine"; on review two refinements landed:
+  - **`ai-agent` and `ai-orchestrator` MERGE into one `ai-agent`** (application-component).
+    Both are application-components coordinating model calls + tools; the only line is
+    control flow (autonomous loop vs deterministic pipeline), a spectrum, and NEITHER is a
+    distinct CycloneDX component type — so the split bought architectural nuance, not BOM
+    fidelity. Merged; the pipeline-vs-loop nuance is captured in the specialization
+    description / an attribute.
+  - **`ai-inference-service` specializes the `service` entity type**, not "application-service"
+    — `application-service` is itself a specialization of `service`, not a base entity type,
+    so a specialization cannot attach to it. `service` is the correct application-layer base;
+    AIBOM component type = service. (D2 label reconciled; the intent "a served inference
+    endpoint" is unchanged.)
+  The final EIGHT: application-component → `ai-model`, `ai-agent`; service →
+  `ai-inference-service`; data-object → `ai-dataset`, `ai-prompt-asset`, `ai-vector-store`;
+  system-software → `ai-runtime`; application-interface → `ai-tool-interface`. The
+  named-profile registry (landed) removes the near-duplicate-schema cost.
 - **Q2 (gated WU-E2) — Marking placement → `arch-repo-write`, REUSE `artifact_edit_entity`.**
   Marking = setting an AI specialization on an existing entity (an architecture write);
   reuse the existing edit tool's `specialization` field rather than add a tool
@@ -43,15 +57,29 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
 
 ## Stream A — Ontology foundation
 
-### WU-A1 — AI specializations (Q1 resolved: ALL NINE)
-- [ ] Declare all nine specializations (Q1 decided) in
-      `src/ontologies/archimate_4/specializations.yaml` (slug + name per base
-      type, per PLAN §4 D2).
-- [ ] Verify each base type accepts specializations and that the slugs collide
-      with nothing existing (the `application-component` list already has
-      `service` and `module`).
-- [ ] Tests: the module loader exposes every new specialization; the guidance
+### WU-A1 — AI specializations (Q1 resolved: EIGHT — see Questions)
+- [x] Declare the eight specializations in
+      `src/ontologies/archimate_4/specializations.yaml` (slug + name +
+      description + create/never guidance per base type).
+- [x] Verify each base type accepts specializations and that the slugs collide
+      with nothing existing.
+- [x] Tests: the module loader exposes every new specialization; the guidance
       layer surfaces them for authoring.
+
+#### WU-A1 PROGRESS (2026-07-22)
+- Eight AI specializations shipped (owner refined D2 from nine — see Questions): `ai-model`,
+  `ai-agent` on `application-component`; `ai-inference-service` on `service`; `ai-dataset`,
+  `ai-prompt-asset`, `ai-vector-store` on `data-object`; `ai-runtime` on `system-software`;
+  `ai-tool-interface` on `application-interface`. Each carries a description + create_when /
+  never_create_when that draws the model/service/runtime and data distinctions, so the
+  authoring surfaces explain when to reach for each.
+- `ai-orchestrator` deliberately NOT shipped (merged into `ai-agent`); a regression asserts
+  its absence. `ai-inference-service` attaches to the `service` entity type (the correct
+  application-layer base; "application-service" is itself a specialization of `service`).
+- No `types.generated.ts` change (it carries type names + reserved paths, not specialization
+  slugs). Profiles/bindings are WU-A2; roles WU-A3.
+- Tests: `tests/domain/test_archimate_4_specializations.py::test_ships_the_eight_ai_specializations_on_their_base_types`.
+- Gates: backend 6378 passed / 5 skipped; ruff + zuban clean.
 
 ### WU-A2 — Shared and specific profiles (needs A1, and the profile registry's WU-P2)
 - [ ] Declare shared named profiles (provenance, licensing, supplier) once and

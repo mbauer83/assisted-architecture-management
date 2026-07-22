@@ -93,6 +93,34 @@ class TestArchimate4SpecializationLibrary:
         with pytest.raises(ValueError, match="Duplicate specialization"):
             load_archimate_4_module(_PACKAGE_DIR, specializations=repo_catalog)
 
+    def test_ships_the_eight_ai_specializations_on_their_base_types(self) -> None:
+        # WU-A1 (Q1 refined to EIGHT: ai-agent absorbs ai-orchestrator; ai-inference-service
+        # specializes the `service` entity type, not the non-existent "application-service").
+        module = load_archimate_4_module(_PACKAGE_DIR)
+        catalog = module.specialization_catalog
+        expected = {
+            "application-component": {"ai-model", "ai-agent"},
+            "service": {"ai-inference-service"},
+            "data-object": {"ai-dataset", "ai-prompt-asset", "ai-vector-store"},
+            "system-software": {"ai-runtime"},
+            "application-interface": {"ai-tool-interface"},
+        }
+        for base_type, slugs in expected.items():
+            have = {s.slug for s in catalog.for_type("entity", base_type, module_alias=META_ONTOLOGY_ALIAS)}
+            assert slugs <= have, f"{base_type} missing {slugs - have}"
+        # ai-orchestrator was merged away — it must NOT ship as a separate specialization.
+        component = {
+            s.slug for s in catalog.for_type("entity", "application-component", module_alias=META_ONTOLOGY_ALIAS)
+        }
+        assert "ai-orchestrator" not in component
+        # Each carries authoring guidance (description + create/never), so the surfaces can
+        # explain when to reach for it.
+        model = catalog.get("entity", "application-component", "ai-model", module_alias=META_ONTOLOGY_ALIAS)
+        assert model is not None
+        assert model.name == "AI Model"
+        assert model.description
+        assert model.create_when and model.never_create_when
+
     def test_unknown_parent_type_is_rejected(self) -> None:
         repo_catalog = SpecializationCatalog(
             specialization_catalog_from_mapping(
