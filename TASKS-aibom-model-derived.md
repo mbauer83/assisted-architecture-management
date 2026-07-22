@@ -186,34 +186,62 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
 ## Stream B — Derivation engine
 
 ### WU-B1 — Derivation core (needs A3)
-- [ ] New pure application module: entities + connections + bindings → typed
+- [x] New pure application module: entities + connections + bindings → typed
       AIBOM component set. No IO, no store access, no HTTP.
-- [ ] Resolve `modelParameters.datasets` from `trained-on` / `evaluated-on` /
-      `fine-tuned-from` bindings; `componentData.governance` from
-      accountability connections; the BOM `dependencies[]` graph from AI-to-AI
+- [x] Resolve datasets from `trained-on`/`evaluated-on`/`fine-tuned-from`; governance from
+      the `governed-by`/`guarded-by` bindings; the `dependencies[]` graph from AI-to-AI
       relations.
-- [ ] Per-field provenance: every value is marked derived or authored, with the
-      authored value winning (PLAN §4 D5).
-- [ ] Tests: each derivation role in isolation; authored-overrides-derived;
-      cycles in the dependency graph terminate; an entity with no relations
-      yields a valid but sparse component.
+- [x] Per-field provenance: authored attributes carried as `authored`; relational facts
+      `derived`; authored wins for a same-named field (D5).
+- [x] Tests: each role in isolation; wrong-target rejected; dependency graph + cycle
+      termination; sparse no-relations component; drift guard (ontology slugs ↔ type map).
+
+#### WU-B1 PROGRESS (2026-07-22)
+- `src/application/aibom_derivation.py` — pure `derive_aibom(entities, connections, bindings)`
+  → `tuple[AibomComponent]`. `AI_COMPONENT_TYPE` maps each AI specialization to its CycloneDX
+  component type (and IS the "which specializations are AI" set); a drift test pins it against
+  the shipped ontology. Datasets/governance are role matches; dependencies are AI→AI edges
+  (emitted once per target, no traversal, so cycles terminate). Authored attributes come from
+  the decoded Properties with `authored` provenance.
+- **GOVERNANCE (recorded A3 note carried through):** the pure core derives governance from the
+  `governed-by`/`guarded-by` bindings over ARCHITECTURE connections only. It does NOT read the
+  confidential assurance accountability store — that boundary is respected. If the owner later
+  wants assurance-edge governance, it enters as a separate input to this pure function; not
+  done, and flagged.
 
 ### WU-B2 — Considerations from the motivation layer (needs B1)
-- [ ] Derive `considerations.users` / `useCases` from stakeholders/drivers/goals
-      reachable from the AI component, bounded by an explicit traversal depth —
-      not an unbounded graph walk.
-- [ ] Tests: depth bound honoured; unreachable motivation yields empty, not
-      error.
+- [x] Derive `considerations.users` (stakeholders) / `use_cases` (drivers/goals) reachable
+      from the AI component, bounded by an explicit `consideration_depth` (bounded BFS, never
+      an unbounded walk).
+- [x] Tests: depth bound honoured; unreachable motivation yields empty, not error.
 
 ### WU-B3 — Coverage evaluation (needs B1)
-- [ ] Per-AI-component report: missing required attributes, unbound derivation
-      roles, missing governance edge, missing dataset linkage.
-- [ ] Tests: a fully-specified component reports clean; each gap class is
-      detected independently.
+- [x] Per-AI-component report: missing required attributes, unbound derivation roles, missing
+      governance edge, missing dataset linkage — in TWO tiers (blocking vs advisory).
+- [x] Tests: fully-specified reports clean; each gap class detected independently; the
+      recommended (advisory) tier does not block validity.
+
+#### WU-B3 PROGRESS (2026-07-22)
+- `src/application/aibom_coverage.py` — `evaluate_coverage(components, required, bindings,
+  recommended_attributes=…)` → `AibomCoverage`. Per-component gaps: required-missing +
+  dataset + governance are BLOCKING (`clean` is false); recommended-missing is ADVISORY
+  (`complete` is false but `clean` stays true) — the "handle optional/unavailable sensibly"
+  tiering. Repo-wide `unbound_roles` from `bindings.unbound_roles()`.
+- **OWNER NOTE (2026-07-22) for Streams D/F:** the AI-BOM creation wizard should surface
+  modeling gaps (from this coverage) and help remedy them on the fly, possibly via a NEW
+  ANCHORED VIEWPOINT anchored on AI components that renders coverage. Optional/unavailable
+  info must be handled sensibly — this coverage's required(blocking) / recommended(advisory) /
+  optional(untracked) tiers are the data model for exactly that. Carry into WU-F3 (coverage
+  view) and WU-D1; consider the anchored-viewpoint approach there.
 
 ### WU-B4 — Stream B boundary
-- [ ] Backend gates green; derivation covered by unit tests with no store
+- [x] Backend gates green; derivation + coverage covered by unit tests with no store
       dependency.
+
+#### WU-B4 PROGRESS (2026-07-22)
+- Stream B (derivation core + considerations + coverage) is pure application-layer, no IO/
+  store/HTTP — every test constructs records directly. Gates: backend 6417 passed / 5
+  skipped; ruff + zuban clean.
 
 ## Stream C — Exporter rewrite
 
