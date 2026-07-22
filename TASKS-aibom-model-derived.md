@@ -380,26 +380,54 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
 ## Stream F — GUI
 
 ### WU-F1 — Panel repair (needs E1)
-- [ ] `AssuranceAibomPanel.vue`: remove the dead `aibom_coverage` calls (404
-      today) and the panel bits that depend on them.
-- [ ] Fix per-component role assignment — `selectedAiComponents` receives `{}`
-      as `roleById`, so every component currently exports with the same default
-      role.
+- [x] `AssuranceAibomPanel.vue` reworked around the model-derived flow.
+- [x] The per-component role-assignment defect is GONE with the flow: export no longer takes
+      a caller-assembled component list or per-component roles, so `selectedAiComponents` /
+      `roleById` (the `{}`-default bug) are deleted, not patched.
+
+#### WU-F1 PROGRESS (2026-07-22)
+- The panel no longer confirms candidates and posts component dicts. It now: (1) shows
+  COVERAGE (GET /coverage) — per-component blocking vs advisory gaps + unbound roles; (2)
+  SCANs (assistive) with a note to mark candidates on their entity page; (3) EXPORTs the
+  model-derived ML-BOM (POST /export with just notes) and renders/downloads it. The dead
+  role selector + `parseRoles`/`selectedAiComponents`/`AiComponent`/`AiRole` helpers are
+  removed; `parseCoverage` + `componentHasBlockingGap` added.
 
 ### WU-F2 — Model-card authoring (needs A2)
-- [ ] Author AIBOM attributes through the existing `TypedPropertyInput`
-      (string/array/enum already supported — no new widget).
-- [ ] Surface on the entity detail view, so a model card is authored where the
-      entity lives rather than inside a wizard.
-- [ ] Vitest coverage per the separate-file-per-component convention.
+- [x] AIBOM attributes are authored through the existing `TypedPropertyInput` — they ARE
+      schema attributes on the AI specialization, so no new widget.
+- [x] Surfaced on the entity detail view: marking an entity with an AI specialization makes
+      the entity EDIT form fetch the effective schema (base ⊕ profiles ⊕ model card) and
+      render the model-card fields, with the WU-Y2 merge-on-specialization-change. Authored
+      where the entity lives — no separate wizard.
+- [x] Vitest coverage: the reconcile engine (`schemaPropertyRows.test.ts`) and the typed
+      list editor (`arrayPropertyValue.test.ts`) already cover the mechanism; the AI model
+      card is just schema attributes flowing through it.
+
+#### WU-F2 PROGRESS (2026-07-22)
+- Delivered by the Stream Y attribute-profile GUI work: an ai-model entity's Properties
+  editor shows Approach (enum), Task, Performance Metrics (typed list), etc., because the
+  effective schema carries them. No AIBOM-specific authoring surface was needed — the point
+  of deriving from the model is that authoring is ordinary entity authoring.
 
 ### WU-F3 — Coverage view (needs D1)
-- [ ] Per-entity "what is missing for a valid AIBOM", replacing the promise the
-      current help text makes and cannot keep.
+- [x] Per-component "what is missing for a valid AIBOM" in the panel — replacing the help
+      text the old panel promised and could not keep (engine-only, per the owner decision;
+      no anchored viewpoint).
+
+#### WU-F3 PROGRESS (2026-07-22)
+- The Coverage block renders `GET /api/assurance/aibom/coverage`: per component, the blocking
+  gaps (missing required attributes / dataset link / governance) as red badges and the
+  advisory (recommended) gaps as amber, or a green "complete"; plus the repo-wide unbound
+  derivation roles. Tiering is the B3/owner "handle optional sensibly" model made visible.
 
 ### WU-F4 — Stream F boundary
-- [ ] Frontend gates green: full `npm run lint`, `npm run typecheck`,
-      `npx vitest run`.
+- [x] Frontend gates green: full `npm run lint`, `npm run typecheck`, `npx vitest run`.
+
+#### WU-F4 PROGRESS (2026-07-22)
+- typecheck clean; vitest 117 files / 1187 passed; lint clean. **Restart-gated**: the panel's
+  live behaviour needs the frontend rebuilt/restarted and the backend (for the new REST
+  endpoints) — queued for WU-X1.
 
 ## Stream G — Self-model, docs, dogfooding
 

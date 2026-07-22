@@ -1,32 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import {
-  parseRoles,
   parseCandidates,
-  selectedAiComponents,
+  parseCoverage,
   scoreBand,
+  componentHasBlockingGap,
 } from '../AssuranceAibom.helpers'
-
-describe('parseRoles', () => {
-  it('decodes the roles array from the backend', () => {
-    expect(parseRoles({ roles: ['machine-learning-model', 'dataset'] })).toEqual([
-      'machine-learning-model',
-      'dataset',
-    ])
-  })
-
-  it('returns empty on a malformed body', () => {
-    expect(parseRoles(null)).toEqual([])
-    expect(parseRoles({})).toEqual([])
-    expect(parseRoles({ roles: 'nope' })).toEqual([])
-  })
-})
-
 
 describe('parseCandidates', () => {
   it('decodes candidates and coerces fields', () => {
     const out = parseCandidates({
       candidates: [
-        { entity_id: 'APP@1', name: 'Claude', entity_type: 'application-component', score: 55, reasons: ['LLM name pattern'] },
+        {
+          entity_id: 'APP@1', name: 'Claude', entity_type: 'application-component',
+          score: 55, reasons: ['LLM name pattern'],
+        },
         { entity_id: 'APP@2', name: 'X', entity_type: 't', score: 'bad', reasons: 'bad' },
       ],
     })
@@ -43,28 +30,45 @@ describe('parseCandidates', () => {
   })
 })
 
-describe('selectedAiComponents', () => {
-  const candidates = [
-    { entity_id: 'APP@1', name: 'Claude', entity_type: 'application-component', score: 55, reasons: [] },
-    { entity_id: 'APP@2', name: 'Vectors', entity_type: 'data-object', score: 25, reasons: [] },
-    { entity_id: 'APP@3', name: 'Ledger', entity_type: 'application-component', score: 10, reasons: [] },
-  ]
-
-  it('maps only selected candidates with their resolved role', () => {
-    const out = selectedAiComponents(
-      candidates,
-      new Set(['APP@1', 'APP@2']),
-      { 'APP@2': 'vector-store' },
-      'machine-learning-model',
-    )
-    expect(out).toEqual([
-      { name: 'Claude', arch_entity_id: 'APP@1', ai_role: 'machine-learning-model' },
-      { name: 'Vectors', arch_entity_id: 'APP@2', ai_role: 'vector-store' },
-    ])
+describe('parseCoverage', () => {
+  it('decodes per-component gaps and unbound roles', () => {
+    const cov = parseCoverage({
+      components: [
+        {
+          entity_id: 'APP@1', name: 'Model', specialization: 'ai-model',
+          missing_required_attributes: ['Task'], missing_recommended_attributes: ['Approach'],
+          missing_dataset_linkage: true, missing_governance: false,
+        },
+      ],
+      unbound_roles: ['governed-by'],
+    })
+    expect(cov.components).toHaveLength(1)
+    expect(cov.components[0].missing_required_attributes).toEqual(['Task'])
+    expect(cov.components[0].missing_dataset_linkage).toBe(true)
+    expect(cov.unbound_roles).toEqual(['governed-by'])
   })
 
-  it('returns empty when nothing is selected', () => {
-    expect(selectedAiComponents(candidates, new Set(), {}, 'tool')).toEqual([])
+  it('is empty and total on a malformed or empty body', () => {
+    expect(parseCoverage(null)).toEqual({ components: [], unbound_roles: [] })
+    expect(parseCoverage({ components: 'nope' })).toEqual({ components: [], unbound_roles: [] })
+  })
+})
+
+describe('componentHasBlockingGap', () => {
+  const base = {
+    entity_id: 'A', name: 'n', specialization: 'ai-model',
+    missing_required_attributes: [] as string[], missing_recommended_attributes: [] as string[],
+    missing_dataset_linkage: false, missing_governance: false,
+  }
+
+  it('is false when nothing blocking is missing (advisory does not count)', () => {
+    expect(componentHasBlockingGap({ ...base, missing_recommended_attributes: ['Approach'] })).toBe(false)
+  })
+
+  it('is true for a missing required attribute, dataset link, or governance', () => {
+    expect(componentHasBlockingGap({ ...base, missing_required_attributes: ['Task'] })).toBe(true)
+    expect(componentHasBlockingGap({ ...base, missing_dataset_linkage: true })).toBe(true)
+    expect(componentHasBlockingGap({ ...base, missing_governance: true })).toBe(true)
   })
 })
 
