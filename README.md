@@ -22,7 +22,7 @@ assurance built in.
 
 [Quickstart](#quickstart) · [Documentation](docs/index.md) · [Why it exists](docs/01-motivation.md) · [Assurance](docs/04-assurance/index.md)
 
-<!-- media: docs/media/hero-overview.png — captured in Phase B (controlled 1440×900 @2x) -->
+<!-- media: docs/media/hero-overview.png — deterministic capture, 1440×900 @2x -->
 ![The architecture repository GUI showing the engagement overview](docs/media/hero-overview.png)
 
 </div>
@@ -38,9 +38,13 @@ structured frontmatter — that both people and agents read, author, and verify 
 same store.
 
 The repository **models its own architecture**. The screenshots throughout these docs are the
-tool describing itself: its components, requirements, decisions, and diagrams all live in
-[`engagements/ENG-ARCH-REPO/`](engagements/ENG-ARCH-REPO/) and are browsable in the running
-app.
+tool describing itself: its components, requirements, decisions, diagrams — and its own
+safety/security analysis — live in
+[`engagements/ENG-ARCH-REPO/`](engagements/ENG-ARCH-REPO/) and the bundled assurance seed,
+browsable in the running app and walked end to end in the
+[showcase](docs/06-showcase.md). Where an illustration needs security findings the live
+model doesn't currently have, they are synthetically seeded and visibly marked as such;
+your own assurance content stays confidential by design.
 
 &nbsp;
 
@@ -85,6 +89,7 @@ More on the audience in [Who it serves](docs/01-motivation.md#who-it-serves).
 | 🤖 | **AI-native access** | A split read/write MCP server exposes the model as typed tools; the same capability is in the GUI, REST API, and CLI |
 | 🏢 | **Two-tier repositories** | Draft in an engagement repo, promote curated content to a shared enterprise baseline |
 | 🛡️ | **First-class assurance** | Confidential STPA/CAST/GRC analysis, linked to the model, with a tamper-evident archive |
+| 🔧 | **Operational upgrades** | `arch-repair upgrade` migrates repositories and deployment data across format changes — dry-run first, resumable, Docker-integrated |
 | 🧩 | **Modular everywhere** | Pluggable ontologies, diagram types, schemata, and storage backends over a hexagonal core |
 
 &nbsp;
@@ -167,6 +172,16 @@ The agent can then `artifact_query_search_artifacts`, walk the graph with
 `artifact_add_connection` — every write validated by the same verifier the GUI uses. See
 [Interfaces & MCP](docs/03-modeling/interfaces-and-mcp.md).
 
+### Optional extras
+
+- **Authoring guidance** is license-separated and ships empty — the authoring surfaces say
+  so explicitly until you import it: `arch-import-guidance --source <url-or-path>`, then
+  restart the backend. See [Authoring guidance](docs/05-extensibility/guidance.md).
+- **Assurance store** (STPA/CAST/GRC + security signals):
+  `arch-assurance init && arch-assurance seed --with-signals` bootstraps an encrypted store
+  with the platform's own example analysis. See
+  [Assurance](docs/04-assurance/index.md).
+
 &nbsp;
 
 ## Documentation
@@ -177,8 +192,10 @@ The agent can then `artifact_query_search_artifacts`, walk the graph with
 | 2 | [Installation & Setup](docs/02-installation.md) | Per-OS prerequisites, dependency groups, backend, MCP, quality checks |
 | 3 | [Architecture Modeling](docs/03-modeling/index.md) | Projects, views, graph exploration, diagramming, viewpoints, the MCP/REST surface |
 | 4 | [Assurance — Safety, Security, GRC](docs/04-assurance/index.md) | STPA/CAST/GRC methods, assurance diagrams, confidential storage |
-| 5 | [Extensibility](docs/05-extensibility/index.md) | Profiles, document types, ontology & diagram-type modules, hexagonal core |
-| — | [Reference](docs/reference/configuration.md) | Configuration, CLI, git sync & promotion, [Docker Compose](docs/reference/docker-compose.md) |
+| 5 | [Extensibility](docs/05-extensibility/index.md) | Profiles, guidance, document types, ontology & diagram-type modules, hexagonal core |
+| 6 | [Showcase](docs/06-showcase.md) | The platform's own model, walked from strategy to assurance |
+| 7 | [First-model tutorial](docs/07-first-model.md) | From a running backend to a model that answers a real question |
+| — | [Reference](docs/reference/configuration.md) | Configuration, CLI, [upgrades](docs/reference/upgrade-guide.md), git sync & promotion, [Docker Compose](docs/reference/docker-compose.md), [REST API](docs/reference/rest-api.md), [licensing](docs/reference/licensing.md) |
 
 &nbsp;
 
@@ -189,6 +206,18 @@ Pre-1.0 and under active development. The model aims for conformance with the
 been independently verified, so no conformance claim is made. The assurance capability
 spans STPA, STPA-Sec, CAST, GRC, and supply-chain signal
 ingestion.
+
+&nbsp;
+
+## Roadmap
+
+Directions under consideration — not commitments, and not yet features:
+
+- Internationalization of the GUI.
+- Multi-language modeling content (localized entity names and descriptions).
+- SPDX 3.0 AI-BOM export alongside the current CycloneDX ML-BOM.
+- SysML v2 support beyond the current minimal module.
+- Rework of the packaged agent skills.
 
 &nbsp;
 

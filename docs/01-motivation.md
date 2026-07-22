@@ -1,8 +1,10 @@
 # Motivation, Ideas, Goals & Scope
 
-This page contains a condensed overview of the motivation for this project. Every driver,
-goal, outcome, principle, and requirement summarised here is contained in the project's self-model — see [`engagements/ENG-ARCH-REPO/`](../engagements/ENG-ARCH-REPO/) and browse it
-live through the GUI or the `arch-repo-read` MCP tools after a demo setup.
+This page is a condensed overview of the motivation for this project. Every driver,
+goal, outcome, principle, and requirement summarized here is contained in the project's
+self-model — see [`engagements/ENG-ARCH-REPO/`](../engagements/ENG-ARCH-REPO/), browse it
+live through the GUI or the `arch-repo-read` MCP tools, or take the guided walk in the
+[showcase](06-showcase.md).
 
 &nbsp;
 
@@ -15,21 +17,30 @@ Five durable trends shape the problem this project addresses.
 *Rendered from the self-model. Open the diagram in a running app:
 [`the-forces-shaping-this-system`](http://localhost:8000/diagram?id=ARC%401777455142.cFB8Hs.the-forces-shaping-this-system).*
 
-**AI-assisted development as the dominant production mode.** LLM-based coding agents are vastly increasing the volume and velocity of code output. This shifts the economics of production, and creates new demands on architectural planning, governance, knowledge management, and assurance work. 
+**AI-assisted development as the dominant production mode.** LLM-based coding agents are
+vastly increasing the volume and velocity of code output. This shifts the economics of
+production and creates new demands on architectural planning, governance, knowledge
+management, and assurance work.
 
 **Rising software complexity and interdependence.** As systems grow, the dependencies
 between components, services, teams, and stacks increase non-linearly. Tracing how a change
-in one place ripples through the rest increasingly requires structured architecture work. 
+in one place ripples through the rest increasingly requires structured architecture work.
 
-**Increasing demand for autonomy of teams and systems.** Recently driven in particular by the vastly increased iteration speed and volume of agentic work in the software-development lifecycle, organisational design keeps moving
-toward more autonomy for teams and subsystems, who need to be enabled to align their work semi-autonomously without being bottlenecked by frequent, highly centralized coordination.
+**Increasing demand for autonomy of teams and systems.** Driven lately by the iteration
+speed and volume of agentic work in the software-development lifecycle, organizational
+design keeps moving toward more autonomy for teams and subsystems — who then need to
+align their work semi-autonomously, without being bottlenecked by frequent, highly
+centralized coordination.
 
-**Expanding software and AI assurance obligations.** Safety, security, and assurance-evidence
-expectations for software and AI systems keep growing, and they increasingly reach smaller organizations and 
-teams. The EU AI Act, the Cyber Resilience Act, and sector-specific safety standards are representative of the trend. 
+**Expanding software and AI assurance obligations.** Safety, security, and
+assurance-evidence expectations for software and AI systems keep growing, and they
+increasingly reach smaller organizations and teams. The EU AI Act, the Cyber Resilience
+Act, and sector-specific safety standards are representative of the trend.
 
-**A safety, security, and GRC capability gap for small teams.** Small to medium teams and organizations, which produce the majority of software, rarely have dedicated assurance tooling, and the method and legal expertise needed for
-rigorous safety, security, and compliance analysis is expensive. 
+**A safety, security, and GRC capability gap for small teams.** Small to medium teams
+and organizations, which produce the majority of software, rarely have dedicated
+assurance tooling — and the method and legal expertise needed for rigorous safety,
+security, and compliance analysis is expensive.
 
 
 &nbsp;
@@ -43,10 +54,14 @@ arrangements runs into hard limits:
 **AI code generation outpaces sequential architectural review.** Review capacity that
   assumes human-paced change cannot keep up with agentic output.
 
-**Centralised governance does not scale well to concurrent development contexts.** Highly centralized planning and implementation-guidance stalls autonomous teams and agents working in parallel - as concurrent work increases, centralized integration efforts cannot be proportionally effective to maintain the same level of coherence.
+**Centralized governance does not scale well to concurrent development.** Highly
+centralized planning and implementation guidance stalls autonomous teams and agents
+working in parallel — as concurrent work increases, centralized integration effort
+cannot keep coherence at the same level without becoming the bottleneck itself.
 
-**LLM agents cannot use unstructured architectural knowledge effectively.** Prose scattered
-  across unstructured or semi-structured document-collections or in non-AI-native tooling gives an agent no simple and effective way to query, navigate, or verify intent and constraints.
+**LLM agents cannot use unstructured architectural knowledge effectively.** Prose
+scattered across document collections, or held in non-AI-native tooling, gives an agent
+no reliable way to query, navigate, or verify intent and constraints.
 
 **Architecture tools without first-class agent access put avoidable manual upkeep on people.**
 Structured modelling tools capture relationships well, but where agent access is bolted on
@@ -55,7 +70,11 @@ and verify model content through typed, validated operations. Routine updates an
 make safely then fall to people too, on top of the design and review that genuinely needs
 human judgement — and the model drifts from the system as agentic output accelerates.
 
-**Implicit interdependencies become unmaintainable without explicit models.** Relationships, reasonings, constraints and dependencies that live only in people's heads dilute and become increasingly difficult to manage as the managed system(s) and the teams grow. Even as code becomes commodified by agentic work, increasing cost and risk is still incurred by growth without explicit architectural intent, governance and knowledge-management. 
+**Implicit interdependencies become unmaintainable without explicit models.**
+Relationships, reasoning, constraints, and dependencies that live only in people's heads
+dilute as systems and teams grow. Even as code itself is commodified by agentic work,
+growth without explicit architectural intent, governance, and knowledge management still
+accumulates cost and risk.
 
 **Assurance disconnected from architecture loses traceability**, and **assurance cannot keep
   pace with agentic development velocity** — findings drift out of sync with the system they
@@ -63,7 +82,9 @@ human judgement — and the model drifts from the system as agentic output accel
 
 &nbsp;
 
-Avoiding such risks and costs enables teams to take full advantage of the velocity enabled by agentic work while maintaining unity of effort leading to more coherent, well-designed, and well-documented systems.
+Avoiding these limits is what lets a team take full advantage of agentic velocity while
+keeping unity of effort — and end up with more coherent, better-designed, and
+better-documented systems.
 
 &nbsp;
 
@@ -102,7 +123,8 @@ The goals fall into three groups:
 Four principles constrain how the system is built.
 
 **Architecture work is accessible through both human and agent interfaces.** Discovery,
-authoring, and verification are reachable for people through a GUI and CLI-tools for setup & configuration — and primarily through MCP for agents.
+authoring, and verification are reachable for people through a GUI (with CLI tools for
+setup and configuration) — and primarily through MCP for agents.
 
 **Extensibility and configurability at multiple levels.** Frontmatter schemata, attribute
 schemata, valid entity and connection types, and directory conventions are all configurable
@@ -149,7 +171,9 @@ The strategy follows directly from those goals and principles.
 
 ## Outcomes we expect
 
-If the strategy holds, the effects fall into the same three groups as the goals.
+If the strategy holds, the effects fall into the same three groups as the goals. Several
+are already demonstrable on the project itself — the [showcase](06-showcase.md) walks
+the self-model as evidence.
 
 **Coherence keeps pace with velocity.** Planning and governance overhead falls, and
 governance scales without a matching rise in coordination effort. Agents author against a

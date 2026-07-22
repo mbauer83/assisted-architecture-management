@@ -30,7 +30,7 @@ For backend ports, log paths, schemata, and storage backends, see
 | `uv` | any recent | Python environment and script runner |
 | Java | 11 | PlantUML diagram rendering and verification |
 | Graphviz | 2.49.0 | Diagram layout engine |
-| Node.js | 18 | Frontend development only (not needed to run) |
+| Node.js | 20 | Frontend development only (not needed to run) |
 | npm | 9 | Frontend development only |
 | SQLCipher (system lib) | 4 | Assurance store (optional) |
 
@@ -149,6 +149,12 @@ get-diagram-runtime
 check-diagram-runtime          # requires Graphviz >= 2.49.0
 ```
 
+The Java runtime PlantUML runs on is yours to choose: the executable resolves via
+`ARCH_JAVA` (explicit path), then `JAVA_HOME`, then `java` on `PATH` — so any
+compatible JRE can be substituted without configuration-file changes. Licensing
+context for the bundled jar and the JRE is in
+[Licensing](reference/licensing.md#bringing-your-own-java-runtime).
+
 &nbsp;
 
 ## 3. Initialise the workspace
@@ -178,6 +184,17 @@ arch-init --initialize-enterprise-repo-if-empty
 
 For workspaces that hop between multiple engagement repos, and for `arch-switch-engagement`
 usage, see [CLI & Backend Reference](reference/cli-and-backend.md).
+
+**Optional: import authoring guidance.** The per-concept "create when / never create
+when" guidance text is license-separated and ships empty — until you import it, the
+authoring surfaces state explicitly that guidance is not loaded (they never fall
+silently blank). To load it:
+
+```bash
+arch-import-guidance --source <url-or-path>   # then restart the backend
+```
+
+See [Authoring guidance](05-extensibility/guidance.md) for the format and layering.
 
 &nbsp;
 
@@ -351,6 +368,10 @@ arch-assurance unlock
 
 # Save the recovery key offline (store it in a password manager)
 arch-assurance export-key
+
+# Optional: seed the store with the bundled example content, including signal
+# anchors for the self-model (a working store to explore before authoring)
+arch-assurance seed --with-signals
 ```
 
 On later backend starts the store unlocks automatically from the OS credential backend. The
