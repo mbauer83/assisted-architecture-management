@@ -70,6 +70,7 @@ def list_active_findings(
             continue
         out.append({
             **dict(finding),
+            "assessed_entity_id": anchor_entity_id,
             "component_name": component.get("name"),
             "component_purl": component.get("purl"),
             "component_directness": component.get("directness"),
@@ -77,21 +78,66 @@ def list_active_findings(
     return out, withheld
 
 
-def signals_stats(*, snapshot_store: SnapshotReadStore) -> dict[str, int]:
+def _active_assessed_entity_ids(snapshot_store: SnapshotReadStore) -> list[str]:
+    """The architecture entities with an active security-signal snapshot (the assessed
+    entities), sorted for deterministic output."""
+    return sorted(
+        {str(r["anchor_entity_id"]) for r in snapshot_store.list_snapshots() if str(r["status"]) == "active"}
+    )
+
+
+def list_all_active_findings(
+    *,
+    snapshot_store: SnapshotReadStore,
+    policy: AssuranceExposurePolicy,
+    purl: str | None = None,
+    component_id: str | None = None,
+) -> tuple[list[dict[str, Any]], int]:
+    """Visible findings across the active snapshots of ALL assessed entities (each finding
+    tagged with its ``assessed_entity_id``). The cross-entity view behind the no-anchor
+    ``assurance_list_vulnerabilities`` call. Exposure-filtered per entity, same as the
+    single-entity path."""
+    out: list[dict[str, Any]] = []
+    withheld = 0
+    for entity_id in _active_assessed_entity_ids(snapshot_store):
+        findings, w = list_active_findings(
+            entity_id, snapshot_store=snapshot_store, policy=policy, purl=purl, component_id=component_id,
+        )
+        out.extend(findings)
+        withheld += w
+    return out, withheld
+
+
+def signals_stats(*, snapshot_store: SnapshotReadStore) -> dict[str, Any]:
     """Operational aggregate over the signal-snapshot model (privileged, unfiltered — the
-    tool is unlock-gated). Counts snapshots and the components/findings of the active snapshots."""
+    tool is unlock-gated). Counts snapshots and the SBOM components / findings of the active
+    snapshots, and enumerates the ASSESSED ENTITIES (the architecture entities that have an
+    active security-signal snapshot) so callers need no out-of-band lookup to learn which
+    entities carry signals. ``bom_component_count`` names the SBOM package count explicitly, to
+    keep it distinct from the architecture *component* the snapshot is attached to."""
     snapshots = snapshot_store.list_snapshots()
     active = [r for r in snapshots if str(r["status"]) == "active"]
+    assessed_entities: list[dict[str, Any]] = []
     components = 0
     findings = 0
     for snapshot in active:
         snapshot_id = str(snapshot["snapshot_id"])
-        components += len(snapshot_store.list_snapshot_components(snapshot_id))
-        findings += len(snapshot_store.list_snapshot_findings(snapshot_id))
+        bom_component_count = len(snapshot_store.list_snapshot_components(snapshot_id))
+        finding_count = len(snapshot_store.list_snapshot_findings(snapshot_id))
+        components += bom_component_count
+        findings += finding_count
+        assessed_entities.append({
+            "entity_id": str(snapshot["anchor_entity_id"]),
+            "snapshot_id": snapshot_id,
+            "bom_component_count": bom_component_count,
+            "finding_count": finding_count,
+        })
+    assessed_entities.sort(key=lambda r: r["entity_id"])
     return {
         "total_snapshots": len(snapshots),
         "active_snapshots": len(active),
-        "anchors_with_active_snapshot": len({str(r["anchor_entity_id"]) for r in active}),
-        "active_snapshot_components": components,
+        "assessed_entity_count": len({r["entity_id"] for r in assessed_entities}),
+        "assessed_entities": assessed_entities,
+        "active_snapshot_bom_components": components,
         "active_snapshot_findings": findings,
     }

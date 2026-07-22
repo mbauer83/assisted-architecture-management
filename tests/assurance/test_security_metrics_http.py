@@ -246,8 +246,10 @@ class TestSignalListing:
 
         stats = client.get("/api/assurance/security-stats").json()
         assert stats["active_snapshots"] == 1
-        assert stats["active_snapshot_components"] == 1
+        assert stats["active_snapshot_bom_components"] == 1
         assert stats["active_snapshot_findings"] == 1
+        assert stats["assessed_entity_count"] == 1
+        assert [e["entity_id"] for e in stats["assessed_entities"]] == ["APP@1"]
 
     def test_locked_listing_returns_423(self, ctx: Any) -> None:
         client = _client(ctx)

@@ -51,25 +51,36 @@ def register_security_read_tools(server: FastMCP) -> None:
     @server.tool(
         name="assurance_list_vulnerabilities",
         description=(
-            "List vulnerability findings of the ACTIVE signal snapshot for an architecture "
-            "anchor, each carrying its component name/purl/directness, severity band, CVSS "
-            "score, and applicability. Optionally scope to one component by purl or "
-            "component_id (the component-details view). Exposure-filtered; a finding is "
-            "hidden when its component is. Requires the assurance store to be unlocked."
+            "List vulnerability findings of the ACTIVE signal snapshot(s), each carrying its "
+            "assessed_entity_id (the architecture entity the snapshot is attached to), component "
+            "name/purl/directness, severity band, CVSS score, and applicability. "
+            "assessed_entity_id (formerly required as anchor_entity_id) is OPTIONAL: omit it to "
+            "list findings across ALL assessed entities (the cross-entity view — pair with "
+            "assurance_security_stats.assessed_entities), or pass one to scope to a single entity. "
+            "Optionally scope to one component by purl or component_id. Exposure-filtered; a "
+            "finding is hidden when its component is. Requires the assurance store to be unlocked."
         ),
     )
     def assurance_list_vulnerabilities(
-        anchor_entity_id: str, purl: str | None = None, component_id: str | None = None,
+        assessed_entity_id: str | None = None, purl: str | None = None, component_id: str | None = None,
     ) -> dict[str, object]:
-        from src.application.security_signals.signals_read import list_active_findings  # noqa: PLC0415
+        from src.application.security_signals.signals_read import (  # noqa: PLC0415
+            list_active_findings,
+            list_all_active_findings,
+        )
 
         if not ctx.is_available():
             return ctx.locked_response()
         snapshot_store = ctx.snapshot_store
         if snapshot_store is None:
             return {"findings": [], "count": 0, "reason": "no co-located signals store"}
-        findings, withheld = list_active_findings(
-            anchor_entity_id, snapshot_store=snapshot_store, policy=_policy(), purl=purl, component_id=component_id)
+        if assessed_entity_id is None:
+            findings, withheld = list_all_active_findings(
+                snapshot_store=snapshot_store, policy=_policy(), purl=purl, component_id=component_id)
+        else:
+            findings, withheld = list_active_findings(
+                assessed_entity_id, snapshot_store=snapshot_store, policy=_policy(),
+                purl=purl, component_id=component_id)
         return {"findings": findings, "count": len(findings), "withheld": withheld}
 
     @server.tool(
@@ -108,9 +119,13 @@ def register_security_read_tools(server: FastMCP) -> None:
     @server.tool(
         name="assurance_security_stats",
         description=(
-            "Snapshot aggregate counts: total_snapshots, active_snapshots, anchors_with_active_snapshot, "
-            "and the component/finding totals across the active snapshots. Requires the assurance "
-            "store to be unlocked."
+            "Snapshot aggregate counts plus the assessed entities. Returns total_snapshots, "
+            "active_snapshots, assessed_entity_count, active_snapshot_bom_components, "
+            "active_snapshot_findings, and assessed_entities — a list of the architecture entities "
+            "with an active signal snapshot, each with {entity_id, snapshot_id, bom_component_count, "
+            "finding_count}. Use assessed_entities to discover which entities carry signals without "
+            "an out-of-band lookup, then drill in with assurance_list_vulnerabilities / "
+            "assurance_security_metrics. Requires the assurance store to be unlocked."
         ),
     )
     def assurance_security_stats() -> dict[str, object]:

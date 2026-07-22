@@ -50,8 +50,8 @@ agent cannot, for example, mark a safety constraint as `accept`-risk-treated.
 | Supply chain / AIBOM | `assurance_aibom_export` | Read-only | Emit a CycloneDX 1.6 ML-BOM/ASBOM JSON document from a list of AI-component dicts. |
 | Supply chain / AIBOM | `assurance_scan_ai_candidates` | Read-only | Heuristic AI-BOM candidate scan over a list of architecture entity dicts. |
 | Security signals | `assurance_list_bom_components` | Read-only | List the software components of the ACTIVE security signal snapshot for an architecture anchor (the current SBOM). |
-| Security signals | `assurance_list_vulnerabilities` | Read-only | List vulnerability findings of the ACTIVE signal snapshot for an architecture anchor, each carrying its component name/purl/directness, severity band, CVSS score, and applicability. |
-| Security signals | `assurance_security_stats` | Read-only | Snapshot aggregate counts: total_snapshots, active_snapshots, anchors_with_active_snapshot, and the component/finding totals across the active snapshots. |
+| Security signals | `assurance_list_vulnerabilities` | Read-only | List vulnerability findings of the ACTIVE signal snapshot(s), each carrying its assessed_entity_id (the architecture entity the snapshot is attached to), component name/purl/directness, severity band, CVSS score, and applicability. |
+| Security signals | `assurance_security_stats` | Read-only | Snapshot aggregate counts plus the assessed entities. |
 | Security signals | `assurance_security_metrics` | Read-only | Security posture metrics for one architecture anchor, computed from the single ACTIVE signal snapshot plus visible VEX assessments, exposure-filtered before any aggregation. |
 | Security signals | `assurance_risk_register` | Read-only | Return a tabular view of all risk entities with their treatment, owner status, linked hazards/loss-scenarios (via assesses), and treating constraints (via treated-by). |
 | Store administration | `assurance_store_status` | Read-only | Return the current status of the confidential assurance store: whether it is configured, locked, or unlocked. |

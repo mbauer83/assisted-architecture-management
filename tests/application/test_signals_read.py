@@ -9,6 +9,7 @@ from src.application.assurance_exposure import AssuranceExposurePolicy
 from src.application.security_signals.signals_read import (
     list_active_components,
     list_active_findings,
+    list_all_active_findings,
     signals_stats,
 )
 
@@ -75,6 +76,7 @@ class TestFindings:
         findings, withheld = list_active_findings("APP@1", snapshot_store=_store(), policy=_AMBER)
         assert [f["finding_id"] for f in findings] == ["F1"]
         assert withheld == 1
+        assert findings[0]["assessed_entity_id"] == "APP@1"
         assert findings[0]["component_name"] == "requests"
         assert findings[0]["component_purl"] == "pkg:pypi/requests@2"
 
@@ -94,6 +96,42 @@ class TestStats:
         stats = signals_stats(snapshot_store=_store())
         assert stats["total_snapshots"] == 2
         assert stats["active_snapshots"] == 1
-        assert stats["anchors_with_active_snapshot"] == 1
-        assert stats["active_snapshot_components"] == 2  # unfiltered operational count
+        assert stats["assessed_entity_count"] == 1
+        assert stats["active_snapshot_bom_components"] == 2  # unfiltered operational count
         assert stats["active_snapshot_findings"] == 2
+
+    def test_assessed_entities_enumerated(self) -> None:
+        stats = signals_stats(snapshot_store=_store())
+        assert stats["assessed_entities"] == [
+            {"entity_id": "APP@1", "snapshot_id": "R1", "bom_component_count": 2, "finding_count": 2},
+        ]
+
+
+def _two_entity_store() -> _FakeStore:
+    return _FakeStore(
+        snapshots=[
+            {"snapshot_id": "R1", "anchor_entity_id": "APP@backend", "status": "active"},
+            {"snapshot_id": "R2", "anchor_entity_id": "APP@gui", "status": "active"},
+        ],
+        components={
+            "R1": [{"component_id": "C1", "name": "requests", "purl": "pkg:pypi/requests@2", "tlp": "TLP:AMBER"}],
+            "R2": [{"component_id": "C3", "name": "vue", "purl": "pkg:npm/vue@3", "tlp": "TLP:AMBER"}],
+        },
+        findings={
+            "R1": [{"finding_id": "F1", "component_id": "C1", "canonical_vulnerability_id": "V1",
+                    "severity_band": "high", "tlp": "TLP:AMBER"}],
+            "R2": [{"finding_id": "F3", "component_id": "C3", "canonical_vulnerability_id": "V3",
+                    "severity_band": "low", "tlp": "TLP:AMBER"}],
+        },
+    )
+
+
+class TestAllActiveFindings:
+    def test_findings_across_all_assessed_entities_are_tagged(self) -> None:
+        findings, withheld = list_all_active_findings(snapshot_store=_two_entity_store(), policy=_AMBER)
+        # Deterministic: assessed entities sorted, so backend (APP@backend) before gui (APP@gui).
+        assert [(f["assessed_entity_id"], f["finding_id"]) for f in findings] == [
+            ("APP@backend", "F1"),
+            ("APP@gui", "F3"),
+        ]
+        assert withheld == 0
