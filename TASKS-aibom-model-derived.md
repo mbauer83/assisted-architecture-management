@@ -303,9 +303,23 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
 ## Stream D — Coverage surface
 
 ### WU-D1 — Coverage read use case (needs B3)
-- [ ] Application read surface for the coverage report, following the segregated
+- [x] Application read surface for the coverage report, following the segregated
       read-port convention.
-- [ ] Tests: unit-level over fake model reads.
+- [x] Tests: unit-level over fake model reads.
+
+#### WU-D1 PROGRESS (2026-07-22)
+- `src/application/aibom_projection.py` — `project_aibom(search: ArtifactSearch, bindings, *,
+  required_by_spec, recommended_by_spec)` → `AibomProjection{components, coverage}`. Pure
+  composition over the segregated `ArtifactSearch` read port (list_entities + list_connections)
+  plus the passed-in attribute levels — no schema/store IO, so it unit-tests over a fake
+  search. This is the one read result every AIBOM surface (Stream E export + coverage
+  endpoints, Stream F wizard) consumes.
+- `aibom_schema_levels(repo_root, catalogs)` is the thin resolver that reads required /
+  recommended (x-recommended) per AI specialization from the effective schemata — the caller
+  passes its output into `project_aibom`, keeping the use case pure.
+- Tests: `tests/application/test_aibom_projection.py` (projection composition over a fake
+  search; empty when no AI entities; the schema-levels resolver over the real catalogs).
+- Gates: backend 6426 passed / 5 skipped; ruff + zuban clean.
 
 ## Stream E — REST + MCP surfaces
 
