@@ -738,13 +738,31 @@ fixed versions:
   `starlette.testclient` (20 test warnings) — future test-client migration, non-blocking.
 
 ### WU-L2 — Python dependency license sweep
-- [ ] Generate a reproducible Python license inventory (tool-based, e.g. `uv`/`pip-licenses`),
+- [x] Generate a reproducible Python license inventory (tool-based, e.g. `uv`/`pip-licenses`),
       classify allow/notice/review/deny against the WU-L0 license, resolve every deny/unknown,
       commit the inventory, and add a CI license gate that fails on deny/unknown (I-L2).
 
 ### WU-L3 — TypeScript/npm dependency license sweep
-- [ ] Same, for `tools/gui` (e.g. `license-checker`): committed inventory + CI gate; resolve
+- [x] Same, for `tools/gui` (e.g. `license-checker`): committed inventory + CI gate; resolve
       copyleft/unknowns; confirm no bundled front-end dependency is incompatible.
+
+#### WU-L2 + WU-L3 PROGRESS (2026-07-22)
+Single reproducible gate tool `tools/check_licenses.py` (`--ecosystem python|npm`,
+`--write`/`--check`) classifies each component against MIT into allow/review/deny/unknown;
+`--check` fails on drift OR any deny/unknown/unacknowledged-review (I-L2). Committed inventories
+`licenses/python.json` + `licenses/npm.json` are the diff-reviewable drift baseline. CI `licenses`
+job (uv + node) runs both `--check`s.
+- **Python (74 shipped-closure components):** 73 allow + 1 review. The one review is `cvss` 3.6
+  (LGPLv3+, Red Hat) — weak copyleft, ACKNOWLEDGED in the tool: imported dynamically + unmodified +
+  pip-replaceable → compatible with MIT redistribution given an LGPL notice + source pointer (ships
+  in L4). No GPL/AGPL. Windows-only closure deps (`pywin32` PSF-2.0, `colorama` + `pywin32-ctypes`
+  BSD-3-Clause) can't be introspected on Linux; licenses researched from PyPI and recorded in a
+  `_PLATFORM_OVERRIDES` map so the full closure is inventoried (not dropped) and the gate stays
+  offline/deterministic.
+- **npm (57 production components, `npm ls --omit=dev`):** all allow (MIT/BSD/Apache/ISC/etc.);
+  no copyleft/unknown. Dev/build tooling (eslint, vue-tsc, nyc, vite) is excluded — not distributed.
+- Gates: both `--check`s green; ruff clean; the tool is out of zuban's `src`-only scope (like other
+  `tools/` scripts). Inventories feed the L4 THIRD-PARTY-NOTICES generation.
 
 ### WU-L4 — Obligations discharge + notices
 - [ ] Generate a top-level `THIRD-PARTY-NOTICES` from the inventories; ship it + the bundled

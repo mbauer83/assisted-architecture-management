@@ -64,6 +64,42 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  licenses:
+    name: Licenses · third-party inventory gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: tools/gui/package-lock.json
+
+      - name: Install Python dependencies (need uv export + installed metadata)
+        run: uv sync --all-groups --extra cloud-archive
+
+      - name: Install frontend production deps (need node_modules for `npm ls`)
+        working-directory: tools/gui
+        run: npm ci
+
+      - name: License gate (Python) — fail on denied/unknown/unacknowledged licenses
+        run: uv run python tools/check_licenses.py --ecosystem python --check
+
+      - name: License gate (npm) — fail on denied/unknown/unacknowledged licenses
+        run: uv run python tools/check_licenses.py --ecosystem npm --check
+
   frontend:
     name: Frontend · lint · types · tests
     runs-on: ubuntu-latest
