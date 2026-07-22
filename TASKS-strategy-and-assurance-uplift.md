@@ -8,19 +8,20 @@ normative. Every stream-boundary gate names its required upstream WUs, local
 tests, cross-stream contract tests, model/documentation deltas, and migration
 evidence for any persisted surface it changed.
 
-## ⚠ READ FIRST — Reconciled state (2026-07-21) and sequencing
+## ⚠ READ FIRST — Reconciled state (2026-07-22) and sequencing
 
-**Checkbox state in this file lags reality in three WUs.** Do not derive remaining
-work from unticked boxes alone; use the table below, which was produced by
-enumerating *every* stream and reconciling each against the dated prose entries
-and against the code.
+Checkboxes were reconciled on 2026-07-22 against the dated evidence below and
+the current repository. `[~]` means the implementation is present but a named
+acceptance step or owner decision remains; it must not be read as missing feature
+implementation.
 
 **How to enumerate this ledger correctly.** Count first, enumerate second,
 reconcile the two — never conclude "what remains" from a truncated search:
 
 ```
-grep -c '^- \[ \]' TASKS-strategy-and-assurance-uplift.md   # open  (50 at reconciliation)
-grep -c '^- \[x\]' TASKS-strategy-and-assurance-uplift.md   # done  (83 at reconciliation)
+grep -c '^- \[ \]' TASKS-strategy-and-assurance-uplift.md   # genuinely open
+grep -c '^- \[~\]' TASKS-strategy-and-assurance-uplift.md   # partial/deferred
+grep -c '^- \[x\]' TASKS-strategy-and-assurance-uplift.md   # done
 grep -n  '^## Stream\|^### WU' TASKS-strategy-and-assurance-uplift.md   # all 8 streams / 33 WUs
 ```
 
@@ -30,23 +31,26 @@ incomplete. (A prior session missed Stream R entirely by capping a grep with
 
 | WU | Open boxes | Reconciled true state |
 |---|---|---|
-| D1 — Guidance format v2 | 7 | **GENUINELY OPEN.** Its guidance-cache upgrade *step* landed separately (`GuidanceCacheFormatStep`, registered); the format-v2 feature itself is not started. |
+| D1 — Guidance format v2 | 0 | **DONE** (commit `6abb3cb`). |
 | E1 — Documentation content | 0 | **DONE 2026-07-22** (5 commits; see WU-E1). |
-| E2 — Deterministic screenshots | 3 | **GENUINELY OPEN.** Gated on the UI surfaces it captures. |
-| G1 — Trace evaluator etc. | 8 | **STALE — substantially complete.** Evidenced by G2's live validation: the shipped `motivation-coverage` viewpoint executed live returning 91 gap rows / 0 warnings, which exercises the grammar, result union, evaluator, and post-projection pipeline. Individual sub-items (enum-set parameter type, §10.7 format impact) were not separately re-verified. |
-| G2 — Shipped viewpoint, docs, self-model, boundary | 6 | **STALE except one item.** Live-validated 2026-07-21; self-model saved (engagement commit `4f5a22e1`); frontend boundary gate green. The deferred **full backend suite is now satisfied** — 6124 passed / 5 skipped, 2026-07-21. **REMAINING: the crit-21b e2e G-S3 GUI walk** (Playwright; needs the running GUI dev server). |
-| R1/R2/R3 — Viewpoint reference integrity | 0 | **COMPLETE (2026-07-21)** — commits `b349250` (R1) + `c8eb759` (R2) + docs/self-model (R3). All gates green; ONLY the R2 e2e route walk is restart-gated. See STREAM R PROGRESS. |
-| U0a — Upgrade foundation | 4 | **STALE.** U0a itself is COMPLETE (2026-07-19). All four open boxes are co-landing hooks, and all four are verified registered: `SignalsRefreshRunSchemaStep`, `GuidanceCacheFormatStep`, `ViewpointDeclarationScanStep`, `DefaultSchemataEnsureStep`. |
-| U0b — Previous-release, partial-failure, Docker | 3 (`[~]`) | **SUBSTANTIALLY DONE (2026-07-22, commits `c074156`+`e0ea65c`).** Previous-release CLI coverage + FORMAT_CONTRACT_VERSION bump + §9.4 self-model delta DONE; Docker startup-ORDER guard DONE. Three `[~]`: legacy-row "quarantine once" has no step to test (recorded); live Docker "reaches healthy" DEFERRED (needs current-image rebuild — queued in PROMPT); config-settings migration DEFERRED (owner — C0/C1-owned, runtime tolerates `encrypted`, post-release export/re-import path). |
+| E2 — Deterministic screenshots | 0 | **DONE 2026-07-22** — 32 deterministic captures, generated manifest, documentation wiring, alt-text/link checks, denylist and visual review. |
+| G1 — Trace evaluator etc. | 1 (`[~]`) | **IMPLEMENTATION COMPLETE.** Grammar, result union, evaluator, budget propagation, approved set-parameter design, pipeline, format detector, previous-release compatibility and fixture benchmark are evidenced. Remaining: the formal ≥30-sample live-model performance run. |
+| G2 — Shipped viewpoint, docs, self-model, boundary | 2 (`[~]`) | **IMPLEMENTATION COMPLETE; ACCEPTANCE PARTIAL.** Remaining: the formal live-model performance run and the Playwright pattern-authoring GUI walk. |
+| R1/R2/R3 — Viewpoint reference integrity | 1 (`[~]`) | **IMPLEMENTATION COMPLETE.** Commits `b349250` and `c8eb759`; remaining: run the existing broken-reference catalogue/editor Playwright route walk. |
+| U0a — Upgrade foundation | 0 | **DONE 2026-07-19.** All four co-landing hooks are registered. |
+| U0b — Previous-release, partial-failure, Docker | 2 (`[~]`) | **ACCEPTANCE COMPLETE 2026-07-22.** Current image `sha256:04125c…` upgraded a mounted previous-release fixture before serving and reached healthy. The legacy-row quarantine mismatch and owner-deferred settings rewrite remain explicit deviations. |
 
-**Genuinely remaining (as of 2026-07-22, end of the licensing/security session):**
-- **E1 — documentation content (owner-deferred to a DEDICATED session).** Not started here by
-  owner direction; PROMPT-next-session.md is now a documentation-evaluation-first brief.
-- **Restart/dev-server-gated batch** (needs an owner `arch-backend` restart + `npm run dev`):
-  E2 deterministic screenshots (3), G2's crit-21b e2e walk (1), aibom G3 live (3),
-  security-signals item 7 GUI walk, U0b live Docker smoke. Also queued: the MCP
-  `assessed_entity` read-surface change (implemented this session, restart-gated for live exposure).
-- **WU-X1 — integrated closure (LAST).** Depends on E1 + the restart batch.
+**Genuinely remaining, in execution order (owner-prioritized 2026-07-22;
+upgrade acceptance completed first):**
+1. **Live acceptance batch:** the G trace-pattern authoring Playwright walk and
+   formal live performance run; the R broken-reference route walk; the B/C/D
+   stateful scenarios listed in WU-X1. The synthetic security-surface GUI walk
+   and deterministic documentation captures are already complete.
+2. **Companion-plan prerequisite:** the queued AI-BOM live mark → derive → export
+   walk remains in `PROMPT-next-session.md`; it is not feature scope in this plan
+   but is queued before integrated closure.
+3. **WU-X1 integrated closure last:** truth and semantic audits, current live
+   witnesses/statistics, then all gates once over the integrated result.
 
 **DONE this session (2026-07-22), all committed with gates green:**
 - **Stream L (Licensing & legal readiness) COMPLETE** (WU-L0–L5): MIT license finalized; GPLv3
@@ -961,7 +965,7 @@ for this image now** (recorded, not silently skipped).
 ## Stream G — Motivation coverage viewpoint
 
 ### WU-G1 — Trace evaluator, declaration grammar, budgets, format impact (needs U0a)
-- [ ] `trace_patterns` grammar per §10.4 — the closed
+- [x] `trace_patterns` grammar per §10.4 — the closed
       `branch-complete-realization` kind EXACTLY as schematized (tagged
       variants stored-edge/diagnostic-edge, leaf none/derived-reachability,
       branches mapping or `{ref}` value expansion, `diagnostic: true`,
@@ -970,12 +974,12 @@ for this image now** (recorded, not silently skipped).
       namespace + collision validation; structural caps at limit and limit+1;
       round-trip YAML→domain→YAML + REST/GUI DTO parity; one validator for
       built-in + authored files; migration detector co-landed.
-- [ ] The discriminated PatternResult union as DOMAIN result semantics
+- [x] The discriminated PatternResult union as DOMAIN result semantics
       (authoritative verdict vs diagnostic observation — owned here, serialized
       in G3) + the application-only cross-surface semantic fixture (passes
       overall; business diagnostic = none_observed identically in GUI/REST/
       CSV/preview).
-- [ ] Branch-complete evaluator per §10.2a–e: branch enumeration over DIRECT
+- [x] Branch-complete evaluator per §10.2a–e: branch enumeration over DIRECT
       stored edges (never derived); influence-shortcut + association→
       ambiguous_link (Q9); TAGGED obligation tuples incl. missing-outcome/
       missing-requirement (mixed no-terminal branch = gap); verdict composed
@@ -989,19 +993,20 @@ for this image now** (recorded, not silently skipped).
       influence-vs-association; app-only/business-only/technology-realized
       requirements PASS overall; live influence-shortcut witness; agreement
       with requirements-coverage-gaps on "has incoming realization".
-- [ ] Request-wide budget bound to the viewpoint execution budget object;
-- [ ] `enum-set` parameter type per §10.3a (persisted YAML, REST array,
-      canonical URL form, normalization, typed errors, hand-declared frontend
-      DTOs); NO generic guard grammar (withdrawn — scope binds via the
-      existing `in` condition).
-- [ ] Post-projection pipeline phase per §10.3b (materialize → trace → verdict
+- [x] Request-wide budget bound to the viewpoint execution budget object;
+- [x] Set-valued parameter intent from §10.3a implemented through the approved
+      orthogonal `type` + `cardinality` + optional `allowed_values` model
+      (persisted YAML, REST array, canonical URL form, normalization, typed
+      errors, hand-declared frontend DTOs); no generic guard grammar.
+- [x] Post-projection pipeline phase per §10.3b (materialize → trace → verdict
       rank → filter → global sort → limit); acceptance: a gap beyond any
       legacy pre-trace limit still appears; sorting global not page-local.
-- [ ] Sizing spike per §10.5 BEFORE freezing the budget default (accounting
+- [~] Deterministic sizing spike complete; formal live-model run remains per
+      §10.5 (accounting
       unit, live model + 5× fixture, benchmark protocol: seed, cold + warmups,
       ≥30 samples, machine metadata; p95 ≤ 70% of request timeout); trace memo
       key = trace inputs only (no assurance state — dependency-policy test).
-- [ ] Format impact co-landed (§10.7): detector for declaration versions,
+- [x] Format impact co-landed (§10.7): detector for declaration versions,
       previous-release viewpoint file loads unchanged, `FORMAT_CONTRACT_VERSION`
       participation, fixtures (F7.17) — registered with U0a.
 
@@ -1064,19 +1069,20 @@ for this image now** (recorded, not silently skipped).
       e2e G-S3 live walk RESTART-GATED → X1.
 
 ### WU-G2 — Shipped viewpoint, docs, self-model, boundary gate (needs G3)
-- [ ] Ship `motivation-coverage` by TRANSCRIBING the §10.4 production YAML
+- [x] Ship `motivation-coverage` by TRANSCRIBING the §10.4 production YAML
       verbatim (deviation = ledger discrepancy, never silent redesign) with
       §10.3 parameters; layer-membership census matrix (F7.1); applicability
       fixtures (F7.15); namespaced CSV columns per §10.4.
-- [ ] Executed-table acceptance (§10.6): definition round-trip, two executions
+- [x] Executed-table acceptance (§10.6): definition round-trip, two executions
       around a model change, repository scan, shareable URL.
-- [ ] Docs: coverage-semantics page per §8.1 incl. branched false-green example;
+- [x] Docs: coverage-semantics page per §8.1 incl. branched false-green example;
       two-way cross-reference with `requirements-coverage-gaps`.
-- [ ] Self-model per §10.8; `artifact_verify` clean; save.
-- [ ] Performance runs per §10.5 (live self-model + branching fixture, p50/p95
-      recorded, headroom threshold).
-- [ ] Boundary gate: upstream = U0a+G1+G3; §13 criteria 20–21b verified with
-      evidence incl. the live branched-goal witness; full gates.
+- [x] Self-model per §10.8; `artifact_verify` clean; save.
+- [~] Branching-fixture performance run passed; formal ≥30-sample live-self-model
+      run remains per §10.5 (p50/p95 recorded, headroom threshold).
+- [~] Boundary gate: upstream = U0a+G1+G3; all recorded evidence and full
+      backend/frontend gates are green; the live performance run and Playwright
+      pattern-authoring walk remain.
 
 ---
 
@@ -1143,7 +1149,8 @@ so a broken query is indistinguishable from a legitimately empty result.
       and EXECUTE (result warnings) — one report, three renderings.
 - [x] Repair affordances: remap the reference, drop the term, or quarantine
       (`disabled`); each produces a NEW definition version (= the acknowledgement).
-- [x] Vitest + a route walk; no new persisted state asserted by a repository scan.
+- [~] Vitest and no-new-persisted-state repository scan complete; the existing
+      broken-reference catalogue/editor Playwright route walk remains to run.
 
 ### WU-R3 — Boundary
 - [x] Full gates; docs note in the viewpoint reference page; self-model sync only if
@@ -1254,15 +1261,15 @@ so a broken query is indistinguishable from a legitimately empty result.
       C0 plan intent and the pre-rename store is a blocking (recreate) finding, not
       a quarantine-migrate path. No legacy-row-quarantine step exists to test once,
       so there is nothing to assert; recorded, not silently skipped.
-- [~] Docker startup ORDER guard DONE (always-on: `TestDockerStartupOrder` asserts
+- [x] Docker startup ORDER guard and live container acceptance DONE. The
+      always-on `TestDockerStartupOrder` asserts
       the entrypoint runs `arch-repair upgrade` before initializing absent stores
       and before `exec arch-backend` — the "no auto-create ahead of detection"
-      invariant, F6.5/F6.8). Live "reaches healthy" container run DEFERRED to the
-      consolidated verification: it needs a CURRENT-code image rebuild (the only
-      built image `architectonic:local` predates the whole operational-upgrade
-      architecture) + intricate volume/env alignment; queued in PROMPT-next-session
-      with the exact procedure (owner-confirmed shape: current image + old-format
-      data volume).
+      invariant, F6.5/F6.8. The opt-in integration test builds the shared
+      previous-release fixture, mounts it into the current image, asserts the
+      migration log precedes backend startup, waits for the production health
+      check, and verifies guidance/signals upgrades plus unrelated-content
+      preservation. See the 2026-07-22 acceptance entry below.
 - [x] §9.4 self-model delta DONE 2026-07-22 — commit `e0ea65c`. New DOB
       `Guidance Cache` (`DOB@1784712071.M6gx2l`); witnesses verified by exact
       source/target/type/direction query — framework —access→ Guidance Cache /
@@ -1302,6 +1309,53 @@ so a broken query is indistinguishable from a legitimately empty result.
 ## Progress log
 
 (append: date · stream/WU · evidence/notes)
+
+- 2026-07-22 · U/WU-U0b DOCKER ACCEPTANCE · COMPLETE. Built the current
+  checkout with `docker build --tag architectonic:upgrade-acceptance .`; accepted
+  image `sha256:04125c888bab962d0db74b2e89bb05db1ca5d63cf6445f83d4d2f0705ea0c039`.
+  Added opt-in `tests/integration/test_docker_previous_release_upgrade.py`, which
+  archives the real ENG-ARCH-REPO model at project commit `05c336f`, combines it
+  with the shared previous-format operational fixture, mounts only a disposable
+  temporary deployment, runs as the image's non-root user, waits for Docker's
+  production health check, and always removes the container. The historical
+  model is missing a current default attribute schema; the test asserts the
+  container upgrade adds it before startup. Command:
+  `ARCH_DOCKER_ACCEPTANCE=1 ARCH_DOCKER_IMAGE=architectonic:upgrade-acceptance uv
+  run python -m pytest -q -n 0 tests/integration/test_docker_previous_release_upgrade.py`
+  → 1 passed in 7.30s. Observed and asserted: guidance format 1→2; signals schema
+  1→2; operator note byte-identical; `Upgrading persisted formats` and
+  `Persisted formats current` both precede `Starting arch-backend`; final state
+  `running healthy`; no acceptance container remains. The first live run exposed
+  a real startup inconsistency: the backend honored `ARCH_REPO_ROOT` /
+  `ARCH_ENTERPRISE_ROOT`, while its MCP watcher ignored them. Shared MCP context
+  resolution now honors the backend variables, retaining the MCP-specific
+  engagement override at highest precedence; two regression tests plus all 11
+  previous-release CLI tests pass. Fixture-only Git `safe.directory` values are
+  process-scoped because the disposable bind mount is host-owned; production
+  named volumes remain owned by uid 10001.
+  OWNER-PROVIDED DEPLOYMENT EXPORT: also ran the same test module with an
+  ephemeral `ARCH_DOCKER_VOLUME_EXPORT` path against disposable copies of all
+  four exported Compose volumes. Final combined run (history-derived fixture +
+  ephemeral export) → 2 passed in 18.44s. This historical deployment carried the real legacy
+  `meta_ontology: archimate-next` value. The current image applied
+  `group-meta-ontology-archimate-4-rename`, recorded the step in repository
+  config, started the backend only after the applied finding, and reached
+  healthy. The source export was never mounted into the container and its
+  groups-file SHA-256 was asserted unchanged after the run.
+
+- 2026-07-22 · LEDGER RECONCILIATION · 129 done / 9 partial / 6 open after
+  checking every previously stale box against its dated implementation evidence.
+  G1 implementation is complete: grammar, discriminated result contract,
+  branch-complete evaluator, request budget propagation, the owner-approved
+  orthogonal set-parameter model, post-projection pipeline, format detection and
+  previous-release compatibility all have named tests/evidence below. G2's shipped
+  viewpoint, executed-table acceptance, documentation and self-model are likewise
+  complete. Kept partial rather than overstating closure: one formal ≥30-sample
+  live-model performance run; the G pattern-authoring and R broken-reference
+  Playwright walks; the C stateful e2e acceptance; U0b's real current-image
+  upgrade-to-healthy smoke plus its two explicit deviations. The six open boxes
+  are WU-X1 only. E1, E2, D1, R implementation and U0a are no longer incorrectly
+  reported as open in the summary.
 
 - 2026-07-22 · U/WU-U0b · SUBSTANTIALLY DONE (commits `c074156` code, `e0ea65c` self-model).
   Reconstructed U0b's intent WITH the owner (see the memory note): U0b is the end-to-end

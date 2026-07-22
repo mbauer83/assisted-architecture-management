@@ -67,12 +67,17 @@ def _workspace_repo_roots() -> tuple[Path, Path] | None:
     return resolve_workspace_repo_roots(workspace_root())
 
 
-def default_engagement_repo_root() -> Path:
+def _configured_repo_root(*names: str) -> Path | None:
     import os
 
-    env = os.getenv("ARCH_MCP_MODEL_REPO_ROOT")
-    if env:
-        return Path(env).expanduser()
+    value = next((os.getenv(name) for name in names if os.getenv(name)), None)
+    return Path(value).expanduser() if value is not None else None
+
+
+def default_engagement_repo_root() -> Path:
+    configured = _configured_repo_root("ARCH_MCP_MODEL_REPO_ROOT", "ARCH_REPO_ROOT")
+    if configured is not None:
+        return configured
     roots = _workspace_repo_roots()
     if roots is None:
         raise RuntimeError(
@@ -83,6 +88,9 @@ def default_engagement_repo_root() -> Path:
 
 
 def default_enterprise_repo_root() -> Path:
+    configured = _configured_repo_root("ARCH_ENTERPRISE_ROOT")
+    if configured is not None:
+        return configured
     roots = _workspace_repo_roots()
     if roots is None:
         raise RuntimeError("Could not resolve enterprise repo root. Run `arch-init` or provide arch-workspace.yaml.")

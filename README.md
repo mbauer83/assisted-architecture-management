@@ -211,13 +211,13 @@ ingestion.
 
 ## Roadmap
 
-Directions under consideration — not commitments, and not yet features:
+Features under consideration:
 
-- Internationalization of the GUI.
-- Multi-language modeling content (localized entity names and descriptions).
-- SPDX 3.0 AI-BOM export alongside the current CycloneDX ML-BOM.
-- SysML v2 support beyond the current minimal module.
-- Rework of the packaged agent skills.
+- [ ] Internationalization of the GUI.
+- [ ] Multi-language modeling content (localized entity names and descriptions).
+- [ ] SPDX 3.0 AI-BOM export alongside the current CycloneDX ML-BOM.
+- [ ] SysML v2 support beyond the current minimal module.
+- [ ] Rework of the packaged agent skills.
 
 &nbsp;
 
