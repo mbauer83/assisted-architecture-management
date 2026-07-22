@@ -714,6 +714,29 @@ WU-L4. This is exactly the plan's sanctioned fallback. (Owner-confirmed 2026-07-
 | Runtime base image | `python:3.13-slim-bookworm` | Docker Hub official | PSF (Python) + Debian bookworm **main = DFSG-free** | Redistributed | Confirmed no non-free apt packages pulled; notice via inventory |
 | Build-only images | `node:20-alpine`, `ghcr.io/astral-sh/uv:python3.13-bookworm-slim` | — | — | **NOT shipped** (multi-stage; only `dist/` + `.venv` + jar copied to runtime) | Out of redistribution scope |
 
+**Pre-sweep dependency-vulnerability remediation (owner-directed 2026-07-22, precedes L2/L3).**
+Independent ground-truth scan with `osv-scanner` v2.4.0 over `uv.lock` + `tools/gui/package-lock.json`
+(cross-checked against the active assurance signal snapshots). Remediated to the OSV-reported
+fixed versions:
+- Backend (41 findings → 0): direct `mcp` 1.27.0→1.28.1, `cryptography` 46.0.7→49.0.0 (constraints
+  bumped in pyproject); transitive via targeted `uv lock --upgrade-package` — `starlette`
+  1.0.0→1.3.1, `python-multipart` 0.0.26→0.0.32, `pyjwt` 2.12.1→2.13.0, `pydantic-settings`
+  2.13.1→2.14.2, `mako` 1.3.10→1.3.12, `click` 8.3.2→8.4.2, `idna` 3.11→3.18 (+ `fastapi`
+  0.135.3→0.139.2, `uvicorn` 0.44.0→0.51.0 to unblock starlette). Re-scan: **0 backend vulns**.
+- Frontend (7 findings → 0): runtime-shipped `dompurify` 3.4.11→3.4.12 (the only in-bundle vuln);
+  dev/build-tool transitives `js-yaml`/`brace-expansion` (under eslint/nyc/vue-tsc, not distributed)
+  updated within semver. Re-scan: **0 npm vulns**.
+- The FastAPI 0.139/Starlette 1.3 upgrade changed `include_router` (routes now behind a lazy
+  `_IncludedRouter`, `app.routes` no longer flattens them). No production code walks `app.routes`;
+  four REST-surface tests did — rehomed onto the public `openapi()` contract via the new
+  `tests/support/route_introspection.py`. Full backend suite GREEN (6457 passed / 4 skipped);
+  frontend typecheck + vitest (1187) GREEN; ruff + zuban clean.
+- FOLLOW-UPS (owner-flagged): (a) re-ingest fresh signals anchored at the backend + frontend
+  model entities so the store reflects the clean set; (b) update the stale self-model backend
+  service attribute that named the old mcp version; (c) evaluate Minimus minimal/hardened base
+  images to cut base-image CVEs + attack surface. (d) NOTE: Starlette 1.3 deprecates `httpx` with
+  `starlette.testclient` (20 test warnings) — future test-client migration, non-blocking.
+
 ### WU-L2 — Python dependency license sweep
 - [ ] Generate a reproducible Python license inventory (tool-based, e.g. `uv`/`pip-licenses`),
       classify allow/notice/review/deny against the WU-L0 license, resolve every deny/unknown,

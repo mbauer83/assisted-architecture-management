@@ -19,8 +19,9 @@ _FORBIDDEN_FRAGMENTS = (
 
 def test_rest_exposes_no_snapshot_lifecycle_route() -> None:
     from src.infrastructure.gui.routers.assurance import router
+    from tests.support.route_introspection import openapi_paths
 
-    paths = {getattr(route, "path", "") for route in router.routes}
+    paths = openapi_paths(router)
     offenders = {
         path for path in paths
         if any(fragment in path for fragment in _FORBIDDEN_FRAGMENTS)

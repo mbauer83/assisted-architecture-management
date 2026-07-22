@@ -24,8 +24,7 @@ from src.infrastructure.gui.routers.rest_mutation_manifest import (
     REST_MUTATION_MANIFEST,
     build_rest_request,
 )
-
-_MUTATION_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+from tests.support.route_introspection import openapi_mutation_routes
 
 
 def _app_mutation_routes() -> set[tuple[str, str]]:
@@ -58,13 +57,7 @@ def _app_mutation_routes() -> set[tuple[str, str]]:
         viewpoints_router, viewpoint_authoring_router,
     ):
         app.include_router(router)
-    routes: set[tuple[str, str]] = set()
-    for route in app.routes:
-        methods = getattr(route, "methods", None) or set()
-        path = getattr(route, "path", "")
-        for method in methods & _MUTATION_METHODS:
-            routes.add((method, path))
-    return routes
+    return openapi_mutation_routes(app)
 
 
 class TestRestRegistryManifestEquality:

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from src.infrastructure.backend.arch_backend_app import _build_app
 from src.infrastructure.mcp.assurance_mcp.context import AssuranceContext
+from tests.support.route_introspection import openapi_paths
 
 # --- Assurance gating ---
 
@@ -63,18 +64,12 @@ def test_assurance_list_nodes_tool_returns_locked_when_store_unavailable(monkeyp
 
 def test_backend_exposes_entity_remove_rest_endpoint() -> None:
     """REST router mounts /api/entity/remove — the same path the CLI targets."""
-    app = _build_app()
-    paths = {getattr(r, "path", None) for r in app.routes}
-
-    assert "/api/entity/remove" in paths
+    assert "/api/entity/remove" in openapi_paths(_build_app())
 
 
 def test_backend_exposes_diagram_remove_rest_endpoint() -> None:
     """REST router mounts /api/diagram/remove — the same path the CLI targets."""
-    app = _build_app()
-    paths = {getattr(r, "path", None) for r in app.routes}
-
-    assert "/api/diagram/remove" in paths
+    assert "/api/diagram/remove" in openapi_paths(_build_app())
 
 
 def test_cli_targets_entity_remove_path(monkeypatch) -> None:
