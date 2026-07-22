@@ -1,4 +1,4 @@
-import { expect, test, type Route } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import fs from 'node:fs'
 import {
   capture, watch, type CaptureProvenance,
@@ -9,10 +9,6 @@ import {
 
 const ANALYSIS = 'STPA@1784721732.pflr.3e4395'
 const HAZARD = 'HAZ@1784721764.wra3.48aefe'
-interface TraceObservation { role?: string; observation?: string; status_code?: string }
-interface TraceRow { pattern_results: [string, TraceObservation][] }
-interface CoverageResponse { trace_table?: { rows: TraceRow[] } }
-
 const provenance = (
   testName: string,
   artifactIds: readonly string[],
@@ -24,25 +20,11 @@ const provenance = (
   parameters, synthetic_augmentation: synthetic,
 })
 
-async function normalizeCoverageDiagnostics(route: Route): Promise<void> {
-  const response = await route.fetch()
-  const body = await response.json() as CoverageResponse
-  for (const row of body.trace_table?.rows ?? []) {
-    for (const [, result] of row.pattern_results) {
-      if (result.role === 'diagnostic' && result.status_code === undefined) {
-        result.status_code = result.observation ?? 'not_applicable'
-      }
-    }
-  }
-  await route.fulfill({ response, json: body })
-}
-
 test('motivation coverage live fallback', async ({ page }) => {
   const parameters = {
     scope: ['goal', 'outcome', 'requirement'], gaps_only: 'true', group: ['motivation-narrative'],
   }
   const problems = watch(page)
-  await page.route('**/api/viewpoints/execute', normalizeCoverageDiagnostics)
   await page.goto('/entities?viewpoint=motivation-coverage&param.scope=goal&param.scope=outcome&param.scope=requirement&param.gaps_only=true&param.group=motivation-narrative',
     { waitUntil: 'load' })
   await page.getByRole('checkbox', { name: 'gaps_only' }).check()

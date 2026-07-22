@@ -37,7 +37,6 @@ export const AuthoritativePatternResultSchema = Schema.Struct({
 export const DiagnosticPatternResultSchema = Schema.Struct({
   role: Schema.Literal('diagnostic'),
   observation: Schema.Literal('observed', 'none_observed', 'not_applicable'),
-  status_code: Schema.String,
   last_satisfied_ids: Schema.Array(Schema.String),
 })
 

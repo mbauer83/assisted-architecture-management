@@ -156,7 +156,6 @@ export const samplePreviewTable = (): TraceTable => ({
           {
             role: 'diagnostic',
             observation: 'none_observed',
-            status_code: 'none_observed',
             last_satisfied_ids: [],
           },
         ],

@@ -946,9 +946,10 @@ for this image now** (recorded, not silently skipped).
   - Deviation — motivation coverage: a dedicated fixture repository was judged
     disproportionate, so the permitted live-model fallback was used with pinned
     `scope=[goal,outcome,requirement]`, `group=[motivation-narrative]`, and
-    `gaps_only=true`. The harness normalizes one missing optional diagnostic status
-    field at capture time to bridge the current response-decoder drift; it does not
-    alter verdicts or model data.
+    `gaps_only=true`. A diagnostic-result decoder defect found during capture was
+    fixed by aligning the GUI with the discriminator-specific wire contract; the
+    harness consumes the live response without normalization and does not alter
+    verdicts or model data.
   - Deviation — assurance graph: the requested STPA analysis is a real seeded
     analysis but is not itself accepted by the graph node endpoint. The capture
     deep-links the real hazard `HAZ@1784721764.wra3.48aefe` belonging to analysis

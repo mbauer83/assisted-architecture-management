@@ -332,7 +332,7 @@
     },
     "capture_tool_version": "Playwright 1.60.0",
     "output_path": "docs/media/motivation-coverage-gaps.png",
-    "sha256": "53e0bb42baf03eac77a1020acda1db84322e0bdad833b26ee13c5557c46c6e10"
+    "sha256": "9ec829112de943702e39e960d2699f3df4a1501f4a6b405fe01da25724229f8b"
   },
   {
     "test_name": "re-shoot overview",

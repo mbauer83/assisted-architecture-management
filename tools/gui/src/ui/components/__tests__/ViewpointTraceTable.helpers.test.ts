@@ -25,7 +25,6 @@ const authoritative = (verdict: string, status: string) => ({
 const diagnostic = (observation: 'observed' | 'none_observed' | 'not_applicable') => ({
   role: 'diagnostic' as const,
   observation,
-  status_code: observation,
   last_satisfied_ids: [],
 })
 
