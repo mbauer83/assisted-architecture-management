@@ -37,11 +37,14 @@ incomplete. (A prior session missed Stream R entirely by capping a grep with
 | G2 — Shipped viewpoint, docs, self-model, boundary | 6 | **STALE except one item.** Live-validated 2026-07-21; self-model saved (engagement commit `4f5a22e1`); frontend boundary gate green. The deferred **full backend suite is now satisfied** — 6124 passed / 5 skipped, 2026-07-21. **REMAINING: the crit-21b e2e G-S3 GUI walk** (Playwright; needs the running GUI dev server). |
 | R1/R2/R3 — Viewpoint reference integrity | 0 | **COMPLETE (2026-07-21)** — commits `b349250` (R1) + `c8eb759` (R2) + docs/self-model (R3). All gates green; ONLY the R2 e2e route walk is restart-gated. See STREAM R PROGRESS. |
 | U0a — Upgrade foundation | 4 | **STALE.** U0a itself is COMPLETE (2026-07-19). All four open boxes are co-landing hooks, and all four are verified registered: `SignalsRefreshRunSchemaStep`, `GuidanceCacheFormatStep`, `ViewpointDeclarationScanStep`, `DefaultSchemataEnsureStep`. |
-| U0b — Previous-release, partial-failure, Docker | 11 | **GENUINELY OPEN.** Last in stream. |
+| U0b — Previous-release, partial-failure, Docker | 3 (`[~]`) | **SUBSTANTIALLY DONE (2026-07-22, commits `c074156`+`e0ea65c`).** Previous-release CLI coverage + FORMAT_CONTRACT_VERSION bump + §9.4 self-model delta DONE; Docker startup-ORDER guard DONE. Three `[~]`: legacy-row "quarantine once" has no step to test (recorded); live Docker "reaches healthy" DEFERRED (needs current-image rebuild — queued in PROMPT); config-settings migration DEFERRED (owner — C0/C1-owned, runtime tolerates `encrypted`, post-release export/re-import path). |
 
-**Genuinely remaining:** D1 (7), E1 (2), E2 (3), G2's e2e walk (1),
-U0b (11) — plus the security-signals backlog items 2–7 at the end of this file.
-(Stream R — viewpoint reference integrity — COMPLETE 2026-07-21.)
+**Genuinely remaining (as of 2026-07-22):** E1 (2, docs), E2 (3, dev-server media),
+G2's e2e walk (1, dev-server). U0b substantially done — its `[~]` remainders (live Docker
+smoke, config-settings migration) are queued/deferred, not open work. D1 DONE (commit
+`6abb3cb`). Restart/dev-server-gated: aibom G3 (3 boxes), security-signals item 7 GUI walk,
+WU-X1 (LAST). All queued in PROMPT-next-session for the consolidated post-restart run.
+(Stream R COMPLETE 2026-07-21.)
 
 ### Cross-plan sequencing (owner-agreed 2026-07-21)
 
@@ -921,26 +924,51 @@ so a broken query is indistinguishable from a legitimately empty result.
 - [x] A0/D2: default-schema ensure steps registered as upgrade detectors.
 
 ### WU-U0b — Previous-release, partial-failure, Docker integration (last in stream)
-- [ ] Previous-release fixture workspace (tier repos, v1 cache + sidecar,
-      legacy SQLite + SQLCipher stores, pre-grammar viewpoint files) upgraded
-      through the public CLI: dry-run purity, first-run migration, second-run
-      no-op, injected mid-apply failure → accurate partial report + safe
-      resume, unknown-content preservation, fail-closed newer/malformed
-      (F6.1–F6.7).
-- [ ] Locked SQLCipher blocking; quarantine populated exactly once across
-      reruns; fresh deployment initializes absent stores without claiming
-      migration.
-- [ ] Docker previous-release volume fixture reaches healthy (startup order
-      per §9.2; no auto-create ahead of detection).
-- [ ] §9.4 self-model delta: create DOB `Guidance Cache`; the exact §9.4
-      connection witnesses verified by source/target/type/direction query;
-      framework/requirement descriptions updated; `artifact_verify` clean.
-- [ ] Config migration rows (encrypted alias, capability-loss findings, public
-      deprecation finding, above-WHITE public BLOCKING fixture — assert no
-      target migration writes, no raw payload in the report, and the
-      secure-import-or-verified-purge instructions; co-located quarantine
-      fixtures separate and explicitly named) fixture-tested; §13
-      criterion 19 evidence.
+- [x] Previous-release fixture upgraded through the public CLI: dry-run purity,
+      first-run migration, second-run no-op, injected mid-apply failure →
+      accurate partial report + safe resume, unknown-content preservation,
+      fail-closed newer/malformed (F6.1–F6.7). DONE 2026-07-22 — commit `c074156`,
+      `tests/integration/test_previous_release_upgrade.py` drives the REAL
+      registries (build_registry + build_operational_registry) via `main_upgrade`
+      against a shared resolver-driven fixture (`tests/support/
+      previous_release_deployment.py`). FORMAT_CONTRACT_VERSION bumped 1→2 with
+      the repo re-stamp asserted. Repo-side coverage exercises the attribute-
+      profile/AI-BOM format evolution (see the reconstruction note below).
+- [~] Locked SQLCipher blocking + fresh-init-without-false-migration DONE (locked
+      store held uninspectable → EXIT_UNRESOLVED_MIGRATION, nothing written;
+      absent signals store never fabricated). Rerun idempotency DONE (second
+      commit is a no-op). NOT built: "quarantine populated exactly once across
+      reruns" for legacy signal ROWS — the current signals migration only adds the
+      snapshot tables + version stamp; the co-located legacy-row quarantine was the
+      C0 plan intent and the pre-rename store is a blocking (recreate) finding, not
+      a quarantine-migrate path. No legacy-row-quarantine step exists to test once,
+      so there is nothing to assert; recorded, not silently skipped.
+- [~] Docker startup ORDER guard DONE (always-on: `TestDockerStartupOrder` asserts
+      the entrypoint runs `arch-repair upgrade` before initializing absent stores
+      and before `exec arch-backend` — the "no auto-create ahead of detection"
+      invariant, F6.5/F6.8). Live "reaches healthy" container run DEFERRED to the
+      consolidated verification: it needs a CURRENT-code image rebuild (the only
+      built image `architectonic:local` predates the whole operational-upgrade
+      architecture) + intricate volume/env alignment; queued in PROMPT-next-session
+      with the exact procedure (owner-confirmed shape: current image + old-format
+      data volume).
+- [x] §9.4 self-model delta DONE 2026-07-22 — commit `e0ea65c`. New DOB
+      `Guidance Cache` (`DOB@1784712071.M6gx2l`); witnesses verified by exact
+      source/target/type/direction query — framework —access→ Guidance Cache /
+      Security Signals Store / Assurance Knowledge Base (access→ Upgrade Report +
+      realization→ Repository Format Upgrade already existed) and Load Guidance
+      Content —access→ Guidance Cache; descriptions broadened on framework /
+      requirement / Upgrade Report; `artifact_verify` clean (73/73, 0 errors, 3
+      pre-existing GAR warnings).
+- [~] Config-settings migration (encrypted→sqlcipher-colocated rewrite,
+      capability-loss findings, public-metric deprecation finding, above-WHITE
+      public blocking) DEFERRED (owner, 2026-07-22). Not required by criterion 19;
+      the `deployment_settings` migration step does not exist and the §9.1 config
+      row is owned by C0/C1. `capability.py` already resolves the `encrypted` alias
+      at runtime (no correctness gap) and parks the rewrite as "the upgrade path's
+      job". No deployment uses assurance features yet. POST-PUBLIC-RELEASE: must be
+      able to migrate assurance deployments, if necessary via export → automated
+      data migration → infrastructure upgrade → re-import.
 
 ---
 
@@ -963,6 +991,26 @@ so a broken query is indistinguishable from a legitimately empty result.
 ## Progress log
 
 (append: date · stream/WU · evidence/notes)
+
+- 2026-07-22 · U/WU-U0b · SUBSTANTIALLY DONE (commits `c074156` code, `e0ea65c` self-model).
+  Reconstructed U0b's intent WITH the owner (see the memory note): U0b is the end-to-end
+  ACCEPTANCE/coverage layer for the operational-upgrade architecture, not feature-building;
+  objective bar is criterion 19. Delivered: (a) `tests/integration/
+  test_previous_release_upgrade.py` — 11 tests driving the REAL registries via `main_upgrade`
+  against a shared resolver-driven fixture (`tests/support/previous_release_deployment.py`
+  writes each artifact at the path the current resolver resolves, so it can't drift and it
+  serves both CLI + Docker): dry-run purity, first/second commit, newer/malformed guidance
+  blocking, locked SQLCipher uninspectable→blocking, absent store never fabricated, injected
+  mid-apply failure→partial_apply→resume, repo-side attribute-profile/AI-BOM evolution (new
+  default schema added, customized preserved, additive specialization declaration untouched),
+  entrypoint startup-order guard. (b) FORMAT_CONTRACT_VERSION 1→2 (`registry.py`), repo
+  re-stamp asserted. (c) §9.4 self-model delta — new DOB `Guidance Cache`
+  (`DOB@1784712071.M6gx2l`) + 4 access witnesses, 3 descriptions broadened, `artifact_verify`
+  73/73 0 errors. Gates for the code: targeted backend suites 53 passed, ruff clean, zuban
+  706 files clean. DEFERRED (`[~]`, queued in PROMPT): live Docker "reaches healthy" (needs
+  current-image rebuild), config-settings migration (owner: C0/C1-owned; runtime tolerates
+  `encrypted`; post-release export→migrate→reimport), legacy-row "quarantine once" (no step
+  exists to test). Full backend suite pending as the part-boundary gate.
 
 - 2026-07-19 · U/WU-U0a · COMPLETE. New: `src/domain/deployment_layout.py` +
   `deployment_layout_resolution.py` (pure two-stage resolver, injectable
