@@ -432,9 +432,18 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
 ## Stream G — Self-model, docs, dogfooding
 
 ### WU-G1 — Self-model sync
-- [ ] Model the AIBOM derivation capability in ENG-ARCH-REPO: guidance-first,
-      read-before-propose, descriptions over new entities, no argumentative or
-      bundled motivation entities.
+- [x] Model the AIBOM derivation capability in ENG-ARCH-REPO: guidance-first,
+      read-before-propose, descriptions over new entities.
+
+#### WU-G1 PROGRESS (2026-07-22)
+- Read-before-propose: searched the self-model; the existing `Supply-Chain & Vulnerability
+  Connector` (APP@1780656431.e2zPs6) already owns AI-BOM emission but its description
+  reflected the OLD caller-confirmed behaviour. Enriched its DESCRIPTION (no new entity, per
+  the motivation-entity discipline) to state the AI-BOM is now DERIVED from the model —
+  entities carrying an AI specialization, model card authored on the entity, datasets/
+  governance/dependencies from connections via the derivation-role vocabulary, per-component
+  coverage, and the un-gated (public-model) vs store-gated (vuln signals) split. Repo-wide
+  `artifact_verify` (engagement) 73/73 valid, 0 errors (3 pre-existing GAR warnings).
 
 ### WU-G2 — Documentation
 - [x] `docs/04-assurance/aibom.md`: what an AIBOM is, why model-derived beats
