@@ -13,7 +13,7 @@
  */
 import { computed, ref, watch } from 'vue'
 import {
-  canAnchorSignals, changedTheStore, describeOutcome, parseSubmission, requestIdFor,
+  asText, canAnchorSignals, changedTheStore, describeOutcome, parseSubmission, requestIdFor,
 } from './SignalIngestPanel.helpers'
 
 const props = defineProps<{ artifactId: string; entityType?: string }>()
@@ -64,7 +64,7 @@ async function submit() {
     if (resp.status === 423) { error.value = 'The assurance store is locked.'; return }
     const body = await resp.json().catch(() => ({})) as Record<string, unknown>
     if (resp.status === 403) {
-      error.value = String(body['message'] ?? 'Signal mutations are denied by this deployment.')
+      error.value = asText(body['message'], 'Signal mutations are denied by this deployment.')
       return
     }
     const message = describeOutcome(resp.status, body)

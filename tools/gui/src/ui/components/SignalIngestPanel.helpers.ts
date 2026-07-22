@@ -22,6 +22,17 @@ export const canAnchorSignals = (
 ): boolean => !!entityType && admissible.includes(entityType)
 
 /**
+ * Coerce an untyped response field to a display string. Only primitives render;
+ * an object or array yields the fallback rather than the `[object Object]` default
+ * stringification, so a malformed body never leaks that into user-facing text.
+ */
+export const asText = (value: unknown, fallback = ''): string => {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return fallback
+}
+
+/**
  * Parse a submission into the request body, or a single message naming the first
  * problem. Vulnerability records are OPTIONAL — a BOM alone is a valid inventory
  * snapshot with no findings, which is a legitimate thing to want.
@@ -64,7 +75,7 @@ export const parseSubmission = (submission: IngestSubmission): ParsedIngest => {
  * reused request id — rather than as a generic failure.
  */
 export const describeOutcome = (status: number, body: Record<string, unknown>): string => {
-  const outcome = String(body['status'] ?? '')
+  const outcome = asText(body['status'])
   const num = (key: string): number => {
     const value = body[key]
     return typeof value === 'number' ? value : 0
@@ -72,7 +83,7 @@ export const describeOutcome = (status: number, body: Record<string, unknown>): 
   switch (outcome) {
     case 'activated': {
       const collapsed = num('collapsed_finding_count')
-      const head = `Snapshot ${String(body['snapshot_id'] ?? '')} is now active — `
+      const head = `Snapshot ${asText(body['snapshot_id'])} is now active — `
         + `${num('component_count')} components, ${num('finding_count')} findings `
         + `(of ${num('submitted_finding_count')} submitted`
       return collapsed > 0
@@ -81,7 +92,7 @@ export const describeOutcome = (status: number, body: Record<string, unknown>): 
     }
     case 'replayed':
       return `Already ingested under this request id — snapshot `
-        + `${String(body['snapshot_id'] ?? '')}. Nothing was written.`
+        + `${asText(body['snapshot_id'])}. Nothing was written.`
     case 'conflict':
       return 'That request id was already used with a different payload; nothing was '
         + 'written. Submit with a new request id.'
@@ -90,14 +101,14 @@ export const describeOutcome = (status: number, body: Record<string, unknown>): 
       const detail = errors
         .map((entry) => {
           const record = entry as Record<string, unknown>
-          return `${String(record['field'] ?? '')}: ${String(record['message'] ?? '')}`
+          return `${asText(record['field'])}: ${asText(record['message'])}`
         })
         .join('; ')
       return `Rejected — ${detail || 'validation failed'}.`
     }
     case 'failed':
       return `The ingest failed and was recorded as failed: `
-        + `${String(body['reason'] ?? 'unknown reason')}. Retry with a new request id.`
+        + `${asText(body['reason'], 'unknown reason')}. Retry with a new request id.`
     default:
       return `Unexpected response from the ingest endpoint (HTTP ${status}).`
   }
@@ -105,7 +116,7 @@ export const describeOutcome = (status: number, body: Record<string, unknown>): 
 
 /** Whether an outcome means the store changed, and the views should re-read. */
 export const changedTheStore = (body: Record<string, unknown>): boolean =>
-  String(body['status'] ?? '') === 'activated'
+  asText(body['status']) === 'activated'
 
 
 /**

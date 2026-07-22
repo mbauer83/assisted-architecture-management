@@ -10,7 +10,7 @@ const info = (over: Partial<EntitySchemaInfo>): EntitySchemaInfo => ({
   required: [],
   descriptors: {},
   ...over,
-} as EntitySchemaInfo)
+})
 
 describe('quarantineFromSchemaInfo', () => {
   it('reads the endpoint flag when present', () => {
