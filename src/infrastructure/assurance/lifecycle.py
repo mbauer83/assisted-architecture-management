@@ -134,11 +134,38 @@ def backup_store(db_path: Path, *, backup_path: Path | None = None) -> dict[str,
 # ── export ────────────────────────────────────────────────────────────────────
 
 
+# Top-level bundle keys that are AUTHORED seed metadata, not store state (see
+# cli/_seed_commands.py) — export_bundle does not produce them, so a plain re-export
+# would silently clobber them. They are carried over from an existing target bundle.
+_AUTHORED_BUNDLE_KEYS = ("signal_anchors",)
+
+
+def _authored_metadata(output_path: Path) -> dict[str, object]:
+    if not output_path.exists():
+        return {}
+    try:
+        existing = json.loads(output_path.read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {}
+    if not isinstance(existing, dict):
+        return {}
+    return {key: existing[key] for key in _AUTHORED_BUNDLE_KEYS if key in existing}
+
+
 def export_store(store: SQLCipherAssuranceStore, output_path: Path) -> dict[str, object]:
-    """Export the full assurance graph (analyses, nodes, edges, arch-refs) to a JSON file."""
+    """Export the full assurance graph (analyses, nodes, edges, arch-refs) to a JSON file.
+
+    Authored-only bundle keys (``signal_anchors`` — seed metadata the store does not hold)
+    are preserved from an existing target bundle so a plain re-export never silently
+    clobbers hand-authored seed metadata.
+    """
     from src.infrastructure.assurance._portability import export_bundle  # noqa: PLC0415
 
-    data: dict[str, object] = {"export_time": utc_now_iso(), **export_bundle(store)}
+    data: dict[str, object] = {
+        "export_time": utc_now_iso(),
+        **_authored_metadata(output_path),
+        **export_bundle(store),
+    }
     output_path.write_text(json.dumps(data, indent=2))
     logger.info("Assurance store exported to %s", output_path)
     nodes = data["nodes"]

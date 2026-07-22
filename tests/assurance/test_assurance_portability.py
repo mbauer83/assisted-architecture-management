@@ -94,3 +94,33 @@ def test_import_requires_unlocked_store(tmp_path) -> None:  # type: ignore[no-un
     locked = SQLCipherAssuranceStore(db_path)  # not unlocked
     with pytest.raises(RuntimeError, match="unlocked"):
         import_bundle(locked, {"nodes": []})
+
+
+def test_export_preserves_authored_signal_anchors(populated_store, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """signal_anchors is authored seed metadata the store never holds; a re-export over an
+    existing bundle must NOT clobber it (regression: a plain export used to drop it)."""
+    import json
+
+    from src.infrastructure.assurance.lifecycle import export_store
+
+    source, _ids = populated_store
+    out = tmp_path / "seed.json"
+    anchors = [{"anchor_entity_id": "APP@1.backend", "target": "python", "label": "Backend"}]
+    out.write_text(json.dumps({"export_time": "old", "signal_anchors": anchors, "nodes": []}))
+
+    export_store(source, out)  # re-export over the existing authored bundle
+
+    rewritten = json.loads(out.read_text())
+    assert rewritten["signal_anchors"] == anchors  # preserved
+    assert len(rewritten["nodes"]) == 2  # and the fresh store graph was written
+
+
+def test_export_without_existing_bundle_has_no_authored_keys(populated_store, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    import json
+
+    from src.infrastructure.assurance.lifecycle import export_store
+
+    source, _ids = populated_store
+    out = tmp_path / "fresh.json"
+    export_store(source, out)
+    assert "signal_anchors" not in json.loads(out.read_text())  # nothing to preserve → absent

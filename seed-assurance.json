@@ -1,6 +1,29 @@
 {
-  "export_time": "2026-07-20T05:11:10Z",
-  "analyses": [],
+  "export_time": "2026-07-22T12:10:02Z",
+  "signal_anchors": [
+    {
+      "anchor_entity_id": "APP@1777293133.OYEmP1",
+      "target": "python",
+      "label": "Architecture Backend"
+    },
+    {
+      "anchor_entity_id": "APP@1776149382.lmO0mp",
+      "target": "npm",
+      "label": "GUI Authoring Tool"
+    }
+  ],
+  "analyses": [
+    {
+      "analysis_id": "STPA@1784721732.pflr.3e4395",
+      "name": "PlantUML Preprocessor Untrusted-Input Disclosure (STPA-Sec)",
+      "method": "STPA",
+      "architecture_anchor_id": "APP@1777293133.OYEmP1",
+      "status": "draft",
+      "tlp": "TLP:WHITE",
+      "created_at": "2026-07-22T12:02:12Z",
+      "updated_at": "2026-07-22T12:02:12Z"
+    }
+  ],
   "nodes": [
     {
       "node_id": "LSS@1781181599.wczn.d5fa5c",
@@ -307,6 +330,186 @@
       "created_at": "2026-06-11T12:41:30Z",
       "updated_at": "2026-06-11T12:41:30Z",
       "created_by": ""
+    },
+    {
+      "node_id": "LSS@1784721758.xyb7.5e5a41",
+      "node_type": "loss",
+      "name": "Unauthorized disclosure of server-side confidential data",
+      "status": "draft",
+      "tlp": "TLP:WHITE",
+      "concern_class": null,
+      "disposition": null,
+      "uca_type": null,
+      "binding_status": null,
+      "node_role": null,
+      "analysis_id": "STPA@1784721732.pflr.3e4395",
+      "attributes_json": "{}",
+      "content_text": "Confidential material held on the server host \u2014 the assurance store, credentials/secrets, TLP-restricted files, deployment configuration \u2014 is read off disk and returned to a requester who was never authorized to see it.",
+      "created_at": "2026-07-22T12:02:38Z",
+      "updated_at": "2026-07-22T12:02:38Z",
+      "created_by": ""
+    },
+    {
+      "node_id": "LSS@1784721761.subh.8af6a4",
+      "node_type": "loss",
+      "name": "Bypass of the TLP / unlock confidentiality controls",
+      "status": "draft",
+      "tlp": "TLP:WHITE",
+      "concern_class": null,
+      "disposition": null,
+      "uca_type": null,
+      "binding_status": null,
+      "node_role": null,
+      "analysis_id": "STPA@1784721732.pflr.3e4395",
+      "attributes_json": "{}",
+      "content_text": "Content reaches a requester outside the exposure policy that is supposed to gate every read (TLP ceiling, unlock gating, one-way persistence), defeating the platform's confidentiality guarantees.",
+      "created_at": "2026-07-22T12:02:41Z",
+      "updated_at": "2026-07-22T12:02:41Z",
+      "created_by": ""
+    },
+    {
+      "node_id": "HAZ@1784721764.wra3.48aefe",
+      "node_type": "hazard",
+      "name": "Renderer processes an untrusted PUML body with the server's filesystem/network authority",
+      "status": "draft",
+      "tlp": "TLP:WHITE",
+      "concern_class": null,
+      "disposition": null,
+      "uca_type": null,
+      "binding_status": null,
+      "node_role": null,
+      "analysis_id": "STPA@1784721732.pflr.3e4395",
+      "attributes_json": "{}",
+      "content_text": "System state: a PUML body originating from an untrusted submitter is handed to the PlantUML renderer, which runs with the server process's ambient filesystem and network authority and a preprocessor able to read files and fetch URLs.",
+      "created_at": "2026-07-22T12:02:44Z",
+      "updated_at": "2026-07-22T12:02:44Z",
+      "created_by": ""
+    },
+    {
+      "node_id": "CSN@1784721769.xsxc.b4d1e7",
+      "node_type": "control-structure-node",
+      "name": "Diagram write/render pipeline",
+      "status": "draft",
+      "tlp": "TLP:WHITE",
+      "concern_class": null,
+      "disposition": null,
+      "uca_type": null,
+      "binding_status": null,
+      "node_role": "controller",
+      "analysis_id": "STPA@1784721732.pflr.3e4395",
+      "attributes_json": "{}",
+      "content_text": "The Architecture Backend use case that accepts a diagram body (via the edit/create surfaces), prepares it, and submits it to the renderer for verification and SVG output. It is the controller that decides what content reaches the renderer.",
+      "created_at": "2026-07-22T12:02:49Z",
+      "updated_at": "2026-07-22T12:02:49Z",
+      "created_by": ""
+    },
+    {
+      "node_id": "CSN@1784721771.uwzz.7ae76a",
+      "node_type": "control-structure-node",
+      "name": "PlantUML renderer (subprocess)",
+      "status": "draft",
+      "tlp": "TLP:WHITE",
+      "concern_class": null,
+      "disposition": null,
+      "uca_type": null,
+      "binding_status": null,
+      "node_role": "controlled-process",
+      "analysis_id": "STPA@1784721732.pflr.3e4395",
+      "attributes_json": "{}",
+      "content_text": "The arm's-length PlantUML process (java -jar) that expands the preprocessor and lays out the diagram. Under its default security profile the preprocessor may read local files and fetch URLs.",
+      "created_at": "2026-07-22T12:02:51Z",
+      "updated_at": "2026-07-22T12:02:51Z",
+      "created_by": ""
+    },
+    {
+      "node_id": "CAC@1784721773.wlse.921a96",
+      "node_type": "control-action",
+      "name": "Submit PUML body to the renderer for verification/output",
+      "status": "draft",
+      "tlp": "TLP:WHITE",
+      "concern_class": null,
+      "disposition": null,
+      "uca_type": null,
+      "binding_status": null,
+      "node_role": null,
+      "analysis_id": "STPA@1784721732.pflr.3e4395",
+      "attributes_json": "{}",
+      "content_text": "The control action of handing a diagram body to the PlantUML process to syntax-check and render. The body's provenance (renderer-generated vs. untrusted-submitter) is the safety-relevant context.",
+      "created_at": "2026-07-22T12:02:53Z",
+      "updated_at": "2026-07-22T12:02:53Z",
+      "created_by": ""
+    },
+    {
+      "node_id": "UCA@1784721777.tdvx.edace6",
+      "node_type": "unsafe-control-action",
+      "name": "Renderer is given an untrusted PUML body carrying a file/network preprocessor directive",
+      "status": "draft",
+      "tlp": "TLP:WHITE",
+      "concern_class": null,
+      "disposition": null,
+      "uca_type": "provided",
+      "binding_status": null,
+      "node_role": null,
+      "analysis_id": "STPA@1784721732.pflr.3e4395",
+      "attributes_json": "{}",
+      "content_text": "The pipeline PROVIDES the submit-to-renderer action in the unsafe context where the body came from an untrusted submitter and contains a file/network preprocessor directive (e.g. an absolute !include, !includeurl, !import, %load_json, %getenv) outside the renderer's own managed includes.",
+      "created_at": "2026-07-22T12:02:57Z",
+      "updated_at": "2026-07-22T12:02:57Z",
+      "created_by": ""
+    },
+    {
+      "node_id": "LOS@1784721780.jswt.792275",
+      "node_type": "loss-scenario",
+      "name": "Submitted !include of a server file is expanded into the returned SVG",
+      "status": "draft",
+      "tlp": "TLP:WHITE",
+      "concern_class": null,
+      "disposition": null,
+      "uca_type": null,
+      "binding_status": null,
+      "node_role": null,
+      "analysis_id": "STPA@1784721732.pflr.3e4395",
+      "attributes_json": "{}",
+      "content_text": "A submitter sends a diagram body \u2014 directly (edit surface) or by smuggling a newline + directive through a diagram name into the generated title \u2014 containing e.g. `!include /etc/passwd`. Verification and rendering run PlantUML under its default security profile, which resolves the include and embeds the file's contents in the SVG returned to the requester. Confirmed empirically with a canary file.",
+      "created_at": "2026-07-22T12:03:00Z",
+      "updated_at": "2026-07-22T12:03:00Z",
+      "created_by": ""
+    },
+    {
+      "node_id": "ACN@1784721782.lrw1.6ca350",
+      "node_type": "assurance-constraint",
+      "name": "Untrusted PUML must not reach the renderer carrying non-managed file/network directives",
+      "status": "draft",
+      "tlp": "TLP:WHITE",
+      "concern_class": "security",
+      "disposition": "mitigated",
+      "uca_type": null,
+      "binding_status": null,
+      "node_role": null,
+      "analysis_id": "STPA@1784721732.pflr.3e4395",
+      "attributes_json": "{}",
+      "content_text": "The pipeline must reject any user-submitted PUML body containing a file/network preprocessor directive (absolute/arbitrary/URL !include, !includeurl, !includesub, !import, !theme\u2026from, %load_json, %getenv) before it is prepared, rendered, or stored, permitting only the renderer's own managed relative macro includes and bundled stdlib. Implemented as a boundary validator enforced in the diagram edit write path.",
+      "created_at": "2026-07-22T12:03:02Z",
+      "updated_at": "2026-07-22T12:03:02Z",
+      "created_by": ""
+    },
+    {
+      "node_id": "ACN@1784721785.rgil.543a7f",
+      "node_type": "assurance-constraint",
+      "name": "User-controlled diagram names must be stripped of control characters before embedding",
+      "status": "draft",
+      "tlp": "TLP:WHITE",
+      "concern_class": "security",
+      "disposition": "mitigated",
+      "uca_type": null,
+      "binding_status": null,
+      "node_role": null,
+      "analysis_id": "STPA@1784721732.pflr.3e4395",
+      "attributes_json": "{}",
+      "content_text": "A diagram name is a single-line label. Control characters (CR/LF/TAB) must be collapsed before the name is embedded in the frontmatter value or the PlantUML `title` line, so the name cannot break out into a standalone preprocessor directive. Implemented in the diagram formatter.",
+      "created_at": "2026-07-22T12:03:05Z",
+      "updated_at": "2026-07-22T12:03:05Z",
+      "created_by": ""
     }
   ],
   "edges": [
@@ -549,6 +752,110 @@
       "conn_type": "accountable-for",
       "attributes_json": "{}",
       "created_at": "2026-06-11T12:45:40Z"
+    },
+    {
+      "edge_id": "EDG@92812f981194",
+      "source_id": "HAZ@1784721764.wra3.48aefe",
+      "target_id": "LSS@1784721758.xyb7.5e5a41",
+      "conn_type": "leads-to",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:03:49Z"
+    },
+    {
+      "edge_id": "EDG@9d9b57f1e1c4",
+      "source_id": "HAZ@1784721764.wra3.48aefe",
+      "target_id": "LSS@1784721761.subh.8af6a4",
+      "conn_type": "leads-to",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:03:51Z"
+    },
+    {
+      "edge_id": "EDG@486d77d07539",
+      "source_id": "CSN@1784721769.xsxc.b4d1e7",
+      "target_id": "CAC@1784721773.wlse.921a96",
+      "conn_type": "issues",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:03:53Z"
+    },
+    {
+      "edge_id": "EDG@0ae948a870f5",
+      "source_id": "CAC@1784721773.wlse.921a96",
+      "target_id": "CSN@1784721771.uwzz.7ae76a",
+      "conn_type": "acts-on",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:03:57Z"
+    },
+    {
+      "edge_id": "EDG@cb1d23d072fb",
+      "source_id": "UCA@1784721777.tdvx.edace6",
+      "target_id": "CAC@1784721773.wlse.921a96",
+      "conn_type": "concerns",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:03:59Z"
+    },
+    {
+      "edge_id": "EDG@3d5cebf0bf0a",
+      "source_id": "UCA@1784721777.tdvx.edace6",
+      "target_id": "HAZ@1784721764.wra3.48aefe",
+      "conn_type": "leads-to",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:04:02Z"
+    },
+    {
+      "edge_id": "EDG@9db475840c3f",
+      "source_id": "LOS@1784721780.jswt.792275",
+      "target_id": "UCA@1784721777.tdvx.edace6",
+      "conn_type": "explains",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:04:05Z"
+    },
+    {
+      "edge_id": "EDG@826d85f6f537",
+      "source_id": "UCA@1784721777.tdvx.edace6",
+      "target_id": "ACN@1784721782.lrw1.6ca350",
+      "conn_type": "derives",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:04:08Z"
+    },
+    {
+      "edge_id": "EDG@b0fbce30f363",
+      "source_id": "UCA@1784721777.tdvx.edace6",
+      "target_id": "ACN@1784721785.rgil.543a7f",
+      "conn_type": "derives",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:04:11Z"
+    },
+    {
+      "edge_id": "EDG@31c06f7bced2",
+      "source_id": "LOS@1784721780.jswt.792275",
+      "target_id": "ACN@1784721782.lrw1.6ca350",
+      "conn_type": "derives",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:04:13Z"
+    },
+    {
+      "edge_id": "EDG@7c9cd8f1e75f",
+      "source_id": "LOS@1784721780.jswt.792275",
+      "target_id": "ACN@1784721785.rgil.543a7f",
+      "conn_type": "derives",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:04:15Z"
+    },
+    {
+      "edge_id": "EDG@17a2b4bdd768",
+      "source_id": "CSN@1784721769.xsxc.b4d1e7",
+      "target_id": "ACN@1784721782.lrw1.6ca350",
+      "conn_type": "responsible-for",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:04:18Z"
+    },
+    {
+      "edge_id": "EDG@3bfbf2f48b41",
+      "source_id": "CSN@1784721769.xsxc.b4d1e7",
+      "target_id": "ACN@1784721785.rgil.543a7f",
+      "conn_type": "responsible-for",
+      "attributes_json": "{}",
+      "created_at": "2026-07-22T12:04:20Z"
     }
   ],
   "arch_refs": [
@@ -599,18 +906,24 @@
       "arch_artifact_id": "APP@1780656431.GnsLC8.assurance-archive",
       "ref_type": "evidenced-by-artifact",
       "resolved_at": null
-    }
-  ],
-  "signal_anchors": [
-    {
-      "anchor_entity_id": "APP@1777293133.OYEmP1",
-      "target": "python",
-      "label": "Architecture Backend"
     },
     {
-      "anchor_entity_id": "APP@1776149382.lmO0mp",
-      "target": "npm",
-      "label": "GUI Authoring Tool"
+      "assurance_node_id": "CSN@1784721769.xsxc.b4d1e7",
+      "arch_artifact_id": "APP@1777293133.OYEmP1",
+      "ref_type": "binds-to",
+      "resolved_at": null
+    },
+    {
+      "assurance_node_id": "ACN@1784721782.lrw1.6ca350",
+      "arch_artifact_id": "APP@1777293133.OYEmP1",
+      "ref_type": "binds-to",
+      "resolved_at": null
+    },
+    {
+      "assurance_node_id": "ACN@1784721785.rgil.543a7f",
+      "arch_artifact_id": "APP@1777293133.OYEmP1",
+      "ref_type": "binds-to",
+      "resolved_at": null
     }
   ]
 }
