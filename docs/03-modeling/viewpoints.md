@@ -353,6 +353,16 @@ mutually exclusive on one definition.
 Legends are always derived from `styling_rules` + `range_bands` + `default_style` — there's
 nothing to separately author.
 
+A shipped example of range-mode styling: the **Resource Map** viewpoint (ArchiMate's
+strategy-layer example viewpoint) carries a heat-map rule over a repo-defined
+`investment_level` profile attribute (1 low – 5 high), so resources render banded by
+investment once a repository defines that attribute — and in the default style when it
+doesn't. Its sibling **Capability Map** deliberately ships *no* heat-map rule: the
+ArchiMate text allows one over an investment attribute, but styling an attribute no
+repository has defined would color everything by absence, so the rule is left to the
+repository that defines the attribute. Executing either viewpoint against this
+repository's own model shows the difference.
+
 &nbsp;
 
 ## Authoring a definition

@@ -13,6 +13,12 @@ The axes are mutually independent — a diagram collection is never tied to a mo
 Grouping is a **soft partition**: it controls where files live and nothing else. Search,
 linking, and verification ignore group boundaries entirely.
 
+Groups are engagement-tier navigation aids. When grouped content is promoted, the
+enterprise side gets its own flat namespace: a new enterprise group defaults to
+`{engagement-label}-{slug}` so same-named groups from different engagements cannot
+collide, and the mapping can be overridden during promotion — see
+[Git sync & promotion](../reference/git-sync-promotion.md#promotion).
+
 ![Group management view](../media/group-management.png)
 
 &nbsp;

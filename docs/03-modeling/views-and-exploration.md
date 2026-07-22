@@ -32,6 +32,21 @@ Enterprise clears the active collection.
 
 &nbsp;
 
+## Repository workflow & status
+
+The top bar's right side is the **workflow/status cluster**: a repository status chip
+plus a **Changes** menu. The chip reports the working state — including a warning when
+the enterprise working branch is behind its remote — and the menu holds every workflow
+verb in one place: *Save engagement changes*, *Save enterprise changes*, *Submit for
+review*, *Discard working branch* / *Discard submission*, and *Promote to enterprise*.
+Nouns live in the left navigation; verbs live here. The cluster is fail-closed: until
+the backend has confirmed what the current session is allowed to do, no verb is
+offered — a connectivity or status failure can never present an action that would be
+rejected. The save/submit/promote semantics behind these verbs are described in
+[Git sync & promotion](../reference/git-sync-promotion.md).
+
+&nbsp;
+
 ## Treemap
 
 A space-filling map of entities, sized and grouped so the shape of a repository is visible
@@ -46,7 +61,9 @@ domain or type.
 
 Full-text search across every artifact family (entities, connections, diagrams, documents)
 with relevance ranking, plus optional semantic supplement where configured. Results carry
-enough metadata to act on without a second round-trip.
+enough metadata to act on without a second round-trip. System-managed bookkeeping
+artifacts (such as the cross-repository reference proxies created by promotion) never
+appear in results — search surfaces only content someone authored.
 
 ![Search view](../media/search.png)
 
