@@ -138,15 +138,13 @@ cross-document consistency, current live MCP stats, all gates over the integrate
     map to the role-functional name at the read boundary. Exposure-filter the entity list.
 - **Non-blocking:** Starlette 1.3 deprecates `httpx` with `starlette.testclient` (20 test
   warnings) — future test-client migration.
-- **PUBLICATION BLOCKER (owner decision):** the committed `arch-workspace.yaml` is the ONLY tracked
-  file leaking an internal identifier — it carries the private `TECHNOLOGY_ARCHITECTURE` engagement
-  and its Azure DevOps URL (`git@ssh.dev.azure.com:v3/BAMDigitalServices/...`). On a fresh PUBLIC
-  clone `arch-init` reads it and tries to validate/clone that private repo (credential prompt /
-  failure), so the shipped default is neither clean nor "ENG-ARCH-REPO-only". Fix before publishing:
-  make the committed default reference ONLY the public ENG-ARCH-REPO self-model — either (A) edit
-  the committed file to ENG-ARCH-REPO-only, or (B) `git rm --cached arch-workspace.yaml` + gitignore
-  it + ship `arch-workspace.example.yaml` (ENG-ARCH-REPO-only) and have arch-init/docs use it. (No
-  private ENGAGEMENT CONTENT is tracked — only ENG-ARCH-REPO is in git; this is a one-file fix.)
+- **Workspace config (RESOLVED 2026-07-22):** the tracked `arch-workspace.yaml` is now
+  ENG-ARCH-REPO-only; the full local config (with the private `TECHNOLOGY_ARCHITECTURE` Azure
+  engagement) moved to the gitignored `arch-workspace.private.yaml`. **STILL TO REVIEW before
+  publishing:** the tracked config's `enterprise.git.url` still points at a personal repo
+  (`git@github.com:mbauer83/global-architecture-repository.git`) — a fresh public clone's arch-init
+  would try to clone it. Decide whether that repo is a public companion (fine) or should default to
+  a local empty enterprise repo (as CI scaffolds).
 - **Assurance seed / fresh-install UX (done 2026-07-22):** `seed-assurance.json` regenerated from
   the self-model store (now includes the STPA-Sec analysis; signal_anchors preserved). Fresh
   install: `arch-assurance init && arch-assurance seed --with-signals` (defaults to
