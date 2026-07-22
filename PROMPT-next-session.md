@@ -120,10 +120,18 @@ cross-document consistency, current live MCP stats, all gates over the integrate
   is runtime-confidential (never committed).
 - **Deferred, owner decision:** evaluate **Minimus** (hardened/minimal) Docker base images — not a
   drop-in (runtime needs apt-installed JRE + graphviz + git); its own focused effort.
-- **MCP ergonomics fix queued (restart-gated):** `assurance_security_stats` reports a *count* of
-  active anchors but not *which*; `assurance_list_vulnerabilities` requires an anchor id → forces
-  out-of-band discovery. Have stats return active anchors `[{entity_id, name}]` and let
-  list_vulnerabilities default to all active anchors. (See the session's MCP-changes plan.)
+- **MCP ergonomics fix queued (restart-gated):** the assurance read surface forces out-of-band
+  discovery of which architecture entities have security signals. Fix, using **role-functional
+  naming** (the entity a snapshot attaches to = the *assessed entity*, NOT an "anchor" — that term
+  is overloaded and unclear in output):
+  · `assurance_security_stats` → add `assessed_entities: [{entity_id, entity_name, snapshot_id,
+    bom_component_count, finding_count}]` and rename the scalar `anchors_with_active_snapshot` →
+    `assessed_entity_count`. (`bom_component_count` disambiguates SBOM packages from the
+    architecture application-*component*.) Output-only → backend restart suffices.
+  · `assurance_list_vulnerabilities` → make `anchor_entity_id` optional (default = all assessed
+    entities) and add `assessed_entity_id` + `assessed_entity_name` to each finding row. Input
+    schema change → needs a Claude session restart. Persisted column `anchor_entity_id` may stay;
+    map to the role-functional name at the read boundary. Exposure-filter the entity list.
 - **Non-blocking:** Starlette 1.3 deprecates `httpx` with `starlette.testclient` (20 test
   warnings) — future test-client migration.
 
