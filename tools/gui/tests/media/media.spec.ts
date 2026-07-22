@@ -1,15 +1,25 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
-import fs from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { expect, test, type Page } from '@playwright/test'
+import {
+  capture, captureRenderedDiagram, captureStoredDiagram, gotoAndCapture,
+  resetManifest, watch, type CaptureProvenance,
+} from './mediaHelpers'
 
-type Problem = { kind: string; detail: string }
-type DiagramSummary = { artifact_id: string; name: string; diagram_type: string }
-type DiagramList = { items: DiagramSummary[] }
+const BACKEND = 'APP@1777293133.OYEmP1.architecture-backend'
+const ANALYSIS = 'STPA@1784721732.pflr.3e4395'
+const STRATEGY = 'ARC@1784483951.yBNaaU.strategy-overview'
+const VALUE_STREAM = 'ARC@1784483996.YRywG6.value-stream-deliver-an-architecture-aligned-change'
+const INVESTMENT = 'ARC@1784488894.WwyJAa.resource-investment-map'
+const C4_CONTEXT = 'CSC@1780829783.z8RRON.amp-system-context'
+const C4_CONTAINERS = 'CC@1780829785.Z_fI-N.amp-containers'
+const C4_COMPONENTS = 'CC@1780829793.K3l46j.architecture-backend-components'
 
-const here = path.dirname(fileURLToPath(import.meta.url))
-const mediaDir = path.resolve(here, '../../../../docs/media')
+const provenance = (testName: string, artifactIds: readonly string[] = []): CaptureProvenance => ({
+  test_name: testName,
+  artifact_ids: artifactIds,
+  synthetic_augmentation: false,
+})
 
+test.beforeAll(() => resetManifest())
 test.beforeEach(async ({ context }) => {
   await context.addInitScript(() => {
     localStorage.setItem('arch_group_model-project', 'uncategorized')
@@ -18,165 +28,124 @@ test.beforeEach(async ({ context }) => {
   })
 })
 
-function mediaPath(fileName: string): string {
-  fs.mkdirSync(mediaDir, { recursive: true })
-  return path.join(mediaDir, fileName)
-}
+test('application entities catalog', async ({ page }) => {
+  await gotoAndCapture(page, '/entities?domain=application&group=platform-core', 'entities-list.png',
+    provenance('application entities catalog'))
+})
 
-function watch(page: Page): Problem[] {
-  const problems: Problem[] = []
-  page.on('pageerror', (err) => problems.push({ kind: 'pageerror', detail: String(err) }))
-  page.on('console', (msg) => {
-    if (msg.type() !== 'error') return
-    if (/Failed to load resource.*status of 423/.test(msg.text()) && msg.location().url.includes('/api/assurance')) return
-    problems.push({ kind: 'console.error', detail: msg.text() })
-  })
-  page.on('response', (resp) => {
-    if (resp.url().includes('/api/') && resp.status() >= 500) {
-      problems.push({ kind: `http ${resp.status()}`, detail: resp.url() })
-    }
-  })
-  return problems
-}
+test('hero application catalog', async ({ page }) => {
+  await gotoAndCapture(page, '/entities?domain=application&group=platform-core', 'hero-overview.png',
+    provenance('hero application catalog'))
+})
 
-async function capture(page: Page, fileName: string): Promise<void> {
-  await expect(page.locator('#app > main')).toBeVisible()
-  await page.evaluate(() => document.fonts.ready)
-  await page.waitForTimeout(300)
-  await page.screenshot({ path: mediaPath(fileName), animations: 'disabled' })
-}
+test('strategy overview diagram', async ({ page, request }) => {
+  await captureRenderedDiagram(page, request, 'strategy-overview.png', STRATEGY,
+    'Architecture Knowledge Management', provenance('strategy overview diagram', [STRATEGY]))
+})
 
-async function gotoAndCapture(page: Page, route: string, fileName: string): Promise<void> {
+test('architecture-aligned change value stream', async ({ page, request }) => {
+  await captureRenderedDiagram(page, request, 'value-stream-deliver-change.png', VALUE_STREAM,
+    'Deliver an Architecture-Aligned Change', provenance('architecture-aligned change value stream', [VALUE_STREAM]))
+})
+
+test('resource investment map', async ({ page, request }) => {
+  await captureRenderedDiagram(page, request, 'resource-investment-map.png', INVESTMENT,
+    'Resource Investment Map', provenance('resource investment map', [INVESTMENT]))
+})
+
+test('C4 system context', async ({ page, request }) => {
+  await captureRenderedDiagram(page, request, 'c4-context.png', C4_CONTEXT,
+    'AMP &#8212; System Context', provenance('C4 system context', [C4_CONTEXT]))
+})
+
+test('C4 containers', async ({ page, request }) => {
+  await captureRenderedDiagram(page, request, 'c4-containers.png', C4_CONTAINERS,
+    'AMP &#8212; Containers', provenance('C4 containers', [C4_CONTAINERS]))
+})
+
+test('C4 backend components', async ({ page, request }) => {
+  await captureRenderedDiagram(page, request, 'c4-backend-components.png', C4_COMPONENTS,
+    'Architecture Backend &#8212; Components', provenance('C4 backend components', [C4_COMPONENTS]))
+})
+
+test('re-shoot overview', async ({ page }) => {
+  await gotoAndCapture(page, '/', 'overview.png', provenance('re-shoot overview'))
+})
+
+test('re-shoot search', async ({ page }) => {
+  await gotoAndCapture(page, '/search?q=architecture', 'search.png', provenance('re-shoot search'))
+})
+
+test('re-shoot treemap', async ({ page }) => {
+  await gotoAndCapture(page, '/entities?view=treemap&group=platform-core', 'treemap.png',
+    provenance('re-shoot treemap'))
+})
+
+test('re-shoot entity detail', async ({ page }) => {
+  await gotoAndCapture(page, `/entity?id=${encodeURIComponent(BACKEND)}`, 'entity-detail.png',
+    provenance('re-shoot entity detail', [BACKEND]))
+})
+
+test('re-shoot group management', async ({ page }) => {
+  await gotoAndCapture(page, '/entities/groups', 'group-management.png', provenance('re-shoot group management'))
+})
+
+test('re-shoot ArchiMate diagram', async ({ page, request }) => {
+  const id = 'ARC@1777452513.68ZZDj.promote-artifacts'
+  await captureRenderedDiagram(page, request, 'diagram-archimate.png', id,
+    'Artifacts Promoted', provenance('re-shoot ArchiMate diagram', [id]))
+})
+
+test('re-shoot matrix diagram', async ({ page, request }) => {
+  const id = 'MAT@1784484071.Vyfzpw.capabilities-value-stream-stages'
+  await captureStoredDiagram(page, request, 'diagram-matrix.png', id,
+    provenance('re-shoot matrix diagram', [id]))
+})
+
+test('re-shoot activity diagram', async ({ page, request }) => {
+  const id = 'ACT@1781338474.NTuMXo.promote-engagement-work-to-the-enterprise-baseline'
+  await captureStoredDiagram(page, request, 'diagram-activity.png', id,
+    provenance('re-shoot activity diagram', [id]))
+})
+
+test('re-shoot sequence diagram', async ({ page, request }) => {
+  const id = 'SEQ@1781338373.XPtsGv.from-a-write-to-a-consistent-broadcast-state'
+  await captureStoredDiagram(page, request, 'diagram-sequence.png', id,
+    provenance('re-shoot sequence diagram', [id]))
+})
+
+test('re-shoot C4 diagram', async ({ page, request }) => {
+  await captureStoredDiagram(page, request, 'diagram-c4.png', C4_CONTAINERS,
+    provenance('re-shoot C4 diagram', [C4_CONTAINERS]))
+})
+
+async function captureAssurance(
+  page: Page, route: string, fileName: string, name: string, artifactIds: readonly string[] = [],
+): Promise<void> {
   const problems = watch(page)
   await page.goto(route, { waitUntil: 'load' })
-  await capture(page, fileName)
+  await expect(page.getByText('Loading assurance store status')).toHaveCount(0, { timeout: 10_000 })
+  await capture(page, fileName, provenance(name, artifactIds))
   expect(problems, `runtime problems while capturing ${fileName}`).toEqual([])
 }
 
-async function firstDiagram(request: APIRequestContext, predicate: (diagram: DiagramSummary) => boolean): Promise<DiagramSummary> {
-  const response = await request.get('/api/diagrams')
-  expect(response.ok()).toBeTruthy()
-  const diagrams = (await response.json() as DiagramList).items
-  const match = diagrams.find(predicate)
-  expect(match, 'expected seeded self-model diagram for media capture').toBeTruthy()
-  return match as DiagramSummary
-}
-
-async function captureStoredDiagram(
-  page: Page,
-  request: APIRequestContext,
-  fileName: string,
-  predicate: (diagram: DiagramSummary) => boolean,
-): Promise<void> {
-  const diagram = await firstDiagram(request, predicate)
-  const problems = watch(page)
-  await page.goto(`/diagram?id=${encodeURIComponent(diagram.artifact_id)}`, { waitUntil: 'load' })
-  if (diagram.diagram_type !== 'matrix') await expect(page.locator('.svg-wrap svg')).toBeVisible({ timeout: 15_000 })
-  await capture(page, fileName)
-  expect(problems, `runtime problems while capturing ${fileName}`).toEqual([])
-}
-
-async function captureRenderedDiagramPng(
-  request: APIRequestContext,
-  fileName: string,
-  predicate: (diagram: DiagramSummary) => boolean,
-): Promise<void> {
-  const diagram = await firstDiagram(request, predicate)
-  const svg = await request.get(`/api/diagram-svg?id=${encodeURIComponent(diagram.artifact_id)}`)
-  expect(svg.ok()).toBeTruthy()
-  const svgText = await svg.text()
-  expect(svgText, `${fileName} SVG should include entity labels before PNG export`).toContain('Artifacts Promoted')
-
-  const response = await request.get(`/api/diagram-download?id=${encodeURIComponent(diagram.artifact_id)}&format=png`)
-  expect(response.ok()).toBeTruthy()
-  fs.writeFileSync(mediaPath(fileName), await response.body())
-}
-
-test.describe('overview and browse media', () => {
-  test('captures overview, entity list, treemap, search, and entity detail', async ({ page }) => {
-    await gotoAndCapture(page, '/', 'hero-overview.png')
-    await gotoAndCapture(page, '/', 'overview.png')
-    await gotoAndCapture(page, '/entities?domain=application&group=platform-core', 'entities-list.png')
-    await gotoAndCapture(page, '/entities?view=treemap&group=platform-core', 'treemap.png')
-    await gotoAndCapture(page, '/search?q=architecture', 'search.png')
-
-    const problems = watch(page)
-    await page.goto('/entities?group=platform-core', { waitUntil: 'load' })
-    const firstEntity = page.locator('main a[href*="/entity?id="]').first()
-    await firstEntity.waitFor({ timeout: 10_000 })
-    await firstEntity.click()
-    await capture(page, 'entity-detail.png')
-    expect(problems, 'runtime problems while capturing entity-detail.png').toEqual([])
-  })
+test('re-shoot assurance overview', async ({ page }) => {
+  await captureAssurance(page, '/assurance', 'assurance-overview.png', 're-shoot assurance overview')
 })
 
-test.describe('grouping media', () => {
-  test('captures group management', async ({ page }) => {
-    await gotoAndCapture(page, '/entities/groups', 'group-management.png')
-  })
+test('re-shoot assurance control structure', async ({ page }) => {
+  await captureAssurance(page, '/assurance/diagrams?type=control-structure',
+    'assurance-control-structure.png', 're-shoot assurance control structure')
 })
 
-test.describe('diagramming media', () => {
-  test('captures stored diagram examples and create flow', async ({ page, request }) => {
-    await captureRenderedDiagramPng(
-      request,
-      'diagram-archimate.png',
-      (d) => d.artifact_id === 'ARC@1777452513.68ZZDj.promote-artifacts',
-    )
-    await captureStoredDiagram(page, request, 'diagram-matrix.png', (d) => d.diagram_type === 'matrix')
-    await captureStoredDiagram(page, request, 'diagram-activity.png', (d) => d.diagram_type === 'activity')
-    await captureStoredDiagram(page, request, 'diagram-sequence.png', (d) => d.diagram_type === 'sequence')
-    await captureStoredDiagram(page, request, 'diagram-c4.png', (d) => d.diagram_type.startsWith('c4-'))
-    await gotoAndCapture(page, '/diagram/create?type=c4-system-context', 'diagram-c4-create.png')
-  })
+test('re-shoot assurance bowtie', async ({ page }) => {
+  await captureAssurance(page, '/assurance/diagrams?type=bowtie',
+    'assurance-bowtie.png', 're-shoot assurance bowtie')
 })
 
-test.describe('assurance media', () => {
-  test('captures assurance overview and diagrams', async ({ page }) => {
-    const problems = watch(page)
-    await page.goto('/assurance', { waitUntil: 'load' })
-    await expect(page.getByText('Loading assurance store status')).toHaveCount(0, { timeout: 10_000 })
-    await capture(page, 'assurance-overview.png')
-    expect(problems, 'runtime problems while capturing assurance-overview.png').toEqual([])
-    await gotoAndCapture(page, '/assurance/diagrams?type=control-structure', 'assurance-control-structure.png')
-    await gotoAndCapture(page, '/assurance/diagrams?type=bowtie', 'assurance-bowtie.png')
-    await gotoAndCapture(page, '/assurance/gsn', 'assurance-gsn.png')
-  })
+test('re-shoot assurance GSN', async ({ page }) => {
+  await captureAssurance(page, `/assurance/gsn?analysis_id=${encodeURIComponent(ANALYSIS)}`,
+    'assurance-gsn.png', 're-shoot assurance GSN', [ANALYSIS])
 })
 
-// graph-explore.gif is intentionally manual: record /graph?id=<entity> after opening
-// first-degree neighbours, then optimize the GIF before replacing docs/media/graph-explore.gif.
-
-test.describe('security signals media', () => {
-  /* Anchored on the repository's OWN backend component, so these images show the
-     real dogfooded snapshot (its actual SBOM and CVEs) rather than a contrived
-     fixture. `watch()` asserts no runtime problems, so a capture fails if the view
-     is broken — the images double as a smoke test of the signals surfaces. */
-  const BACKEND_ANCHOR = 'APP@1777293133.OYEmP1.architecture-backend'
-
-  test('captures the entity panel, component vulnerabilities, and impact', async ({ page }) => {
-    const problems = watch(page)
-    await page.goto(`/entity?id=${encodeURIComponent(BACKEND_ANCHOR)}`, { waitUntil: 'load' })
-    // The derived-attributes panel is absent until signals resolve; without this
-    // wait the capture races it and silently produces a screenshot of nothing.
-    await page.locator('.derived-security').waitFor({ timeout: 10_000 })
-    await capture(page, 'security-entity-panel.png')
-    expect(problems, 'runtime problems while capturing security-entity-panel.png').toEqual([])
-
-    const findingProblems = watch(page)
-    await page.goto(
-      `/assurance/security/findings?anchor=${encodeURIComponent(BACKEND_ANCHOR)}`,
-      { waitUntil: 'load' },
-    )
-    await page.locator('[data-testid="component-group"]').first().waitFor({ timeout: 10_000 })
-    await capture(page, 'security-findings.png')
-    expect(findingProblems, 'runtime problems while capturing security-findings.png').toEqual([])
-
-    // Reached the way a user reaches it, so the capture also proves the link works.
-    const impactProblems = watch(page)
-    await page.locator('[data-testid="vulnerability-link"]').first().click()
-    await page.locator('[data-testid="impact-headline"]').waitFor({ timeout: 10_000 })
-    await capture(page, 'security-vulnerability-impact.png')
-    expect(impactProblems, 'runtime problems while capturing security-vulnerability-impact.png').toEqual([])
-  })
-})
+// graph-explore.gif remains a manual asset and is intentionally not regenerated.
