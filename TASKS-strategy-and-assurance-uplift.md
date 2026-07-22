@@ -790,10 +790,28 @@ job (uv + node) runs both `--check`s.
   from the inventories). ruff clean on both tools.
 
 ### WU-L5 — Stream L boundary
-- [ ] Full backend + frontend gates; the CI license gates green; a from-clean Docker build
+- [x] Full backend + frontend gates; the CI license gates green; a from-clean Docker build
       carries the correct PlantUML variant + notices; §10b.6 acceptance satisfied; self-model
       note only if a new legal capability/decision warrants an entity (guidance-first — prefer
       a description/ADR over new entities).
+
+#### WU-L5 PROGRESS (2026-07-22) — Stream L COMPLETE
+- Backend gates: `pytest` 6457 passed / 4 skipped / 0 failures; `ruff check src/ tests/` clean;
+  `zuban check` clean (706 files). Frontend gates: full `npm run lint` (type-aware, ~7–8 min)
+  exit 0; `npm run typecheck` clean; `vitest` 1187 passed. All three CI license `--check`s green
+  (python 74 / npm 57 / notices up-to-date).
+- **From-clean Docker build verified**: built the image and inspected it — `/app/LICENSE` (MIT
+  first line), `/app/THIRD-PARTY-NOTICES.md` (8826 B, PlantUML GPL-3.0 source-offer present), and
+  `plantuml.jar` = PlantUML **1.2026.3** (the GPLv3 edition kept, as decided) all present and run.
+- **§10b.6 acceptance:** all six criteria met — GPL redistribution explicitly discharged (notice +
+  source offer, decision recorded); committed python+npm inventories with a green CI gate;
+  generated THIRD-PARTY-NOTICES shipped in image + source tree (+ wheel); project LICENSE present;
+  user-settable JRE (`ARCH_JAVA`) with bundled OpenJDK default; every §10b.2 component dispositioned
+  with evidence.
+- **Self-model:** no new legal capability/decision warrants a new entity (guidance-first). The
+  licensing posture is captured in LICENSE + THIRD-PARTY-NOTICES + `docs/reference/licensing.md`;
+  the pre-existing Architecture Backend service attribute was refreshed (mcp `>=1.28.1`) as part of
+  the dependency remediation. No entity/connection additions.
 
 ---
 
