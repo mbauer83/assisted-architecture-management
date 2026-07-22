@@ -2473,6 +2473,78 @@ derivation) → verdicts → modeler creates missing elements → re-execution.
 | Playwright e2e | G-S1 incl. the named live branched-goal witness; G-S3; URL snapshot reload reproduces results; route-walk smoke. |
 | Closure | Live self-model + branching-fixture measurements against the §10.5 thresholds. |
 
+## 10b. Part L — Licensing & legal readiness for open-source publication (publication gate; PRECEDES Part E)
+
+The project is being prepared for **non-commercial open-source publication**. Before the
+documentation rework (Part E) presents the project publicly, its dependency and runtime
+stack must be shown license-compatible with that publication, and every redistribution
+obligation must be discharged. The ArchiMate modelling guidance was already license-separated
+and made CLI-importable for exactly this reason (guidance-first, license-separated method
+content) — Part L generalises that discipline to the whole stack.
+
+*Not legal advice.* Conclusions here are read from the public license texts and our actual
+integration; the publication decision and any ambiguous case are confirmed with counsel. The
+engineering job is to make the compatible choice the default and discharge obligations
+mechanically.
+
+### 10b.1 Order of work (owner-directed)
+
+The **native/runtime setup is checked first** — if the platform (Docker image, the JVM,
+Graphviz, PlantUML, git) is not cleanly compatible, no amount of Python/TS package hygiene
+matters. Only then the language-ecosystem package sweeps.
+
+### 10b.2 Setup-level determinations (verified against our integration 2026-07-22)
+
+| Component | How we integrate | License (as used) | Exposure | Adopter-friendly disposition |
+|---|---|---|---|---|
+| **PlantUML** `1.2026.3` | `plantuml.jar` **bundled** in the image (fetched by `get-plantuml` from Maven Central / GitHub releases); invoked **arm's-length** as a separate process (`subprocess java -jar`) | plain `net.sourceforge.plantuml:plantuml` artifact = **GPLv3** | We do NOT link it (separate process → no derivative work), but we **redistribute** the GPL jar in the image | **Switch the bundled jar to a permissive/weak-copyleft variant** published on Maven Central — `plantuml-mit-light` (filtered MIT), `plantuml-lgpl`, `plantuml-epl`, or `plantuml-bsd` — after verifying our diagram-type usage renders identically. Removes/*minimises* redistribution copyleft entirely. Pin the variant in `get-plantuml`. |
+| **JRE** | `default-jre-headless` installed in the image; runs PlantUML | OpenJDK = **GPLv2 + Classpath Exception** | Bundled + run | Keep bundled OpenJDK (works out of the box; the Classpath Exception is designed for exactly this). **Add a user-settable JRE** escape hatch (honour an explicit `JAVA`/`JAVA_HOME`/settings path) for adopters who must supply their own compatible JRE. |
+| **Graphviz** | `graphviz` apt package; PlantUML shells out to `dot` | **EPL-1.0** (weak copyleft) | Bundled + invoked | Compatible; ship the EPL notice + attribution. We do not modify it. |
+| **git** | apt package; invoked as a separate process for repo sync | **GPLv2** | Invoked, not linked; standard base-image package | Aggregation/arm's-length — compatible; notice in the third-party inventory. |
+| **Base image + fonts** | Debian-based Python image + font packages | per-package (Debian main = DFSG-free) | Redistributed in the image | Inventory the base image's shipped licenses; ship font licenses (OFL/etc.); confirm no non-free package pulled in. |
+
+**Key finding:** the only genuine copyleft-redistribution exposure is the **GPLv3 PlantUML
+jar**; switching to a published permissive variant is the efficient, robust, adopter-friendly
+fix and is the load-bearing decision of WU-L1.
+
+### 10b.3 Package-sweep approach (Python + TypeScript)
+
+Automated, reproducible, CI-enforced — not a one-time manual read. Produce a **license
+inventory artifact** per ecosystem (tool-generated: e.g. `uv`/`pip-licenses` for Python,
+`license-checker` for npm), classify each into allow / notice-required / review / deny
+buckets against the chosen publication license, and fail CI on a deny or an unknown. The
+inventory is committed so drift is a reviewable diff.
+
+### 10b.4 Obligations discharge
+
+A single top-level **`THIRD-PARTY-NOTICES`** (generated from the inventories) plus the bundled
+runtime notices (PlantUML variant, Graphviz, OpenJDK, fonts) shipped in the image and the
+source tree; the project's own **LICENSE** (the chosen non-commercial OSS license); and a
+short **licensing reference page** (authored in Part E's docs pass, stub created here). Any
+weak-copyleft bundled component (EPL/LGPL) gets its written-offer/notice satisfied by shipping
+its notice and pointing at its upstream source.
+
+### 10b.5 Invariants
+
+- **I-L1:** no bundled or redistributed component carries a license incompatible with the
+  chosen publication license; the only permitted copyleft is arm's-length-invoked (separate
+  process) or weak-copyleft-with-notice.
+- **I-L2:** every third-party component we ship or invoke appears in the committed inventory
+  with its license; CI fails on an unknown/denied license.
+- **I-L3:** obligations (notices, attributions, source offers) ship **in the artifacts adopters
+  receive** (image + sdist/wheel + repo), not just in a doc.
+- **I-L4:** the compatible choice is the **default**; escape hatches (user-settable JRE) never
+  silently reintroduce an incompatible default.
+
+### 10b.6 Acceptance
+
+The bundled PlantUML jar is a permissive/weak-copyleft variant (or the GPL redistribution is
+explicitly discharged with notice + source offer, decision recorded); committed Python and
+npm license inventories with a green CI license gate; a generated `THIRD-PARTY-NOTICES`
+shipped in the image and source tree; the project LICENSE chosen and present; a user-settable
+JRE path honoured with the bundled OpenJDK as default; every setup-level component in §10b.2
+dispositioned with evidence.
+
 ## 11. Security & classification considerations 🔴
 
 - **Proportionality (governing posture).** This product is security- and

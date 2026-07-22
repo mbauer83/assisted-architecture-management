@@ -39,11 +39,13 @@ incomplete. (A prior session missed Stream R entirely by capping a grep with
 | U0a — Upgrade foundation | 4 | **STALE.** U0a itself is COMPLETE (2026-07-19). All four open boxes are co-landing hooks, and all four are verified registered: `SignalsRefreshRunSchemaStep`, `GuidanceCacheFormatStep`, `ViewpointDeclarationScanStep`, `DefaultSchemataEnsureStep`. |
 | U0b — Previous-release, partial-failure, Docker | 3 (`[~]`) | **SUBSTANTIALLY DONE (2026-07-22, commits `c074156`+`e0ea65c`).** Previous-release CLI coverage + FORMAT_CONTRACT_VERSION bump + §9.4 self-model delta DONE; Docker startup-ORDER guard DONE. Three `[~]`: legacy-row "quarantine once" has no step to test (recorded); live Docker "reaches healthy" DEFERRED (needs current-image rebuild — queued in PROMPT); config-settings migration DEFERRED (owner — C0/C1-owned, runtime tolerates `encrypted`, post-release export/re-import path). |
 
-**Genuinely remaining (as of 2026-07-22):** E1 (2, docs), E2 (3, dev-server media),
-G2's e2e walk (1, dev-server). U0b substantially done — its `[~]` remainders (live Docker
-smoke, config-settings migration) are queued/deferred, not open work. D1 DONE (commit
-`6abb3cb`). Restart/dev-server-gated: aibom G3 (3 boxes), security-signals item 7 GUI walk,
-WU-X1 (LAST). All queued in PROMPT-next-session for the consolidated post-restart run.
+**Genuinely remaining (as of 2026-07-22):** **Stream L (Licensing & legal readiness) —
+NEW, added 2026-07-22, PRECEDES Stream E** (a publication gate; native setup check first,
+then package sweeps, then notices). Then E1 (2, docs), E2 (3, dev-server media), G2's e2e
+walk (1, dev-server). U0b substantially done — its `[~]` remainders (live Docker smoke,
+config-settings migration) are queued/deferred, not open work. D1 DONE (commit `6abb3cb`).
+Restart/dev-server-gated: aibom G3 (3 boxes), security-signals item 7 GUI walk, WU-X1
+(LAST). All queued in PROMPT-next-session for the consolidated post-restart run.
 (Stream R COMPLETE 2026-07-21.)
 
 ### Cross-plan sequencing (owner-agreed 2026-07-21)
@@ -614,6 +616,60 @@ verbatim; re-verify by name on mismatch), §4.9 (witness chain W1).
       (pyproject.toml, runtime config, actual repo URL — source recorded per
       value; nothing invented); record before/after.
 - [x] Stream D boundary: §13 criteria 16–17 verified; full gates.
+
+---
+
+## Stream L — Licensing & legal readiness for open-source publication (publication gate; PRECEDES Stream E)
+
+Prepare the project to be legally OK for **non-commercial open-source publication** (PLAN
+Part L, §10b). Native/runtime setup is checked FIRST (owner-directed); then the Python/TS
+package sweeps; then obligations discharge. Not legal advice — make the compatible choice the
+default and discharge obligations mechanically; ambiguous cases are flagged for counsel.
+
+### WU-L0 — Publication license + scope
+- [ ] Choose the project's own non-commercial open-source LICENSE (owner decision; record
+      rationale) and the deployment scenarios in scope: local/dev checkout, the Docker image,
+      and any sdist/wheel + npm artifacts. This choice defines the compatibility target every
+      later WU checks against.
+
+### WU-L1 — Setup / native runtime dependencies (the gating check)
+- [ ] **PlantUML**: switch the bundled jar from the GPL `plantuml` artifact to a permissive/
+      weak-copyleft Maven variant (`plantuml-mit-light` / `plantuml-lgpl` / `plantuml-epl` /
+      `plantuml-bsd`) after verifying every diagram type we render is byte/visually equivalent;
+      pin the variant + version in `get_plantuml.py` and the Dockerfile; keep the arm's-length
+      subprocess invocation. If no variant covers a needed feature, record the GPL-redistribution
+      discharge (notice + source offer) as the explicit fallback decision.
+- [ ] **JRE**: confirm `default-jre-headless` resolves to OpenJDK (GPLv2 + Classpath Exception)
+      on our base image; keep it as the bundled default; add a **user-settable JRE** (honour an
+      explicit java path via env/settings) that overrides the bundled one without reintroducing
+      an incompatible default. Test both paths select the right binary.
+- [ ] **Graphviz / git / base image / fonts**: record license (Graphviz EPL-1.0; git GPLv2 —
+      both arm's-length/aggregation) + confirm the Debian base pulls only DFSG-free packages and
+      inventory the fonts' licenses (ship OFL/etc. notices). No modification → notice-only.
+- [ ] §10b.2 table dispositioned with evidence (the exact artifact/version/source URL each
+      component is fetched or installed from).
+
+### WU-L2 — Python dependency license sweep
+- [ ] Generate a reproducible Python license inventory (tool-based, e.g. `uv`/`pip-licenses`),
+      classify allow/notice/review/deny against the WU-L0 license, resolve every deny/unknown,
+      commit the inventory, and add a CI license gate that fails on deny/unknown (I-L2).
+
+### WU-L3 — TypeScript/npm dependency license sweep
+- [ ] Same, for `tools/gui` (e.g. `license-checker`): committed inventory + CI gate; resolve
+      copyleft/unknowns; confirm no bundled front-end dependency is incompatible.
+
+### WU-L4 — Obligations discharge + notices
+- [ ] Generate a top-level `THIRD-PARTY-NOTICES` from the inventories; ship it + the bundled
+      runtime notices (PlantUML variant, Graphviz, OpenJDK, fonts) in BOTH the image and the
+      source tree (and sdist/wheel if published); add the project LICENSE; create the licensing
+      reference-page stub (full page authored in Stream E). Verify obligations ride in the
+      artifacts adopters actually receive (I-L3).
+
+### WU-L5 — Stream L boundary
+- [ ] Full backend + frontend gates; the CI license gates green; a from-clean Docker build
+      carries the correct PlantUML variant + notices; §10b.6 acceptance satisfied; self-model
+      note only if a new legal capability/decision warrants an entity (guidance-first — prefer
+      a description/ADR over new entities).
 
 ---
 
