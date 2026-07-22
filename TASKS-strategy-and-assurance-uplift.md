@@ -627,10 +627,27 @@ package sweeps; then obligations discharge. Not legal advice — make the compat
 default and discharge obligations mechanically; ambiguous cases are flagged for counsel.
 
 ### WU-L0 — Publication license + scope
-- [ ] Choose the project's own non-commercial open-source LICENSE (owner decision; record
+- [x] Choose the project's own non-commercial open-source LICENSE (owner decision; record
       rationale) and the deployment scenarios in scope: local/dev checkout, the Docker image,
       and any sdist/wheel + npm artifacts. This choice defines the compatibility target every
       later WU checks against.
+
+DECISION (owner, 2026-07-22): **MIT License**, kept as-is (the repo already carried a
+titleless MIT body). Copyright line: `Michael Bauer <mbauer.mphil@googlemail.com>`.
+- Rationale: the owner wants adopters to use, modify, and integrate the software for personal,
+  public, AND commercial purposes, including integration into commercial products — MIT grants
+  exactly this (use/copy/modify/merge/publish/distribute/sublicense/sell). A non-commercial
+  source-available license (PolyForm Noncommercial, BUSL) was considered and rejected: it would
+  forbid the commercial internal use the owner explicitly wants, and adds no dependency-hygiene
+  benefit. MIT is also the *cheapest compatibility target* for the rest of this stream — every
+  bundled/invoked dependency here is permissive, weak-copyleft (notice-only), or
+  arm's-length-invoked GPL, all compatible inbound with an MIT-licensed distribution.
+- Cleanups applied: added the `MIT License` title line and switched curly to straight quotes so
+  SPDX/GitHub-`licensee` scanners classify it reliably; normalized to `Copyright (c) 2026`.
+- **Scope of publication (compatibility target for L1–L5):** (a) local/dev source checkout,
+  (b) the Docker image (`Dockerfile`), (c) any published Python sdist/wheel and npm artifact.
+  All three must carry LICENSE + THIRD-PARTY-NOTICES (I-L3). SPDX id for the whole project:
+  `MIT`. Not legal advice; ambiguous inbound licenses are flagged for counsel in L2/L3.
 
 ### WU-L1 — Setup / native runtime dependencies (the gating check)
 - [ ] **PlantUML**: switch the bundled jar from the GPL `plantuml` artifact to a permissive/
