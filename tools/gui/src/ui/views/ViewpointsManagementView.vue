@@ -136,8 +136,9 @@ const startEdit = (envelope: ViewpointDefinitionEnvelope) => {
   void Effect.runPromise(svc.getViewpointReferencers(envelope.slug)).then((r) => { referencers.value = r })
 }
 
-const backToList = () => {
-  const dirty = isDraftDirty(draft.value, originalDraft.value, { isCreating: isCreating.value, isReadOnly: isReadOnly.value })
+const backToList = (options: { persisted?: boolean } = {}) => {
+  const dirty = !options.persisted
+    && isDraftDirty(draft.value, originalDraft.value, { isCreating: isCreating.value, isReadOnly: isReadOnly.value })
   if (dirty && !window.confirm('Discard unsaved changes to this viewpoint?')) return
   if (route.path !== '/viewpoints') void router.replace('/viewpoints')
   mode.value = 'list'
@@ -201,7 +202,7 @@ const save = () => {
     : svc.editViewpointDefinition(body)
   Effect.runPromise(call).then((result: ViewpointPersistResult) => {
     saving.value = false
-    if (result.ok) { backToList(); return }
+    if (result.ok) { backToList({ persisted: true }); return }
     issues.value = result.issues
     referencers.value = result.referencers.length > 0 ? result.referencers : referencers.value
     highlightedNodeId.value = draft.value ? firstErrorNodeId(result.issues, draft.value) : null
@@ -242,7 +243,7 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
         <button
           type="button"
           class="back-btn"
-          @click="backToList"
+          @click="backToList()"
         >
           ← Back
         </button>
@@ -344,7 +345,7 @@ const focusIssue = (issue: ViewpointValidationIssue) => {
           class="cancel-btn"
           :disabled="saving"
           title="Abandon this fork and return to the catalog without saving"
-          @click="backToList"
+          @click="backToList()"
         >
           Cancel
         </button>

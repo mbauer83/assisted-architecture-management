@@ -53,6 +53,20 @@ def _obligations(entity_id, entity_type, index):
 
 
 class TestGoalRows:
+    def test_zero_edge_pattern_uses_the_root_as_its_terminal(self) -> None:
+        index = _index([_e("GOL@1")], [])
+        obligations = enumerate_row_obligations("GOL@1", "goal", (), (), index)
+        assert obligations.terminals == (TerminalObligation("GOL@1", "GOL@1"),)
+
+    def test_one_edge_pattern_uses_reached_nodes_as_terminals(self) -> None:
+        index = _index(
+            [_e("GOL@1"), _e("OUT@1")],
+            [_realizes("r1", "OUT@1", "GOL@1")],
+        )
+        branches = (_BRANCHES[0],)
+        obligations = enumerate_row_obligations("GOL@1", "goal", branches, (), index)
+        assert obligations.terminals == (TerminalObligation("GOL@1", "OUT@1"),)
+
     def test_goal_without_outcomes_or_shortcut_is_missing_outcome(self) -> None:
         index = _index([_e("GOL@1")], [])
         obligations = _obligations("GOL@1", "goal", index)

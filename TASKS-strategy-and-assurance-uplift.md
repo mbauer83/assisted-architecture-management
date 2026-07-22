@@ -129,7 +129,7 @@ U0a → A0 → A1 → A2 → A3 → A4 → A5    (A0 also → D2: A0 owns the re
                                       A0/D2 register their ensure-steps as U0a
                                       compatibility detectors)
 B0 → B1 → B2      B0 → B3 → B4      (B1‖B3 after B0) → B5
-U0a → C0 → C1 → C2 → C3 → C4 → C6 → C5   (refresh command in C0/C1; script consumes it in C2)
+U0a → C0 → C1 → C2 → C3 → C4 → C6 → C5   (ingest command in C0/C1; script consumes it in C2)
 U0a → D1 ; U0a → A0 → D2                   (D2 recognizes a landed A0 payload; never rewrites it)
 U0a → G1 → G3 → G2                   (strict order: evaluator/grammar → projection/controls/GUI
                                       → shipped viewpoint + boundary gate; the gate cannot race the UI)
@@ -335,11 +335,11 @@ verbatim; re-verify by name on mismatch), §4.9 (witness chain W1).
 
 ## Stream C — Security signals & virtual attributes
 
-### WU-C0 — Refresh-run & identity foundation 🔴 (store migration; full gates immediately)
-- [x] `security_refresh_run` aggregate per D9/§6.0(c): lifecycle
+### WU-C0 — Signal-snapshot & identity foundation 🔴 (store migration; full gates immediately)
+- [x] `security_signal_snapshot` aggregate per D9/§6.0(c): lifecycle
       `staging→complete→active→superseded` + `staging→failed` with
-      `activated_at`/`superseded_at`; unique `run_id`; caller `request_id`
-      retry idempotency; **DB constraint: one active run per anchor**;
+      `activated_at`/`superseded_at`; unique `snapshot_id`; caller `request_id`
+      retry idempotency; **DB constraint: one active snapshot per anchor**;
       activation = one transaction (supersede + activate); creation/activation
       serialized through the existing write queue; stale-staging timeout →
       failed; retention = retain-all (documented). Explicit schema-version
@@ -347,7 +347,7 @@ verbatim; re-verify by name on mismatch), §4.9 (witness chain W1).
       co-located SQLCipher; legacy signal rows preserved in queryable
       legacy/quarantine form with NO fabricated semantics (detector/migrator
       registered for U0).
-- [x] `RefreshSecuritySignals` application command per §6.0(b): typed bundle in,
+- [x] `IngestSecuritySignals` application command per §6.0(b): typed bundle in,
       staging→populate→complete→activate→audit out; failure recording; low-level
       transitions on the store port only; CLI-only adapter surface (v1).
 - [x] Canonical vulnerability identity with alias resolution (D12).
@@ -359,14 +359,14 @@ verbatim; re-verify by name on mismatch), §4.9 (witness chain W1).
 - [x] Replay identity per the §6.0(c) table: (anchor, request_id) key, full
       canonical bundle digest (NOT BOM digest), mismatch = typed no-write
       conflict; domain + SQLCipher integration tests over every table row.
-- [x] Unit: run state machine + transition table, activation atomicity (crash
-      fixture after EACH persistence phase — previous run stays sole basis),
+- [x] Unit: snapshot state machine + transition table, activation atomicity (crash
+      fixture after EACH persistence phase — previous snapshot stays sole basis),
       overlap serialization + DB-constraint proof, request_id retry, stale-
       staging recovery, feed-shrinkage retirement, same-serial-different-digest
       (F3.4/F3.8); both-backend migration tests; full backend gates now.
 
 ### WU-C1 — Metrics + VEX use cases and read/write surfaces (needs C0)
-- [x] D9 metrics use case over (active run, VEX, exposure snapshot): unit-explicit
+- [x] D9 metrics use case over (active snapshot, VEX, exposure snapshot): unit-explicit
       vocabulary incl. `distinct_open_vulnerabilities`, per-directness
       `open_component_findings`, `max_cvss_score`/`max_severity_band`
       (vetted CVSS library, vectors retained; no fabrication),
@@ -380,7 +380,7 @@ verbatim; re-verify by name on mismatch), §4.9 (witness chain W1).
       (F3.16/F3.17); D21 fault-injection matrix at every commit boundary.
 - [x] Filter-before-aggregate per §6.0(e) with the closed availability/content
       states and full payload vocabulary; mixed-TLP property tests (F3.18).
-- [x] `SignalSnapshotToken` capability per §6.0(f) (availability-state port for
+- [x] `SignalReadToken` capability per §6.0(f) (availability-state port for
       the SQLCipher generation; batch reads under one token; revalidate-or-
       unavailable); tests over lock/unlock, activation, ceiling change, VEX
       mutation mid-evaluation (F3.15).
@@ -391,7 +391,7 @@ verbatim; re-verify by name on mismatch), §4.9 (witness chain W1).
       cross-surface consistency test scaffold (I-C3).
 - [x] I-C7 verified/closed on all signal write paths.
 
-### WU-C2 — Acquisition + refresh script (needs C1)
+### WU-C2 — Acquisition + ingest script (needs C1)
 - [x] CVSS dependency-selection spike per §6.0(g) (2.0/3.0/3.1/4.0 vectors,
       official-fixture agreement, license, strict invalid-vector behavior) +
       purl library selection — immediate full-gate + license/lockfile review.
@@ -401,20 +401,20 @@ verbatim; re-verify by name on mismatch), §4.9 (witness chain W1).
       range ecosystem adapters + event semantics, finding uniqueness,
       partial-source reporting (F3.0); fixture-based failure/retry tests, no
       network in CI.
-- [x] `tools/refresh_security_signals.py`: SBOM generation (uv env + `npm sbom`,
-      graphs preserved; generator versions into run provenance) → submits a
-      typed bundle to `RefreshSecuritySignals` (§6.0(b)); report (components,
+- [x] `tools/ingest_security_signals.py`: SBOM generation (uv env + `npm sbom`,
+      graphs preserved; generator versions into snapshot provenance) → submits a
+      typed bundle to `IngestSecuritySignals` (§6.0(b)); report (components,
       findings by class, applicability_unknown, unknown severity, unmatched);
       dry-run mode; architecture/dependency test: the script imports no
       infrastructure connector.
 - [x] Run it against both anchors; record `assurance_security_stats` + report
-      here; re-run creates a fresh activated run.
+      here; re-ingest creates a fresh activated snapshot.
 
 ### WU-C3 — Dynamic capability + derived-attribute source (needs C1)
 - [x] Domain: typed source discriminator; validation (source-mix name collision,
       F3.10); deferral interplay test.
 - [x] Application orchestration: partition graph vs external attributes;
-      **batch** fetch; `SignalSnapshotToken` pinning with `unavailable` result
+      **batch** fetch; `SignalReadToken` pinning with `unavailable` result
       (I-C11/F3.15 concurrency test).
 - [x] Configured/null capability at composition roots (never unlock-time);
       no-assurance boot test + locked-startup→unlock cycle test (F3.9);
@@ -429,7 +429,7 @@ verbatim; re-verify by name on mismatch), §4.9 (witness chain W1).
       persistence refusal by viewpoint semantics (unit + integration over the
       real write path); repository-scan regression (F3.1/I-C1); classification
       computation tests over co-located TLP-mix fixtures + public-backend
-      `no_active_run` test (F3.12).
+      `no_active_snapshot` test (F3.12).
 - [x] GUI render + export flows; Playwright C-S3; dashboard + VEX form (C-S2).
 
 ### WU-C6 — Entity details derived-attributes panel (needs C3)
@@ -443,13 +443,13 @@ verbatim; re-verify by name on mismatch), §4.9 (witness chain W1).
 ### WU-C5 — Stream C boundary + self-model sync
 - [x] Self-model per PLAN §6.1 — SAVED 2026-07-20, `artifact_verify` clean
       (71 files, 0 errors/0 warnings). Entities (group in parens):
-      PRC@1784532411.JMfieH Refresh Security Signals (assurance);
+      PRC@1784532411.JMfieH Ingest Security Signals (assurance);
       FNC@1784532421.PILDZV Compute Security Posture Metrics,
       FNC@1784532426.gvj-dp Provide Signal-Derived Viewpoint Attributes,
       FNC@1784532432.898xln Assess Vulnerability Applicability (assurance);
-      DOB@1784532438.IU4RE4 Security Refresh Run,
+      DOB@1784532438.IU4RE4 Security Signal Snapshot,
       DOB@1784532443.6ruT_G Security Posture Metrics (assurance, never-persisted
-      noted in description); EVT@1784532448.6bgjBH Security Signals Refreshed
+      noted in description); EVT@1784532448.6bgjBH Security Signals Ingested
       (assurance); REQ@1784532453.NGg0tV Entity-Level Security Posture Metrics,
       REQ@1784532460.n0Qwax Signal-Derived Styling Never Persisted
       (specialization=constraint), REQ@1784532466.VoXnNp Exploitability-Informed
@@ -467,12 +467,17 @@ verbatim; re-verify by name on mismatch), §4.9 (witness chain W1).
       regression tests in test_bulk_write.py::TestBulkFieldPropagation. The fix
       is restart-gated for LIVE bulk use; this batch used the single-tool create
       path which already forwards these correctly.
-- [~] §13 criteria 10–15 (incl. 15b): automated portions (10 lifecycle, 11
+- [x] §13 criteria 10–15 (incl. 15b): automated portions (10 lifecycle, 11
       cross-surface parity, 14 VEX integration, 15b matrix-parity/negative/
       dependency/D21) are covered by the Stream C suites (re-run in the full
       backend gate). e2e-gated portions (12 C-S3 render, 13 post-e2e denylist,
       14 C-S2 e2e, 15 D17 round-trip) remain in the restart-gated verification
-      queue. Full frontend gates green (typecheck+lint 2026-07-20); full backend
+      queue. COMPLETED 2026-07-22: Playwright covers the colored render and
+      server-authoritative stamped export, unavailable fallback, contextual VEX
+      validation/recording through browser interception (no live-store mutation),
+      and the read-only/locked entity panel. The documentation-media denylist and
+      derived-panel edit isolation were already green. Full frontend gates green
+      (typecheck+lint 2026-07-20); full backend
       gate GREEN 2026-07-20 (5925 passed, 5 skipped, 0 failures) — includes the
       guidance de-coupling + bulk field-propagation changes and their regression
       tests. ruff + zuban clean.
@@ -1001,11 +1006,14 @@ for this image now** (recorded, not silently skipped).
 - [x] Post-projection pipeline phase per §10.3b (materialize → trace → verdict
       rank → filter → global sort → limit); acceptance: a gap beyond any
       legacy pre-trace limit still appears; sorting global not page-local.
-- [~] Deterministic sizing spike complete; formal live-model run remains per
+- [x] Deterministic sizing spike and formal live-model run complete per
       §10.5 (accounting
       unit, live model + 5× fixture, benchmark protocol: seed, cold + warmups,
       ≥30 samples, machine metadata; p95 ≤ 70% of request timeout); trace memo
       key = trace inputs only (no assurance state — dependency-policy test).
+      Live 2026-07-22: cold 398.669ms; 3 warmups + 30 samples; p50 383.462ms,
+      p95 457.923ms, max 472.224ms = 22.9% of the 2000ms timeout (≤70%);
+      WSL2 Linux 6.18.33.2, Python 3.14.2, pinned scope/group list parameters.
 - [x] Format impact co-landed (§10.7): detector for declaration versions,
       previous-release viewpoint file loads unchanged, `FORMAT_CONTRACT_VERSION`
       participation, fixtures (F7.17) — registered with U0a.
@@ -1065,8 +1073,9 @@ for this image now** (recorded, not silently skipped).
       observation cell from the row projection's discriminated `PatternResult`
       union for a sample entity. DONE 2026-07-20 — see the WU-G3 authoring-GUI
       progress entry. (e2e G-S3 live walk RESTART-GATED → X1.)
-- [~] Vitest per §10.13 DONE (helpers + serialization round-trip + preview cell shapes);
-      e2e G-S3 live walk RESTART-GATED → X1.
+- [x] Vitest per §10.13 plus the live Playwright authoring walk: default controls,
+      invalid-state highlighting, deep branch/shortcut/leaf editing, preview,
+      execution, save navigation, and canonical API round-trip.
 
 ### WU-G2 — Shipped viewpoint, docs, self-model, boundary gate (needs G3)
 - [x] Ship `motivation-coverage` by TRANSCRIBING the §10.4 production YAML
@@ -1078,11 +1087,10 @@ for this image now** (recorded, not silently skipped).
 - [x] Docs: coverage-semantics page per §8.1 incl. branched false-green example;
       two-way cross-reference with `requirements-coverage-gaps`.
 - [x] Self-model per §10.8; `artifact_verify` clean; save.
-- [~] Branching-fixture performance run passed; formal ≥30-sample live-self-model
-      run remains per §10.5 (p50/p95 recorded, headroom threshold).
-- [~] Boundary gate: upstream = U0a+G1+G3; all recorded evidence and full
-      backend/frontend gates are green; the live performance run and Playwright
-      pattern-authoring walk remain.
+- [x] Branching-fixture performance run and formal ≥30-sample live-self-model
+      run passed per §10.5; values recorded above.
+- [x] Boundary gate: upstream = U0a+G1+G3; recorded evidence is green, including
+      the live performance run and Playwright pattern-authoring walk.
 
 ---
 
@@ -1149,8 +1157,8 @@ so a broken query is indistinguishable from a legitimately empty result.
       and EXECUTE (result warnings) — one report, three renderings.
 - [x] Repair affordances: remap the reference, drop the term, or quarantine
       (`disabled`); each produces a NEW definition version (= the acknowledgement).
-- [~] Vitest and no-new-persisted-state repository scan complete; the existing
-      broken-reference catalogue/editor Playwright route walk remains to run.
+- [x] Vitest, no-new-persisted-state repository scan, and the live broken-reference
+      catalogue/editor Playwright route walk are complete.
 
 ### WU-R3 — Boundary
 - [x] Full gates; docs note in the viewpoint reference page; self-model sync only if
@@ -1252,7 +1260,8 @@ so a broken query is indistinguishable from a legitimately empty result.
       previous_release_deployment.py`). FORMAT_CONTRACT_VERSION bumped 1→2 with
       the repo re-stamp asserted. Repo-side coverage exercises the attribute-
       profile/AI-BOM format evolution (see the reconstruction note below).
-- [~] Locked SQLCipher blocking + fresh-init-without-false-migration DONE (locked
+- [x] Locked SQLCipher blocking + fresh-init-without-false-migration acceptance
+      CLOSED WITH A RECORDED DEVIATION (locked
       store held uninspectable → EXIT_UNRESOLVED_MIGRATION, nothing written;
       absent signals store never fabricated). Rerun idempotency DONE (second
       commit is a no-op). NOT built: "quarantine populated exactly once across
@@ -1260,7 +1269,9 @@ so a broken query is indistinguishable from a legitimately empty result.
       snapshot tables + version stamp; the co-located legacy-row quarantine was the
       C0 plan intent and the pre-rename store is a blocking (recreate) finding, not
       a quarantine-migrate path. No legacy-row-quarantine step exists to test once,
-      so there is nothing to assert; recorded, not silently skipped.
+      so there is nothing to assert. The plan now records the owner-approved
+      pre-release policy: detect this shape and block with recreate instructions,
+      rather than claiming a legacy-row quarantine migration exists.
 - [x] Docker startup ORDER guard and live container acceptance DONE. The
       always-on `TestDockerStartupOrder` asserts
       the entrypoint runs `arch-repair upgrade` before initializing absent stores
@@ -1278,7 +1289,8 @@ so a broken query is indistinguishable from a legitimately empty result.
       Content —access→ Guidance Cache; descriptions broadened on framework /
       requirement / Upgrade Report; `artifact_verify` clean (73/73, 0 errors, 3
       pre-existing GAR warnings).
-- [~] Config-settings migration (encrypted→sqlcipher-colocated rewrite,
+- [x] Config-settings migration decision CLOSED AS OWNER-DEFERRED
+      (encrypted→sqlcipher-colocated rewrite,
       capability-loss findings, public-metric deprecation finding, above-WHITE
       public blocking) DEFERRED (owner, 2026-07-22). Not required by criterion 19;
       the `deployment_settings` migration step does not exist and the §9.1 config
@@ -1286,29 +1298,92 @@ so a broken query is indistinguishable from a legitimately empty result.
       at runtime (no correctness gap) and parks the rewrite as "the upgrade path's
       job". No deployment uses assurance features yet. POST-PUBLIC-RELEASE: must be
       able to migrate assurance deployments, if necessary via export → automated
-      data migration → infrastructure upgrade → re-import.
+      data migration → infrastructure upgrade → re-import. The active PLAN and
+      PROMPT now state this future boundary consistently.
 
 ---
 
 ## WU-X1 — Integrated closure (restart-gated)
-- [ ] Owner backend restart; live walks: B-S2 graph, C-S2 VEX, C-S3 render/
+- [x] Owner backend restart; live walks: B-S2 graph, C-S2 VEX, C-S3 render/
       export, C-S4 panel, D-S1 guidance levels, D-S3 typed editor.
-- [ ] Documentation truth audit (I-E4): README/docs/reference/screenshots vs the
+- [x] Documentation truth audit (I-E4): README/docs/reference/screenshots vs the
       running product.
-- [ ] §13.2 layered gates: local/regional/global — each item verified and
+- [x] §13.2 layered gates: local/regional/global — each item verified and
       evidenced; witness chains re-run; **current live MCP stats** recorded (no
       historical totals).
-- [ ] Cross-document semantic consistency check over PLAN/TASKS/PROMPT (metric
-      names, KEV absence, computed classification, run identity, VEX key,
+- [x] Cross-document semantic consistency check over PLAN/TASKS/PROMPT (metric
+      names, KEV absence, computed classification, snapshot identity, VEX key,
       backend gating, guidance scope, documentation exceptions) — R2.10.
-- [ ] Truth audit compares screenshots/README/docs/reference/generated MCP
+- [x] Truth audit compares screenshots/README/docs/reference/generated MCP
       tables against the running UI/API contracts (not file existence).
-- [ ] All gates once over the integrated result; counted-line records for
+- [x] All gates once over the integrated result; counted-line records for
       touched near-limit files; closing deviations note.
 
 ## Progress log
 
 (append: date · stream/WU · evidence/notes)
+
+- 2026-07-22 · INTEGRATED ACCEPTANCE · COMPLETE. The owner restarted both
+  services before the walk. Live MCP statistics over engagement + enterprise:
+  472 entities, 1,013 connections, 40 diagrams, 15 documents; repository verify
+  including diagrams reported 0 errors and 0 warnings. The self-model vocabulary
+  was reconciled through dry-run-then-write MCP edits: `Ingest Security Signals`,
+  `Security Signal Snapshot`, and `Security Signals Ingested`, plus the two
+  dependent metric descriptions and all rewritten connection references.
+  Focused Playwright command:
+  `cd tools/gui && npx playwright test tests/e2e/assurance-graph-explore.spec.ts
+  tests/e2e/guidance-and-schema-authoring.spec.ts
+  tests/e2e/security-posture-flow.spec.ts
+  tests/e2e/viewpoint-trace-authoring.spec.ts --project=chromium` → 8 passed;
+  `npx playwright test tests/e2e/viewpoint-editor.spec.ts --project=chromium
+  --grep "broken reference"` → 1 passed. Security findings and the locked state
+  were browser-intercepted synthetic data because the live store intentionally
+  contains no findings; those security tests mutate neither the live signal store
+  nor the model. The stamped-export assertion proves the server ignored browser-supplied
+  provenance and used its live snapshot/classification stamp. The real graph walk
+  used hazard `HAZ@1784721764.wra3.48aefe`; guidance/schema checks used the live
+  imported cache and current application-component Service schema.
+
+  Viewpoint authoring acceptance covers invalid-node highlighting, canonical
+  goal→outcome→requirement branches, shortcut and derived-leaf editing, preview,
+  test run, a temporary engagement-viewpoint persistence round-trip, and verified
+  cleanup. It exposed and fixed two product
+  defects: a single-branch trace crashed by indexing a nonexistent second edge,
+  and a successful create still invoked the unsaved-changes confirmation. The
+  backend now treats zero-edge and one-edge roots explicitly; the GUI bypasses
+  discard confirmation only after a successful persistence response. Regression
+  tests accompany both behaviors. `ViewpointsManagementView.vue` is exactly 350
+  counted source lines; `trace_obligations.py` is 114.
+
+  The exact live motivation-coverage benchmark used parameters
+  `scope=[goal,outcome,requirement]`, `gaps_only=true`,
+  `group=[motivation-narrative]`, one cold request, three warmups, and 30 samples:
+  cold 398.669 ms; p50 383.462 ms; p95 457.923 ms; max 472.224 ms, 91 rows,
+  22.9% of the 2,000 ms timeout on WSL2 Linux 6.18.33.2 / Python 3.14.2.
+
+  Cross-document truth checks reconciled the active metric names, explicit KEV
+  absence, visible-contributor classification, snapshot/read-token identity,
+  contextual VEX key, capability predicate, OntologyModule-only guidance scope,
+  and the amended live-self-model/synthetic-augmentation media policy. Historical
+  dated ledger entries retain the old names solely as superseded evidence. Media
+  audit: 32 manifest entries match 32 PNGs and every SHA-256; five images are
+  explicitly synthetic; the manual GIF is unchanged; OCR/string denylist review
+  found no credentials, tokens, or private paths. Public CVE IDs and dependency
+  versions are intentionally permitted. `tests/common/test_documentation_claims.py`,
+  `tools/generate_mcp_docs.py --check`, and `tools/check_doc_links.py` are green.
+
+  Integrated gate commands, run sequentially with no overlapping heavy work:
+  `uv run python -m pytest -q`; `uv run ruff check src/ tests/`;
+  `uv run zuban check`; `cd tools/gui && npm run lint`;
+  `npm run typecheck && npx vitest run`; and
+  `uv run python tools/check_doc_links.py`. All are green. CLOSING DEVIATIONS:
+  (1) the pre-rename signal schema is a blocking recreate finding, not a
+  quarantine migration, because no supported legacy-row migration step exists;
+  (2) the `deployment_settings` rewrite is explicitly owner-deferred until the
+  first post-public-release assurance upgrade; runtime alias resolution already
+  preserves current correctness; (3) security GUI acceptance uses visible,
+  intercepted synthetic findings because the live store has zero findings and
+  acceptance is forbidden from mutating it.
 
 - 2026-07-22 · U/WU-U0b DOCKER ACCEPTANCE · COMPLETE. Built the current
   checkout with `docker build --tag architectonic:upgrade-acceptance .`; accepted

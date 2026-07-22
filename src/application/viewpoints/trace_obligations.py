@@ -114,13 +114,18 @@ def _walk_from_root(
     """Goal row: outcomes, then each outcome's requirements. A goal with no outcome AND no
     shortcut is a missing-outcome gap; an outcome with no requirement is a missing-requirement
     gap."""
+    if not edges:
+        return RowObligations((TerminalObligation(goal_id, goal_id),), (), shortcuts, ambiguous)
     outcomes = _neighbors(goal_id, edges[0], index)
     if not outcomes:
         missing_outcome: tuple[MissingObligation, ...] = () if shortcuts else (MissingOutcomeObligation(goal_id),)
         return RowObligations((), missing_outcome, shortcuts, ambiguous)
+    if len(edges) == 1:
+        reached = tuple(TerminalObligation(goal_id, outcome) for outcome in outcomes)
+        return RowObligations(reached, (), shortcuts, ambiguous)
     terminals: list[TerminalObligation] = []
     missing: list[MissingObligation] = []
-    requirement_edge = edges[1]
+    requirement_edge = next(iter(edges[1:]))
     for outcome in outcomes:
         requirements = _neighbors(outcome, requirement_edge, index)
         if not requirements:

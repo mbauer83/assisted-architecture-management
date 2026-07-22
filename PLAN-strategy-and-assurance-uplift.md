@@ -72,7 +72,7 @@ and its assurance store are EXAMPLE/dogfooding content.** Nothing in this
 specific store is really confidential (its TLP labels exercise the product
 mechanisms), and no third-party installations exist. Consequences: the
 developer's own self-model and assurance store may be **migrated or recreated
-freely** whenever a format changes (destructive re-refresh acceptable);
+freely** whenever a format changes (destructive re-ingest acceptable);
 legacy-preservation and confidentiality invariants remain PRODUCT capabilities
 proven on synthetic fixtures — never constraints derived from preserving this
 store's content.
@@ -176,19 +176,19 @@ store's content.
 - **D8 — Deep-linkable assurance node route** `/assurance/node/:id` reusing
   `AssuranceNodeDetail`; the browse split-view keeps its query-param behavior.
 - **D9 — Security metrics are one pure application use case over an atomic
-  refresh-run snapshot.** The current schema cannot represent an atomic "latest
-  refresh": BOM ingests and vulnerability imports commit separately, and
-  vulnerability records carry no refresh/anchor/component identity
+  security-signal snapshot.** The prior schema could not represent an atomic latest
+  ingest: BOM and vulnerability data committed separately, and
+  vulnerability records carry no snapshot/anchor/component identity
   (`src/infrastructure/assurance/_schema.py`, `_security_connector.py`). Therefore
-  a **security_refresh_run aggregate** is the foundation (WU-C0), with the
+  a **security_signal_snapshot aggregate** is the foundation (WU-C0), with the
   §6.0(c) lifecycle as the single normative one
   (`staging → complete → active → superseded`, `staging → failed` terminal);
-  `run_id`; started/completed/activated/superseded timestamps plus a stable
+  `snapshot_id`; started/completed/activated/superseded timestamps plus a stable
   tie-breaker; anchor; BOM digest, serial/version, generator/source versions;
-  **component findings** and **vulnerability findings** owned by the run; **atomic
-  activation** of a completed run; failed/stale runs retained for audit but
+  **component findings** and **vulnerability findings** owned by the snapshot; **atomic
+  activation** of a completed snapshot; failed/stale snapshots retained for audit but
   excluded from metrics; an explicit retention policy. Metrics read exactly **one
-  completed, active run snapshot per anchor** plus one exposure-policy snapshot.
+  completed, active signal snapshot per anchor** plus one exposure-policy snapshot.
   Metric vocabulary (unit-explicit): `distinct_open_vulnerabilities` (distinct
   canonical vulnerability identities, alias-resolved) and
   `open_component_findings` partitioned by directness class (direct | transitive |
@@ -197,7 +197,7 @@ store's content.
   finding counts sum to the finding total — distinct-vulnerability counts do NOT
   partition by class, one vulnerability may hit several classes); per-severity
   band counts; `max_cvss_score` and `max_severity_band` per D12 (no fabricated
-  scores); `component_count`; basis `run_id` + timestamp. **KEV is removed from
+  scores); `component_count`; basis `snapshot_id` + timestamp. **KEV is removed from
   v1** (no defined source/schema; requires CISA-KEV ingestion keyed by canonical
   identities — backlog). **VEX is a contextual assessment** keyed exactly per §6.0(d) —
   `(anchor_entity_id, canonical_component_id_incl_version,
@@ -219,8 +219,8 @@ store's content.
   per-entity/per-metric N+1), and constructs the evaluation environment; the
   infrastructure adapter calls the D9 metrics use case; ports live in
   `src/application/viewpoints/ports.py`. Every capability call evaluates current
-  availability, exposure policy, and the active completed run, and one viewpoint
-  execution pins one opaque `SignalSnapshotToken` (§6.0(f)) — returning either
+  availability, exposure policy, and the active completed snapshot, and one viewpoint
+  execution pins one opaque `SignalReadToken` (§6.0(f)) — returning either
   one coherent snapshot or an explicit `unavailable` result; it never mixes values fetched before and after a lock or
   run change. Unavailable → existing unresolvable-reference fallback (default
   styling plus an explicit "signals unavailable" legend note). The
@@ -233,7 +233,7 @@ store's content.
   metrics in v1** per §6.0(a)/Q10 — it has no population path; metrics run on
   the co-located backend. Every metrics
   payload and export carries: maximum contributing classification,
-  `visibility_limited`, completeness/availability state, and basis run +
+  `visibility_limited`, completeness/availability state, and basis snapshot +
   timestamp. Rendering pipeline (the existing persisted-diagram download route is
   NOT reused): `POST` ephemeral render entirely in memory with
   `Cache-Control: no-store` and a classification banner derived from the payload;
@@ -266,12 +266,12 @@ store's content.
   · **Canonical identity**: OSV aliases (CVE/GHSA/…) are resolved to one
   canonical identity per vulnerability so `distinct_open_vulnerabilities` never
   double-counts an alias pair.
-- **D13 — Dogfooding is a repeatable refresh-run, not a one-off.** A script
-  (`tools/refresh_security_signals.py`) generates the backend SBOM (CycloneDX from
+- **D13 — Dogfooding is a repeatable signal ingest, not a one-off.** A script
+  (`tools/ingest_security_signals.py`) generates the backend SBOM (CycloneDX from
   the uv environment) and frontend SBOM (`npm sbom --sbom-format cyclonedx` in
-  `tools/gui`), acquires vulnerability data, and drives one **refresh run per
+  `tools/gui`), acquires vulnerability data, and drives one **signal snapshot per
   anchor** (D9): stage → import → atomically activate; a crash before activation
-  leaves the previous run active. OSV acquisition is two-phase per the API
+  leaves the previous snapshot active. OSV acquisition is two-phase per the API
   contract: `querybatch` returns compact id/modified results **aligned to request
   inputs and paginated** — each result is mapped back to its queried component —
   followed by per-id `GET /v1/vulns/{id}` fan-out with deduplication, retries,
@@ -280,10 +280,10 @@ store's content.
   `bom-ref`, the metadata root component, and the `dependencies` graph** (the
   current `_sbom_parser.py` discards them), enabling directness classification.
   Anchors: backend → `APP@1777293133.OYEmP1` (Architecture Backend), frontend →
-  `APP@1776149382.lmO0mp` (GUI Authoring Tool). Every user-requested execution creates a **new run**
-  (BOM digest is content identity/provenance, never run identity); command retry
+  `APP@1776149382.lmO0mp` (GUI Authoring Tool). Every user-requested execution creates a **new snapshot**
+  (BOM digest is content identity/provenance, never snapshot identity); command retry
   idempotency uses a caller-provided `request_id` (§6.0.c). The script submits a
-  typed refresh bundle to the single `RefreshSecuritySignals` application command
+  typed ingest bundle to the single `IngestSecuritySignals` application command
   (§6.0.b) — it imports no infrastructure connector.
 - **D14 — No ontology changes to the architecture model** in Parts B/C (the
   assurance edge catalog is served from existing module config; viewpoint schema
@@ -360,23 +360,21 @@ store's content.
   assurance store is unlocked and D9 metrics exist for an architecture entity, its
   detail page shows the signal-derived attributes in a dedicated read-only panel:
   visually offset background, classification icon per the payload's **computed**
-  classification (D11), basis run + timestamp, completeness/availability state.
+  classification (D11), basis snapshot + timestamp, completeness/availability state.
   Sourced from the D9 use case over the assurance REST read surface (gated exactly
   like the existing assurance lens: hidden when locked/absent/empty).
   **Structurally separate from the editable properties model** — the values never
   enter the entity edit payload, so no edit round-trip can persist them (I-C1).
-- **D18 — Documentation & media are in scope, with synthetic confidential data
-  only.** Part E updates user-facing documentation to the current product (the
+- **D18 — Documentation & media are in scope, with public self-model content and
+  marked synthetic augmentation.** Part E updates user-facing documentation to the current product (the
   docs already describe content-first navigation while `docs/media/*` screenshots
   still show the old tier-first header and stale counts) and regenerates a
-  deterministic screenshot suite. Two hard rules: (i) screenshots showing
-  security metrics or assurance content use an **explicitly synthetic TLP:WHITE
-  documentation fixture** with a visible "Synthetic documentation data" marker —
-  never the developer's live assurance store (extending today's media suite,
-  which captures a live unlocked stack into tracked `docs/media/`, to the metrics
-  panel would violate I-C1); fixtures come via route interception or a dedicated
-  seeded test connector, with **no documentation bypass in production code**;
-  (ii) screenshots select **stable entity IDs**, never "first result". The README
+  deterministic screenshot suite. Two hard rules: (i) the owner-declared
+  TLP:WHITE ENG-ARCH-REPO model and assurance content may be captured live;
+  findings absent from that store are augmented only through Playwright route
+  interception and visibly marked "Synthetic documentation data", with **no
+  documentation bypass in production code**; (ii) screenshots select **stable
+  entity IDs**, never "first result". The README
   claim that every screenshot is the system describing itself is amended to
   distinguish self-model content from synthetic confidential-data examples.
 - **D20 — Motivation-coverage viewpoint (Part G; contract = §10).** A new
@@ -472,7 +470,7 @@ Security signals:
 - Store unlocked; `assurance_security_stats` = 0 BOMs / 0 components / 0 vulns /
   0 anchors. Connector supports CycloneDX+SPDX ingest and vuln records with
   `cvss_score`/`severity`/`vex_status` (`_security_connector.py`), **but**:
-  BOM and vulnerability imports commit at separate points (no atomic refresh);
+  BOM and vulnerability imports commit at separate points (no atomic ingest);
   vulnerability records carry **no** run/ingest/anchor/component identity and
   `vex_status` is a **global** flag on the record (`_schema.py:158`); severity/
   CVSS are stored verbatim with no vector parsing; the SBOM parser
@@ -728,7 +726,7 @@ model answers a real question for them.
 |---|---|---|---|---|
 | 1 | Establish the Assurance Analysis Context | analysis scoped and anchored to architecture elements | IA, AKM | Author Assurance Artifacts |
 | 2 | Analyze Hazards & Threats | identified losses, hazards, UCAs, constraints | IA | Conduct Hazard Analysis |
-| 3 | Contextualize Supply-Chain Risk | external dependency risk bound to affected elements | IA | Ingest & Reconcile Supply-Chain Signals; Refresh Security Signals (new, §6.1) |
+| 3 | Contextualize Supply-Chain Risk | external dependency risk bound to affected elements | IA | Ingest & Reconcile Supply-Chain Signals; Ingest Security Signals (new, §6.1) |
 | 4 | Treat Risks & Track Compliance Obligations | risks dispositioned, obligations tracked | IA | Manage Risk & Compliance |
 | 5 | Build & Seal the Assurance Case | tamper-evident, reviewable assurance case | IA, AAV | Build Assurance Case |
 
@@ -1002,6 +1000,11 @@ test; F2.1/F2.2 (S ≥ 8) additionally get explicit negative tests at two levels
 
 ### 6.0 Normative operation & data contracts (locked)
 
+The owner-locked role-functional vocabulary is `ingest` for the operation and
+`snapshot` for persisted state. It supersedes the earlier refresh/run names:
+`IngestSecuritySignals`, `snapshot_id`, `basis_snapshot_id`, `SignalReadToken`, and
+`no_active_snapshot` are the active contracts.
+
 **(a) Capability predicate over the FULL configuration space and audit
 durability (D21).** "Audited" is a durable-state invariant: **no accepted
 signal mutation may exist without its durable audit record committed in the
@@ -1009,7 +1012,7 @@ same unit of work.** The configuration space is the real factory cross-product
 — store `sqlcipher | pocketbase | private-git` × signals
 `sqlcipher-colocated | sqlite | encrypted` × archive
 `standard | worm | s3-worm | azure-blob-worm` × lock state — not two
-dimensions. **Signal mutations (refresh lifecycle, BOM/vuln/anchor, VEX) are
+dimensions. **Signal mutations (snapshot lifecycle, BOM/vuln/anchor, VEX) are
 allowed iff:**
 
 ```text
@@ -1027,11 +1030,12 @@ boundary exists), `pocketbase`/`private-git` stores, plain-`sqlite` signals —
 **denies mutations with a typed capability reason**; reads/metrics remain
 available where exposure policy allows. The transactional ledger + cloud
 delivery outbox is the documented future path for cloud-WORM writes (§14).
-The `signals_backend=encrypted` alias resolves per store backend and is
-**migrated explicitly** (§9.1): SQLCipher store → `sqlcipher-colocated`;
-non-SQLCipher store → blocking owner-choice finding. Configurations that lose
-write capability under this predicate produce an explicit upgrade finding —
-never silent read-only degradation. Fault-injection acceptance covers every
+The `signals_backend=encrypted` alias resolves per store backend at runtime.
+Its persistent settings rewrite is owner-deferred until the first
+post-public-release assurance upgrade (§9.1): SQLCipher store →
+`sqlcipher-colocated`; non-SQLCipher store → blocking owner-choice finding.
+That future migration must report configurations that lose write capability —
+never silently degrade them to read-only. Fault-injection acceptance covers every
 allowed AND denied archive combination at every commit boundary (before signal
 commit; inside the transaction; after commit; duplicate retry; archive
 locked/unavailable mid-operation), asserting mutation-with-audit or no
@@ -1039,11 +1043,11 @@ mutation, and idempotent recovery without duplicate audit events.
 
 **Public SQLite (Q10, option 1 — honest deprecation):** `signals_backend=
 sqlite` is **deprecated for metrics in v1**. It has no population path (writes
-denied; quarantine leaves no active run; a fresh file has nothing), so
+denied; quarantine leaves no active snapshot; a fresh file has nothing), so
 advertising it would promise metrics it cannot produce, and the current SQLite
 adapter is writable (creates directories/tables) — prose cannot make it
 read-only. Upgrade emits a finding with instructions to select co-located
-SQLCipher for refresh/metrics; legacy public rows above TLP:WHITE block or
+SQLCipher for ingest/metrics; legacy public rows above TLP:WHITE block or
 quarantine (never remain readable because old code treated TLP as
 informational); an absent public file is `unavailable/no snapshot`, never
 silently initialized. D11's "public backend preserved" claim is **withdrawn**;
@@ -1051,11 +1055,11 @@ docs/tests/demos use co-located only. The atomic TLP:WHITE
 snapshot-publication command is the documented future path if a public
 read-only deployment becomes a real requirement (§14).
 
-**(b) Refresh orchestration = one application command.** A single
-`RefreshSecuritySignals` application command owns: typed refresh-bundle
+**(b) Ingest orchestration = one application command.** A single
+`IngestSecuritySignals` application command owns: typed ingest-bundle
 validation (anchor + normalized SBOM + acquisition results + diagnostics +
-source/generator metadata), beginning a unique staging run, populating
-components/aliases/vulnerability records/findings under that run, marking
+source/generator metadata), beginning a unique staging snapshot, populating
+components/aliases/vulnerability records/findings under that snapshot, marking
 complete only when all required data is present, atomic activation, failure
 recording with safe diagnostics, and the audit event per (a). Low-level
 transition methods exist only on the store port. **v1 exposes this command via
@@ -1064,49 +1068,49 @@ the CLI/script adapter only — deliberately no public REST/MCP lifecycle API**
 SBOMs and acquires OSV data, then submits the bundle; an architecture/dependency
 test proves it imports no infrastructure connector.
 
-**(c) Run lifecycle, identity, concurrency, retention.**
+**(c) Snapshot lifecycle, identity, concurrency, retention.**
 - Lifecycle: `staging → complete → active → superseded` and `staging → failed`;
   status plus `activated_at`/`superseded_at` timestamps (never overloading one
-  field). A run activates only from `complete`; re-activating the same `run_id`
+  field). A snapshot activates only from `complete`; re-activating the same `snapshot_id`
   is a no-op success.
 - Identity & idempotent replay (failed is TERMINAL — replay returns, never
-  resumes): every execution creates a unique `run_id`.
+  resumes): every execution creates a unique `snapshot_id`.
   `IdempotencyKey = (anchor_entity_id, request_id)` — per-anchor scope, the
   natural aggregate boundary since one bundle has exactly one anchor; a
   multi-anchor script generates a distinct `request_id` per command.
-  `request_payload_digest = SHA-256(canonical accepted RefreshBundle)` — every
+  `request_payload_digest = SHA-256(canonical accepted IngestBundle)` — every
   semantic field after normalization (components, findings, aliases,
   applicability evaluations, diagnostics, generator/source metadata, anchor),
-  excluding only generated fields (run id, timestamps). Deliberately NOT the
+  excluding only generated fields (snapshot id, timestamps). Deliberately NOT the
   BOM digest (BOM content is not the whole command); both persist separately
   as idempotency vs provenance fields. Normative transition table:
 
   | Existing key | Digest | Stored outcome | Result |
   |---|---|---|---|
-  | none | any | none | create a new staging run |
+  | none | any | none | create a new staging snapshot |
   | same key | same | staging | return "in progress, retry later"; no mutation |
-  | same key | same | active/superseded | return stored success (original run id); no mutation, no new audit |
+  | same key | same | active/superseded | return stored success (original snapshot id); no mutation, no new audit |
   | same key | same | failed | return stored failure + "use a new request_id"; no mutation, no new audit |
   | same key | different | any | **typed idempotency conflict; no signal or audit write** |
-  | new request_id | same payload | any prior run | create a new audited run |
+  | new request_id | same payload | any prior snapshot | create a new audited snapshot |
 
   Tested at domain AND real-SQLCipher integration level, incl. canonicalizable
   input reordering (same digest), semantic field change (different digest →
   conflict), and concurrent duplicate calls.
 - Activation is one database transaction (supersede previous active + activate
-  target); **one active run per anchor is a database constraint**, and
+  target); **one active snapshot per anchor is a database constraint**, and
   creation/activation serialize through the existing write queue — process-local
   locking alone is insufficient.
 - Stale staging recovery: marked failed after an explicit timeout at the next
-  refresh or via admin repair; never auto-activated.
-- Retention (v1): **no automatic deletion** — run history is exposed, growth is
+  ingest or via admin repair; never auto-activated.
+- Retention (v1): **no automatic deletion** — snapshot history is exposed, growth is
   documented, pruning is out of scope (§14).
 - Migrations and invariant tests run against BOTH public SQLite and co-located
   SQLCipher adapters.
 
 **(d) Contextual VEX contract.** Key:
 `(anchor_entity_id, canonical_component_id_incl_version, canonical_vulnerability_id)`
-— run-independent; it applies exactly when a run contains that
+— snapshot-independent; it applies exactly when a snapshot contains that
 component/version/vulnerability finding; **no carry-over to any other component
 version**. Assessments are immutable revisions with one current revision per key
 (latest-valid precedence; superseded revisions retained). Dispositions:
@@ -1124,20 +1128,20 @@ classification = maximum of **visible** contributors; no total is ever computed
 from hidden rows; all-hidden ⇒ an empty, `visibility_limited` projection — never
 "zero vulnerabilities". Result carries two closed fields: availability
 `available | unavailable` and content state
-`complete | visibility_limited | no_active_run | no_findings`. Payload always
+`complete | visibility_limited | no_active_snapshot | no_findings`. Payload always
 includes `finding_total`, `applicability_unknown_count`,
 `unknown_severity_finding_count`, `component_count`, per-directness
 `open_component_findings`, `distinct_open_vulnerabilities`, `max_cvss_score`,
-`max_severity_band`, basis `run_id` + timestamp, and computed classification.
+`max_severity_band`, basis `snapshot_id` + timestamp, and computed classification.
 Severity-band counts are **component findings**; distinct-vulnerability counts
 are named separately. `visibility_limited` stays coarse (ceiling below maximum
 supported class — never a withheld-row count). Mixed-TLP property tests must
 fail if a hidden row influences any count, maximum, band, suppression, or
 classification.
 
-**(f) Snapshot token.** One application capability call returns an opaque
-`SignalSnapshotToken` covering: connector/backend identity, availability
-revision, active `run_id`/revision, exposure ceiling/config revision, and VEX
+**(f) Read-consistency token.** One application capability call returns an opaque
+`SignalReadToken` covering: connector/backend identity, availability
+revision, active `snapshot_id`/revision, exposure ceiling/config revision, and VEX
 revision. Batch reads happen under one token and the token is revalidated before
 return; on any revision change the result is `unavailable/retry` — never partial
 values. The SQLCipher connection manager's internal generation is exposed
@@ -1150,7 +1154,7 @@ never imports the connection manager.
   (never a mutable "smallest external alias" primary key); linking two existing
   canonical groups merges transactionally with history preserved.
 - Finding uniqueness: one canonical vulnerability × exact component/version ×
-  anchor × run = exactly one finding, however many OSV affected entries or query
+  anchor × snapshot = exactly one finding, however many OSV affected entries or query
   responses support it; all provenance retained separately.
 - OSV input validity: queries use valid versioned package identities; malformed
   or versionless components go to explicit unmatched/applicability-unknown
@@ -1171,27 +1175,27 @@ never imports the connection manager.
 - New purl/CVSS dependencies are an immediate full-gate event with license,
   maintenance, official-fixture accuracy, and lockfile review.
 
-**(h) Vocabulary & tooling.** `assurance_security_stats` reports run counts by
-status, active runs per anchor, component and finding totals (units named), and
-excludes failed/superseded runs from posture figures while reporting their
+**(h) Vocabulary & tooling.** `assurance_security_stats` reports snapshot counts by
+status, active snapshots per anchor, component and finding totals (units named), and
+excludes failed/superseded snapshots from posture figures while reporting their
 counts. **Anchor terminology:** the run's `anchor_entity_id` (product
 architecture anchor) is distinct from the pre-existing component-level
 `anchor_mappings` (retained for AI-BOM/component reconciliation; they can never
-change run attribution). Tooling prerequisites documented in E1: npm ≥ 9.5
+change snapshot attribution). Tooling prerequisites documented in E1: npm ≥ 9.5
 (`npm sbom`), the pinned cyclonedx-py generator, and generator versions recorded
-into run provenance.
+into snapshot provenance.
 
 ### 6.1 Self-model delta
 
 | Element | Type | Rationale & relations |
 |---|---|---|
-| Refresh Security Signals | process (new) | Causally ordered: generate SBOMs → ingest BOMs → query & import vulnerabilities → verify stats. Assigned: ROL `AI Agent` / ACT `DevOps Engineer`. Realizes VS-2 stage *Contextualize Supply-Chain Risk*; serves REQ `External Supply-Chain Signal Ingestion` (realization). Triggers EVT below. |
+| Ingest Security Signals | process (new) | Causally ordered: generate SBOMs → ingest BOMs → query & import vulnerabilities → verify stats. Assigned: ROL `AI Agent` / ACT `DevOps Engineer`. Realizes VS-2 stage *Contextualize Supply-Chain Risk*; serves REQ `External Supply-Chain Signal Ingestion` (realization). Triggers EVT below. |
 | Compute Security Posture Metrics | function (new) | The single metrics use case (D9). Realizes REQ-C1; accesses DOB `Security Signals Store`; assigned to APP `Supply-Chain & Vulnerability Connector`. |
 | Provide Signal-Derived Viewpoint Attributes | function (new) | The provider-port behavior consumed by viewpoint evaluation (D10). Realizes REQ-C1 + REQ-C2; serves APP `Query Binding Evaluator`; accesses nothing persistent beyond the metrics function (serving relation to it). |
-| Security Refresh Run | data-object (new) | The atomic ingest aggregate (D9): staged/complete/failed runs with component and vulnerability findings, activation state, retention. Accessed by the refresh process and the metrics function. |
-| Security Posture Metrics | data-object (new) | Computed, transient aggregate (distinct vulnerabilities, component findings by directness, severity bands, `max_cvss_score`, classification, basis run) — description states: never persisted, never exported outside the D11 pipeline. Accessed (read) by the provider function. |
+| Security Signal Snapshot | data-object (new) | The atomic ingest aggregate (D9): staged/complete/failed snapshots with component and vulnerability findings, activation state, retention. Accessed by the ingest process and the metrics function. |
+| Security Posture Metrics | data-object (new) | Computed, transient aggregate (distinct vulnerabilities, component findings by directness, severity bands, `max_cvss_score`, classification, basis snapshot) — description states: never persisted, never exported outside the D11 pipeline. Accessed (read) by the provider function. |
 | Assess Vulnerability Applicability | function (new) | The audited, contextual VEX assessment behavior (disposition + justification per anchor/component/vulnerability). Realizes REQ-C1's VEX clause; assigned to APP `Supply-Chain & Vulnerability Connector`; serves the analyst via AIF `Assurance REST Interface`. |
-| Security Signals Refreshed | event (new) | Raised on successful activation of a refresh run; triggers nothing yet (verification/reporting hook later). |
+| Security Signals Ingested | event (new) | Raised on successful activation of a signal snapshot; triggers nothing yet (verification/reporting hook later). |
 | Bill of Materials / Security Signals Store | data-object (existing) | Unchanged; gain access connections from the new process. |
 
 Motivation & strategy links:
@@ -1251,9 +1255,9 @@ components, thousands of vulns}.
   (visibly marked, harness-proven origin). (Extends the no-plaintext invariant;
   test-enforced.)
 - **I-C2 (global, atomic basis):** metrics are a pure, deterministic function of
-  (one active completed refresh run per anchor, the contextual VEX assessments,
+  (one active completed signal snapshot per anchor, the contextual VEX assessments,
   one exposure-policy snapshot, D12 policy). Activation is atomic: a crash at any
-  point leaves the previous run active; staging/failed runs are never readable as
+  point leaves the previous snapshot active; staging/failed snapshots are never readable as
   metrics basis; two consecutive evaluations without an intervening activation or
   VEX/policy change are identical.
 - **I-C3 (local, contextual VEX):** VEX suppression applies only within its
@@ -1263,29 +1267,29 @@ components, thousands of vulns}.
   case, cross-surface consistency test). Every VEX change is an audited mutation.
 - **I-C4 (local, backend-sensitive per the §6.0(a) predicate):** whenever the
   predicate says reads are unavailable (disabled backend; co-located while
-  locked; no active run; deprecated public backend ⇒ `no_active_run`), the
-  capability returns an explicit `unavailable`/`no_active_run` result ⇒
+  locked; no active snapshot; deprecated public backend ⇒ `no_active_snapshot`), the
+  capability returns an explicit `unavailable`/`no_active_snapshot` result ⇒
   viewpoint renders with default styling and a "signals unavailable" legend
   note — never an error, never a partial mix.
-- **I-C5 (local):** findings scope by (run, anchor): a package shared by backend
+- **I-C5 (local):** findings scope by (snapshot, anchor): a package shared by backend
   and frontend yields independent findings per anchor; no cross-anchor bleed and
-  no bleed across runs.
+  no bleed across snapshots.
 - **I-C6 (local):** severity accounting partitions: every open finding is exactly
   one of {vector/score-backed, band-only, unknown}; `max_cvss_score` derives
   only from the first class, `max_severity_band` from the first two;
   `unknown_severity_count` and `applicability_unknown` counts are user-visible.
-- **I-C7 (write-path):** BOM/vuln/anchor/VEX/run writes are unlock-checked and
+- **I-C7 (write-path):** BOM/vuln/anchor/VEX/snapshot writes are unlock-checked and
   audited on the same path as other assurance mutations.
 - **I-C8 (local):** styled output leaves the browser only through the D11 export
   pipeline (POST, in-memory, `Content-Disposition`, banner = computed
-  classification + basis run + timestamp); no server-side files, and the persisted
+  classification + basis snapshot + timestamp); no server-side files, and the persisted
   diagram download route is never used for signal-styled content.
 - **I-C9 (local, units):** directness classification is total (direct | transitive
   | unknown) and per-class `open_component_findings` sum to the finding total;
   `distinct_open_vulnerabilities` is alias-deduplicated and is NOT claimed to
   partition by class.
 - **I-C11 (local, snapshot coherence):** one viewpoint execution or metrics
-  request pins one `SignalSnapshotToken` (§6.0(f)) and is all-or-none — a lock, unlock, policy change, or activation during evaluation
+  request pins one `SignalReadToken` (§6.0(f)) and is all-or-none — a lock, unlock, policy change, or activation during evaluation
   yields either the pinned coherent snapshot or `unavailable`, never a mix.
 - **I-C10 (local):** derived attributes on the entity detail page (D17) are fed by
   a payload disjoint from the editable properties model: they appear in no edit
@@ -1294,7 +1298,7 @@ components, thousands of vulns}.
 
 ### 6.4 Control structure & unsafe control actions
 
-Loops: (1) refresh script → `RefreshSecuritySignals` command (§6.0(b)) → store port → signals store; (2)
+Loops: (1) ingest script → `IngestSecuritySignals` command (§6.0(b)) → store port → signals store; (2)
 viewpoint evaluation → provider port → metrics use case → store; (3) analyst → GUI
 render → decision about dependency risk.
 
@@ -1303,7 +1307,7 @@ render → decision about dependency risk.
 - **UCA-C2** *Metrics provided* attributed to the wrong entity (wrong anchor at
   ingest, or cross-anchor bleed) — analyst treats the wrong component as risky/safe.
   [→ F3.2]
-- **UCA-C3** *Metrics provided with stale/partial basis* (half-completed refresh run
+- **UCA-C3** *Metrics provided with stale/partial basis* (half-completed signal ingest
   visible mid-ingest; or provider mixing locked/unlocked states). [→ F3.4/F3.8]
 - **UCA-C4** *VEX suppression applied too broadly* (a `fixed` status suppresses a
   still-affected version) or *not applied* (alarm fatigue → real criticals ignored —
@@ -1319,35 +1323,35 @@ render → decision about dependency risk.
 |---|---|---|---|---|---|---|
 | F3.0 | Incorrect OSV/purl/CVSS interpretation produces materially false posture metrics (mis-mapped batch results, unpaginated reads, alias double-counting, wrong affected-range, fabricated scores) | 9 | 7 | 8 | 504 | D12/D13 semantics: two-phase OSV with result↔component mapping + pagination; purl library; affected-range evaluation; alias canonicalization; scores only from parsed vectors; fixture-based permutation tests over each rule |
 | F3.1 | Signal-styled render persisted to git (incl. via the persisted diagram download route) | 10 | 3 | 9 | 270 | D11 refusal by viewpoint semantics + dedicated render/export pipeline; test: persisted artifacts contain no signal values; repository-scan regression |
-| F3.2 | Findings attributed to wrong entity (anchor confusion / cross-anchor or cross-run bleed) | 7 | 4 | 6 | 168 | I-C5 (run, anchor) scoping in the single use case; unit matrix with shared packages; refresh script asserts anchor ids against the model |
+| F3.2 | Findings attributed to wrong entity (anchor confusion / cross-snapshot bleed) | 7 | 4 | 6 | 168 | I-C5 (snapshot, anchor) scoping in the single use case; unit matrix with shared packages; ingest script asserts anchor ids against the model |
 | F3.3 | Globally-scoped VEX suppresses another anchor's/version's finding, or suppression targets a superseded component version | 9 | 6 | 8 | 432 | Contextual VEX keying (D9) + audited VEX mutation; unit matrix incl. superseded-version case (I-C3) |
-| F3.4 | Non-atomic refresh observable: crash between staging and activation, overlapping refreshes for one anchor, or feed shrinkage silently retiring nothing | 9 | 6 | 8 | 432 | Refresh-run aggregate + atomic activation (I-C2); single-writer serialization per anchor; run-scoped findings make retirement structural (absent from new run = not open); crash/overlap/shrinkage integration tests |
+| F3.4 | Non-atomic ingest observable: crash between staging and activation, overlapping ingests for one anchor, or feed shrinkage silently retiring nothing | 9 | 6 | 8 | 432 | Snapshot aggregate + atomic activation (I-C2); single-writer serialization per anchor; snapshot-scoped findings make retirement structural (absent from new snapshot = not open); crash/overlap/shrinkage integration tests |
 | F3.5 | Band-only or unscored records distort `max_cvss_score` (fabricated or silently dropped) | 6 | 5 | 6 | 180 | D12: no fabrication; band/score/unknown partition (I-C6) with visible unknown counts; permutation tests |
-| F3.6 | Locked store / no active run breaks viewpoint rendering entirely | 4 | 6 | 3 | 72 | I-C4 `unavailable` fallback; unit + e2e locked render |
+| F3.6 | Locked store / no active snapshot breaks viewpoint rendering entirely | 4 | 6 | 3 | 72 | I-C4 `unavailable` fallback; unit + e2e locked render |
 | F3.7 | Version-unqualified vulnerability identifiers treated as affecting all versions (or silently dropped) | 6 | 5 | 7 | 210 | D12 `applicability_unknown` class, surfaced separately; unit matrix over purl/range permutations |
-| F3.8 | Same BOM serial with different content, or unstable generated serials, mislead run provenance | 5 | 5 | 6 | 150 | Run identity = `run_id` with caller `request_id` retry semantics (§6.0(c)); digest and serial are provenance only; test with mutated same-serial fixture |
+| F3.8 | Same BOM serial with different content, or unstable generated serials, mislead snapshot provenance | 5 | 5 | 6 | 150 | Snapshot identity = `snapshot_id` with caller `request_id` retry semantics (§6.0(c)); digest and serial are provenance only; test with mutated same-serial fixture |
 | F3.9 | Assurance-disabled deployment breaks composition, or a locked-at-startup backend never gains the capability | 6 | 5 | 4 | 120 | D10 configured/null capability with per-call availability — never unlock-time injection; no-assurance boot test + lock-cycle integration test |
 | F3.10 | Metric name collision with user-defined derived attributes | 3 | 3 | 4 | 36 | Names are viewpoint-author-chosen; validation rejects duplicate names already — add source-mix case |
 | F3.11 | Dependency graph absent/malformed (or bom-ref/root discarded at parse) → wrong direct/transitive split | 5 | 6 | 5 | 150 | Parser preserves bom-ref/root/graph (D13); I-C9 `unknown` class (never guess); unit matrix over graph permutations |
-| F3.12 | Exported render missing or under-stating classification (hardcoded AMBER over RED contribution) | 7 | 4 | 6 | 168 | D11 computed classification in payload + banner from payload; tests over co-located TLP-mix fixtures + explicit public-backend `unavailable/no_active_run` test |
+| F3.12 | Exported render missing or under-stating classification (hardcoded AMBER over RED contribution) | 7 | 4 | 6 | 168 | D11 computed classification in payload + banner from payload; tests over co-located TLP-mix fixtures + explicit public-backend `unavailable/no_active_snapshot` test |
 | F3.13 | Derived attributes leak into the editable properties model → an edit persists them into the entity file | 8 | 3 | 7 | 168 | I-C10 structural separation (own payload + read-only component); regression test: edit round-trip on a metric-bearing entity leaves the entity file byte-identical in its properties |
 | F3.14 | Derived-attributes panel rendered while the store is locked | 6 | 3 | 5 | 90 | Same gating path as the assurance lens (single helper); integration test locked→absent |
 | F3.15 | Snapshot incoherence: values from before and after a lock/activation/policy change mixed in one render | 8 | 6 | 7 | 336 | I-C11 + §6.0(f) snapshot token, all-or-none; concurrency integration test flipping lock/run mid-evaluation |
 | F3.16 | Signal mutation commits but its audit record does not (split-store partial write) | 9 | 5 | 8 | 360 | D21: mutations only on the co-located backend with data + audit in ONE transaction; public SQLite read-only; fault-injection at every commit boundary (two levels) |
 | F3.17 | A store×signals×archive combination outside the §6.0(a) predicate accepts a mutation without an atomic audit boundary (e.g. cloud WORM archive) | 10 | 5 | 8 | 400 | Capability predicate enforced in the one unit of work; tests over standard/worm/s3-worm/azure-blob-worm and the encrypted alias; typed denial reasons |
 | F3.18 | Hidden rows influence aggregate counts, maxima, bands, suppression, or classification | 9 | 4 | 8 | 288 | §6.0(e) filter-before-aggregate; mixed-TLP property tests (two levels) |
-| F3.19 | Retained refresh runs grow the store without an operational policy | 5 | 6 | 6 | 180 | §6.0(c) explicit retain-all v1 decision; run history exposed in stats; growth documented (E1) |
+| F3.19 | Retained signal snapshots grow the store without an operational policy | 5 | 6 | 6 | 180 | §6.0(c) explicit retain-all v1 decision; snapshot history exposed in stats; growth documented (E1) |
 
 ### 6.6 User scenarios, stories, expected behavior
 
-- **Story C-S1 (owner, refresh):** *As the owner I refresh security signals before a
+- **Story C-S1 (owner, ingest):** *As the owner I ingest security signals before a
   release.* Tasks: run the script → review its report (components, matched vulns,
   unmatched purls, unknown-severity count) → `assurance_security_stats` reflects
-  the new active runs. Expected: a re-run creates a fresh run and atomically
+  the new active snapshots. Expected: a re-ingest creates a fresh snapshot and atomically
   supersedes the previous one; retrying a failed request (same `request_id` +
   digest) returns the original failure and instructs a new `request_id`;
   partial acquisition failure fails the staging run
-  with diagnostics and leaves the previous active run as the sole basis
+  with diagnostics and leaves the previous active snapshot as the sole basis
   (F3.0/F3.4).
 - **Story C-S2 (analyst, dashboard + VEX):** *As an analyst I open the supply-chain
   view and see per-anchor posture* (backend vs frontend), drill into the finding
@@ -1362,12 +1366,12 @@ render → decision about dependency risk.
   unlocked → colors + legend; locked → same diagram, default styling, "signals
   unavailable" note; attempting to save the styled diagram as a git artifact is
   refused with the classification message; downloading it produces a PNG/SVG with
-  the computed classification, basis run, and timestamp (C-S3 is the acceptance
+  the computed classification, basis snapshot, and timestamp (C-S3 is the acceptance
   demo for D10/D11).
 - **Story C-S4 (architect, entity details):** *As an architect on the Architecture
   Backend's detail page with the store unlocked, I see its derived security
   attributes (distinct open vulnerabilities, component findings by directness,
-  severity bands, max CVSS score, component count, basis run + timestamp) as
+  severity bands, max CVSS score, component count, basis snapshot + timestamp) as
   read-only values on an offset background with the computed classification
   icon.* Expected: values equal the metrics tool's output (I-C3); the
   panel offers no edit affordance and nothing of it appears in the edit form;
@@ -1381,7 +1385,7 @@ render → decision about dependency risk.
 | Level | Coverage (mapped to RPN) |
 |---|---|
 | Domain/application unit | D12 package-identity/range/severity permutation matrices incl. aliases and applicability_unknown (F3.0/F3.5/F3.7); contextual VEX keying incl. superseded-version and cross-anchor cases (F3.3); (run, anchor) scoping (F3.2); directness incl. graph permutations and finding-sum property (F3.11/I-C9); run lifecycle state machine + determinism (F3.4/I-C2); capability unavailable-fallback + deferral interplay (F3.6); snapshot-tuple pinning (F3.15/I-C11); style-rule integration with scale bands. |
-| Backend integration (seeded SQLCipher signals) | End-to-end: fixture CycloneDX + OSV records → staged run → atomic activation → MCP metrics tool == REST == provider (I-C3 cross-surface test); crash-before-activation and overlapping-run tests (F3.4); feed-shrinkage retirement; VEX mutation audited (I-C7); unlock gating (locked → 423 / unavailable); lock-cycle after locked startup (F3.9); classification computation over co-located TLP-mix fixtures + public-backend `no_active_run` test (F3.12); no-new-plaintext-file assertion around evaluation & render. |
+| Backend integration (seeded SQLCipher signals) | End-to-end: fixture CycloneDX + OSV records → staged snapshot → atomic activation → MCP metrics tool == REST == provider (I-C3 cross-surface test); crash-before-activation and overlapping-snapshot tests (F3.4); feed-shrinkage retirement; VEX mutation audited (I-C7); unlock gating (locked → 423 / unavailable); lock-cycle after locked startup (F3.9); classification computation over co-located TLP-mix fixtures + public-backend `no_active_snapshot` test (F3.12); no-new-plaintext-file assertion around evaluation & render. |
 | Persistence refusal | Dedicated tests: create/edit-diagram with a signal-sourced viewpoint is rejected; saved artifacts and exchange exports contain no metric values (F3.1, two levels: use-case unit + integration over the real write path). |
 | Script test | Refresh script dry-run mode against fixtures (no network in CI); OSV two-phase acquisition: pagination, result↔component mapping, GET fan-out dedup/retry/timeout, partial-source reporting (F3.0); staging-then-activate property (activation only after a fully staged run). |
 | Frontend Vitest | Dashboard renders metric payloads; locked-state legend note; derived-attributes panel read-only rendering + absence from edit-form state (F3.13/I-C10); panel gating states (F3.14). |
@@ -1631,13 +1635,13 @@ describing itself" claim to distinguish self-model content from synthetic
 confidential-data examples); navigation, tier facets, and workflow/status
 controls; strategy & value modelling plus the four shipped strategy viewpoints;
 assurance graph exploration and ontology-driven edge authoring; security-signal
-refresh, metric meanings and units, the VEX workflow, classification semantics,
+ingest, metric meanings and units, the VEX workflow, classification semantics,
 locked states, and persistence refusal; virtual viewpoint attributes and
 ephemeral/stamped exports; guidance format v2 and the specialization schema
 convention; CLI/MCP/reference pages including regenerated MCP tables;
 configuration for the co-located signal backend plus the public-backend
 deprecation/migration guidance (not normal configuration); installation and
-operational prerequisites for the refresh tooling; the `motivation-coverage`
+operational prerequisites for the ingest tooling; the `motivation-coverage`
 viewpoint page — including the exact §10.2 coverage semantics (applicable
 population, denominator, pass/gap/N-A, branch completeness, shortcut-as-gap,
 visibility limits, parameters) with a branched false-green regression example,
@@ -1657,11 +1661,12 @@ stamped export example.
 
 ### 8.2 Invariants
 
-- **I-E1 (global, fail-closed):** the capture harness blocks ALL live
-  `/api/assurance/**` traffic, fulfills only declared synthetic fixture routes,
-  fails on any unexpected request, runs against a temp workspace/store, and
-  asserts the production connector was never constructed. Harness provenance —
-  not a text scan of pixels — is the primary proof of origin.
+- **I-E1 (global, fail-closed):** live assurance requests are permitted only for
+  the owner-declared TLP:WHITE self-model. Every synthetic finding or locked-state
+  response is fulfilled by an explicitly declared Playwright route and visibly
+  marked where findings are shown; unexpected synthetic-route requests fail the
+  test. Harness provenance — not a text scan of pixels — is the primary proof of
+  origin, and the harness never mutates the live assurance store.
 - **I-E2 (amended — see PLAN-docs-rework.md §3.0):** ENG-ARCH-REPO's assurance
   content is the public self-model of this open-source software (owner-declared
   TLP:WHITE) and MAY be captured as-is from the seeded self-model store. Screenshots
@@ -1673,8 +1678,9 @@ stamped export example.
   manifest** (test name, fixture ID/commit/seed, entity IDs, viewpoint ID +
   parameter snapshot where applicable, theme/viewport, capture-tool version,
   output path, digest);
-  images contain no secrets, operational CVEs, real dependency versions, or
-  TLP:AMBER/RED values (denylist text scan + manual/OCR review). Every Markdown
+  images contain no credentials, tokens, private paths, or non-self-model
+  TLP:AMBER/RED values (denylist text scan + manual/OCR review). Public CVE IDs
+  and dependency versions are permitted facts. Every Markdown
   reference to a generated image has meaningful alt text (alt text is a document
   property — tested on the documents).
 - **I-E4:** README/docs/reference/screenshots describe the same, current
@@ -1705,10 +1711,10 @@ manual visual review at desktop and narrow widths.
 |---|---|---|---|---|---|
 | Repository default schemata | files absent | new resource/business-object/specialization schemas | probe exact missing filenames | auto-add missing defaults only; user-owned same-named files preserved byte-for-byte and reported, never overwritten | A0/D2 + U0 |
 | Guidance cache + sidecar | format 1 | canonical format 2 | parse document + sidecar versions | **one-line cache-header text patch + sidecar field update** (§9.2): only `guidance_format` changes in the document; sidecar gains cache-format/migration fields, retaining original source digest; NO ancestor context invented; report recommends re-import from the licensed source; unknown/newer/malformed/mismatched cache → blocking manual finding, no partial rewrite | D1 + U0 |
-| Public security SQLite | legacy ingest/vulnerability tables | schema metadata + administrative quarantine ONLY | schema-version + content probes | **administrative-only migration (Q11):** TLP:WHITE legacy rows → quarantine in the public file; **any above-WHITE row = blocking preflight finding** (commit writes nothing to this target; report carries table/PK metadata only, never raw payload; manual instructions: secure import/quarantine into the co-located store, or explicit verified purge/retirement); permanently `no_active_run` — no refresh instruction exists for this backend; an absent public file is no target and is never initialized | C0 + U0 |
-| Co-located SQLCipher signals | same legacy tables, encrypted | versioned run-owned schema | unlocked schema probe | transactional migration: quarantine legacy rows, then a NEW refresh establishes the first active run; commit requires the established credential/unlock path; a locked store is an **unresolved migration**, never "current" | C0 + U0 |
+| Public security SQLite | legacy ingest/vulnerability tables | schema metadata + administrative quarantine ONLY | schema-version + content probes | **administrative-only migration (Q11):** TLP:WHITE legacy rows → quarantine in the public file; **any above-WHITE row = blocking preflight finding** (commit writes nothing to this target; report carries table/PK metadata only, never raw payload; manual instructions: secure import/quarantine into the co-located store, or explicit verified purge/retirement); permanently `no_active_snapshot` — no ingest instruction exists for this backend; an absent public file is no target and is never initialized | C0 + U0 |
+| Co-located SQLCipher signals | same legacy tables, encrypted | versioned snapshot-owned schema | unlocked schema probe | transactional migration: quarantine legacy rows, then a NEW ingest establishes the first active snapshot; commit requires the established credential/unlock path; a locked store is an **unresolved migration**, never "current" | C0 + U0 |
 | Viewpoint declarations (`.arch-repo/viewpoints.yaml`, built-in catalogue) | no trace grammar | trace_patterns/enum-set parameters/structured columns (§10.7) | declaration/format-version probe | previous files load unchanged, no rewrite; new grammar requires the bumped contract version; the default dry-run names incompatible definitions; downgrade explicitly unsupported (older parsers fail clearly, never drop fields); one validator for built-in + authored | G1 + U0 |
-| Configuration: `signals_backend=encrypted` alias; combinations losing write capability under §6.0(a); deprecated public metrics | old settings valid | explicit backend values + capability predicate | settings probe | encrypted→`sqlcipher-colocated` (SQLCipher store) or blocking owner choice; capability-loss = explicit finding, never silent; public-sqlite metric deprecation finding with co-located instructions; legacy public rows above TLP:WHITE = **blocking preflight finding with secure-import-or-verified-purge instructions (Q11 — never public quarantine)** | C0/C1 + U0 |
+| Configuration: `signals_backend=encrypted` alias; combinations losing write capability under §6.0(a); deprecated public metrics | old settings valid | explicit backend values + capability predicate | settings probe | **Owner-deferred until the first post-public-release assurance upgrade:** runtime continues to resolve `encrypted` as `sqlcipher-colocated`; the eventual migration must rewrite safely or block for owner choice, report capability loss explicitly, and direct deprecated public-sqlite metrics to the co-located store. No current assurance deployment requires this rewrite. | post-public release |
 | Assurance edge/reference data | historically unrestricted/mixed | reconciled typed edge/reference policy (WU-B0) | B0 preflight (edges and arch refs separately) | auto-repair only where semantics are certain; otherwise blocking/manual/grandfather per the B0 decision; deterministic repairs become **registered data migrations** reusable by other installations (a one-time developer-store script is not product upgrade functionality) | B0 + U0 |
 
 ### 9.2 Operational upgrade architecture (executable contract)
@@ -1797,9 +1803,10 @@ reported. Every resolved value carries a typed source enum. The manifest carries
 physical identity (symlinks resolved), logical kind, configured/active state,
 source provenance, and the settings-target identity; runtime and Docker
 **accept the manifest** rather than re-resolving. The operator-owned settings
-file is a versioned, atomic text-file target (`deployment_settings`) — the
-`signals_backend=encrypted` rewrite and capability-loss findings apply through
-it, idempotently, unknown fields byte-preserved. Acceptance: table-driven
+file is discoverable as a versioned text-file target (`deployment_settings`).
+The owner-deferred `signals_backend=encrypted` rewrite and capability-loss
+findings will apply through it idempotently with unknown fields byte-preserved.
+Acceptance for the implemented resolver remains: table-driven
 permutation test over every selector source and conflict; two workspaces under
 one home never discover each other's stores absent an explicit shared
 identity; Docker upgrade and runtime open byte-identical canonical paths from
@@ -1908,7 +1915,7 @@ CREATE TABLE legacy_signal_quarantine (
   raw_payload TEXT NOT NULL,          -- canonical JSON object: column → typed value
                                       -- {"t":"null|int|real|text|blob","v":...};
                                       -- blob = base64
-  reason_code TEXT NOT NULL,          -- closed: no_run_identity | global_vex |
+  reason_code TEXT NOT NULL,          -- closed: no_snapshot_identity | global_vex |
                                       -- unparseable | above_public_ceiling |
                                       -- duplicate_identity | unknown_schema
   source_schema_version INTEGER NOT NULL,
@@ -1924,8 +1931,8 @@ file — where it may reveal TLP:WHITE payloads only, behind the same local
 operator access as the CLI itself, since above-WHITE content never enters that
 file); no partial row
 conversion; backup expectation stated before commit; **co-located metrics remain
-`no_active_run` until a clean refresh creates an active current-format run;
-public-file metrics are permanently `no_active_run` in v1 (no refresh path
+`no_active_snapshot` until a clean ingest creates an active current-format snapshot;
+public-file metrics are permanently `no_active_snapshot` in v1 (no ingest path
 exists — Q10/Q11)**.
 SQLCipher migrations use an explicit credential-bearing raw migration
 connection and one target transaction; ordinary constructors never auto-create
@@ -1943,7 +1950,7 @@ designs):**
   `signals-0001-run-aggregate` (detector: version < 1; both physical layouts);
   future steps append ordered ids with explicit dependencies.
 - Quarantine reason precedence (first match wins): `unknown_schema >
-  unparseable > above_public_ceiling > global_vex > no_run_identity >
+  unparseable > above_public_ceiling > global_vex > no_snapshot_identity >
   duplicate_identity`. In the **co-located store**, ALL legacy signal rows are
   quarantined (semantics are never provably complete for run-less rows). In the
   **public file**, only TLP:WHITE rows quarantine there;
@@ -1974,7 +1981,8 @@ designs):**
   `"nan"|"inf"|"-inf"`; text with invalid UTF-8 falls back to
   `{"t":"blob"}`. Round-trip reconstruction tests (not just string
   snapshots) cover every SQLite storage class.
-- Settings rewrite (`deployment_settings` target): atomic
+- Future settings rewrite (`deployment_settings` target; owner-deferred until the
+  first post-public-release assurance upgrade): atomic
   write-temp-then-rename; **supported forms are declared** — a plain
   block-mapping scalar (`signals_backend: encrypted`, optionally quoted,
   optional inline comment): the patch is a token/span-aware scalar replacement
@@ -2009,7 +2017,7 @@ integration) closes the stream.
 | F6.8 | Upgrade discovers/mutates another deployment's cache or stores, or skips one Docker will open | 10 | 7 | 7 | 490 | §9.2 DeploymentLayout resolver shared with runtime; deployment_settings target; two-workspace isolation + Docker same-manifest tests |
 | F6.9 | Exit-code/flag reassignment breaks existing automation (EXIT_UNRESOLVED_MIGRATION=3) | 8 | 7 | 7 | 392 | §9.2 additive CLI table; code 3 preserved + regression; new codes 20/21 |
 | F6.10 | Failed-run replay ambiguity (resume vs return) corrupts operator expectations | 6 | 6 | 7 | 252 | §6.0(c) transition table: replay returns stored outcome; per-anchor key + full bundle digest; mismatch = typed no-write conflict |
-| F6.11 | Above-WHITE legacy rows normalized into the plain public file, or an operator waits for impossible public metrics | 9 | 6 | 8 | 432 | Q11 split policy: blocking finding for above-WHITE; public file permanently no_active_run; docs never instruct a public refresh |
+| F6.11 | Above-WHITE legacy rows normalized into the plain public file, or an operator waits for impossible public metrics | 9 | 6 | 8 | 432 | Q11 split policy: blocking finding for above-WHITE; public file permanently no_active_snapshot; docs never instruct a public ingest |
 | F6.12 | Upgrade and runtime resolve different physical stores (settings/env/CLI category confusion) | 9 | 6 | 7 | 378 | §9.2 two-stage resolver; typed source enums; read-only source-tree settings; permutation + manifest-handoff tests |
 | F6.13 | Dry-run exit-code reinterpretation breaks existing automation | 8 | 6 | 6 | 288 | §9.2 state→exit table: dry-run always 0; report carries state; existing fixtures pass unchanged |
 | F6.14 | Quarantine/settings codecs invented divergently (rerun inequality, byte-preservation failure) | 7 | 5 | 7 | 245 | §9.2 canonical typed-wrapper JSON fixture + declared settings scalar forms; round-trip reconstruction tests |
@@ -2328,7 +2336,7 @@ semantics as viewpoint execution generally**; one filtered adjacency snapshot
 per execution; memoization keyed ONLY by trace inputs — model/read snapshot
 revision, effective repo/tier scope, entity, declaration digest, pattern/edge
 declaration, direction, endpoint constraints, and applicable visibility
-context. **No assurance/security state in the key** (`SignalSnapshotToken`
+context. **No assurance/security state in the key** (`SignalReadToken`
 belongs exclusively to the signal-derived attribute capability; a future
 external-source pattern would carry its own explicit provider snapshot):
 lock/unlock or signal-run activation never invalidates a pure motivation
@@ -2561,14 +2569,14 @@ dispositioned with evidence.
 - Both parts extend the **read surface** of confidential content: every new endpoint
   (neighbors, catalog-driven search, metrics) goes through the exposure policy and
   unlock gate per the §6.0(a) matrix and D7 (edge-catalog is configured-gated;
-  the deprecated public backend answers `no_active_run`; everything else
+  the deprecated public backend answers `no_active_snapshot`; everything else
   unlock-gated); error/absence semantics must not distinguish "locked",
   "above ceiling", and "unknown id" in ways that leak existence (align with the
   established locked(423)/forbidden/empty contract).
 - Part C creates a **new derivative channel** for confidential data (colors on
   architecture diagrams). D11 + I-C1 are the containment: ephemeral render only,
   refusal on persistence, exclusion from exports, no-store headers, redacted logs.
-- The refresh script handles only the product's own dependency data (TLP:AMBER
+- The ingest script handles only the product's own dependency data (TLP:AMBER
   ceiling respected by the store); OSV queries disclose the dependency list to
   osv.dev — acceptable for this project (public OSS dependencies), noted explicitly.
 
@@ -2580,9 +2588,9 @@ this section and adds nothing)
   `distinct_open_vulnerabilities` does not partition); `max_cvss_score` from
   parsed vectors only; **no KEV in v1**; no dependency-depth number. EPSS is
   recorded as a **draft** motivation-domain requirement (REQ-C3), not implemented.
-- **Q2 → decided (superseded into D9):** the **active completed refresh run** per
+- **Q2 → decided (superseded into D9):** the **active completed signal snapshot** per
   anchor is the metrics basis; BOM serial/version are provenance metadata only;
-  run history retained (v1: no automatic deletion — §6.0.c); basis run +
+  snapshot history retained (v1: no automatic deletion — §6.0.c); basis snapshot +
   timestamp surfaced.
 - **Q3 → decided:** `Platform Adopter` stays engagement-local; promotion revisited
   when publication planning makes the persona real (the broader
@@ -2599,8 +2607,8 @@ this section and adds nothing)
   Version + Authentication Method + Lifecycle State (§7.1b is the exact
   payload contract).
 - **Q6 → decided (second review), partially superseded:** the surviving parts —
-  refresh orchestration = single `RefreshSecuritySignals` use case with
-  CLI-only adapters; run identity/retention per §6.0(c); VEX key per §6.0(d);
+  ingest orchestration = single `IngestSecuritySignals` use case with
+  CLI-only adapters; snapshot identity/retention per §6.0(c); VEX key per §6.0(d);
   traversal size-budget partials + whole-request time abort, no continuation;
   synthetic media = TLP:WHITE. Superseded parts: the audit policy is now D21
   (not "unlock + audit-failure fails mutation") and guidance migration is the
@@ -2624,7 +2632,7 @@ this section and adds nothing)
   file; any above-WHITE row is a blocking preflight finding (commit writes
   nothing to that target; report carries table/PK metadata only, never raw
   payload; manual path = secure import into the co-located store or verified
-  purge); the public file is permanently `no_active_run` in v1 — no refresh
+  purge); the public file is permanently `no_active_snapshot` in v1 — no ingest
   instruction exists for it.
 - **Q10 → decided (fourth review):** public SQLite metrics **deprecated in v1**
   (§6.0(a)) — no population path exists; upgrade finding directs to co-located
@@ -2635,7 +2643,7 @@ this section and adds nothing)
   §10.3 enum-set/pipeline contract and always-visible controls; shortcut = gap; executed
   table, never a saved diagram; viewpoint grammar in the §9.1 migration table.
 - **Q4 → decided:** styled-render download allowed only via the D11 export
-  pipeline, stamped with the **computed classification**, basis run, and
+  pipeline, stamped with the **computed classification**, basis snapshot, and
   timestamp (I-C8); git/repo persistence stays refused.
 - **Q13 → decided (owner walkthrough against `spec/STPA_Handbook.pdf`):** the
   assurance relationship model is reconciled as specified in D6 — UCA/CAC stay
@@ -2653,12 +2661,12 @@ this section and adds nothing)
 
 | Concept | Authoritative form |
 |---|---|
-| Run lifecycle | `staging → complete → active → superseded`; `staging → failed` terminal (§6.0c) |
-| Run identity | unique `run_id`; `IdempotencyKey = (anchor, request_id)`; `request_payload_digest` = SHA-256 of the canonical bundle (NOT the BOM digest); mismatch = typed no-write conflict (§6.0c table) |
+| Snapshot lifecycle | `staging → complete → active → superseded`; `staging → failed` terminal (§6.0c) |
+| Snapshot identity | unique `snapshot_id`; `IdempotencyKey = (anchor, request_id)`; `request_payload_digest` = SHA-256 of the canonical bundle (NOT the BOM digest); mismatch = typed no-write conflict (§6.0c table) |
 | VEX key | `(anchor_entity_id, canonical_component_id_incl_version, canonical_vulnerability_id)` (§6.0d) |
-| Snapshot | opaque `SignalSnapshotToken` (§6.0f) |
+| Read consistency | opaque `SignalReadToken` (§6.0f) |
 | Mutation capability | §6.0(a) predicate over store × signals × archive × lock |
-| Public sqlite | metrics deprecated in v1 (Q10): `no_active_run`; migration finding; admin quarantine inspection only |
+| Public sqlite | metrics deprecated in v1 (Q10): `no_active_snapshot`; migration finding; admin quarantine inspection only |
 | Guidance migration | one-line cache-header text patch + sidecar field update; all other bytes preserved (§9.2) |
 | Viewpoint parameters | `scope` enum-set + `gaps_only` + `group` (§10.3a) |
 | Verdicts | `pass | gap | not_applicable` + §10.2d registry; row verdict = motivation + overall_realization; layer columns diagnostic (`none_observed`) |
@@ -2666,7 +2674,7 @@ this section and adds nothing)
 | Table persistence | executed table; definition persists, cells never (§10.6) |
 | Format impact | viewpoint grammar, stores, cache, deployment settings/config = §9.1 rows |
 | Upgrade CLI | additive: existing flags/guards kept; dry-run default; exit 3 preserved; new 20/21; DeploymentLayout resolver |
-| Failed-run replay | terminal; same key+digest returns stored outcome, never resumes; different digest = conflict (§6.0c table) |
+| Failed-ingest replay | terminal; same key+digest returns stored outcome, never resumes; different digest = conflict (§6.0c table) |
 
 ## 13. Acceptance criteria (objective, layered)
 
@@ -2703,13 +2711,13 @@ Part B:
    Vitest; no purge machinery — §11 proportionality).
 
 Part C:
-10. One refresh run per anchor staged, completed, and atomically activated;
-    the crash-before-activation test leaves the previous run active; re-running
-    creates a new run; `assurance_security_stats` reflects both anchors.
+10. One signal snapshot per anchor staged, completed, and atomically activated;
+    the crash-before-activation test leaves the previous snapshot active; re-ingesting
+    creates a new snapshot; `assurance_security_stats` reflects both anchors.
 11. Metrics tool/REST/dashboard/provider/detail-panel return identical numbers
-    from the same active run (cross-surface test), with per-directness finding
+    from the same active snapshot (cross-surface test), with per-directness finding
     counts summing to the finding total (I-C9), alias-deduplicated distinct
-    vulnerabilities, and basis run + timestamp + computed classification in every
+    vulnerabilities, and basis snapshot + timestamp + computed classification in every
     payload.
 12. C-S3 in e2e: unlocked colored render; locked → default styling + note;
     persistence refused by viewpoint semantics; stamped export via the D11
@@ -2726,10 +2734,10 @@ Part C:
     entity leaves persisted properties byte-identical (F3.13, two levels).
 
 15b. §6.0(a) matrix parity for operations exposed on multiple transports
-    (delegation tests), plus negative tests asserting the refresh lifecycle is
-    absent from REST/MCP (deliberately CLI-only); the refresh script passes the
+    (delegation tests), plus negative tests asserting the ingest lifecycle is
+    absent from REST/MCP (deliberately CLI-only); the ingest script passes the
     no-infrastructure-import dependency test and drives the single
-    `RefreshSecuritySignals` command; D21 fault-injection matrix green at every
+    `IngestSecuritySignals` command; D21 fault-injection matrix green at every
     commit boundary.
 
 Part F:
@@ -2744,9 +2752,11 @@ Part F:
     non-interactive path (never logged); Docker startup upgrades mounted
     previous-release volumes before ordinary connector initialization and
     reaches healthy; a fresh deployment initializes absent stores at current
-    version without claiming a migration; quarantine schema populated exactly
-    once across reruns; `FORMAT_CONTRACT_VERSION` bumped with coverage tests
-    green; §9.4 self-model delta verified with query witnesses.
+    version without claiming a migration; the pre-release refresh-run schema is
+    detected and blocks with recreate instructions rather than being mistaken
+    for current; the future `deployment_settings` rewrite remains explicitly
+    owner-deferred; `FORMAT_CONTRACT_VERSION` bumped with coverage tests green;
+    §9.4 self-model delta verified with query witnesses.
 
 Part D:
 16. Guidance v2 live: a strategy-domain request returns domain-level framing once
@@ -2804,7 +2814,7 @@ Part G:
   parsing / VEX keying; schema and guidance-hierarchy validation; traversal
   bounds and deterministic DTO ordering; static specialization attributes never
   mix with derived attributes.
-- **Regional:** one refresh is atomically visible across MCP, REST, dashboard,
+- **Regional:** one ingest is atomically visible across MCP, REST, dashboard,
   viewpoint, and detail page; lock/ceiling/run changes produce all-or-none
   results; GUI catalog choices are a subset of the same module policy enforced on
   writes; validator, editor, and registry snapshot use the same effective schema;
@@ -2849,12 +2859,12 @@ Part G:
   (separately scoped future features — §10.6); leaf-realizer multiplicity
   policies (existential leaf in v1 — §10.2).
 - Any architecture-ontology change; any GTM/marketing strategy content (D1).
-- Multi-BOM union or active-flag semantics beyond the run model (D9).
+- Multi-BOM union or active-flag semantics beyond the snapshot model (D9).
 - Purge/scrubbing machinery for already-rendered confidential content (§11).
 - Transactional audit-intent outbox; any public-SQLite signal capability in v1
   (metrics deprecated per Q10; the snapshot-publication command and the outbox
   are the documented future paths — §6.0(a));
-  public REST/MCP refresh lifecycle API (CLI-only command adapters in v1 —
+  public REST/MCP ingest lifecycle API (CLI-only command adapters in v1 —
   §6.0(b)).
-- Server-side traversal continuation tokens (D7); refresh-run pruning/retention
+- Server-side traversal continuation tokens (D7); signal-snapshot pruning/retention
   automation (§6.0(c)); OSV commit-event range evaluation (§6.0(g)).

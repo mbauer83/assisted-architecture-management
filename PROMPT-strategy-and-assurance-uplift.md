@@ -44,12 +44,12 @@ first unticked WU is current.
    contract: the backend × operation matrix and D21 audit durability (all
    mutations on the co-located backend with data + audit in ONE SQLCipher
    transaction; public SQLite read-only in v1 — never claim atomicity across
-   two databases); the single `RefreshSecuritySignals` command (the script
+   two databases); the single `IngestSecuritySignals` command (the script
    never imports an infrastructure connector); the §6.0(c) lifecycle
    (`staging→complete→active→superseded`, `staging→failed`) with `request_id`
    retry identity and retain-all retention; the exact §6.0(d) VEX key +
    immutable revisions; filter-before-aggregate with closed states; the
-   `SignalSnapshotToken`. Never fabricate CVSS scores;
+   `SignalReadToken`. Never fabricate CVSS scores;
    version-unqualified identifiers are `applicability_unknown`, never "affects
    all"; purl matching via a proper library; OSV is two-phase with pagination
    and result↔component mapping; aliases resolve to immutable canonical
@@ -113,7 +113,8 @@ npm run lint && npm run typecheck && npx vitest run
 - Metrics vocabulary, units, and classification per D9/D11/D12/§6.0 — per-
   directness counts partition **findings**, not distinct vulnerabilities;
   `max_cvss_score` from parsed vectors only; no KEV; classification computed
-  from visible contributors. Signal mutations are allowed ONLY under the
+  from visible contributors. Basis identity is `snapshot_id`/`basis_snapshot_id`,
+  and the closed absent state is `no_active_snapshot`. Signal mutations are allowed ONLY under the
   §6.0(a) capability predicate (sqlcipher store + colocated signals + local
   standard/worm archive + unlocked — one transaction owns data + audit; cloud
   WORM and all other combinations deny with typed reasons); public
@@ -126,9 +127,10 @@ npm run lint && npm run typecheck && npx vitest run
   persisted-key contract (only `investment_level` is lowercase); `format: uri`
   informative; enums single-sourced; Module has no Owner; dogfood values are
   discovered, never invented.
-- Documentation media: synthetic TLP:WHITE fixtures with visible markers behind
-  the fail-closed harness; media provenance manifest; stable entity IDs; README
-  claim amended.
+- Documentation media: the owner-declared TLP:WHITE self-model may be captured
+  live; absent findings are augmented only by Playwright interception with visible
+  markers; no live-store mutation; media provenance manifest; stable entity IDs;
+  README claim amended.
 - Motivation coverage (Part G/D20/§10): **branch enumeration uses direct
   stored edges only** — `archimate-realization` for outcome/requirement
   branches plus the Q9 `archimate-influence` shortcut (association →
@@ -148,7 +150,7 @@ npm run lint && npm run typecheck && npx vitest run
   alternatives/quantifier keywords — the schema in the PLAN is the format);
   §10.5 spike-derived budgets with the trace-inputs-only memo key (no
   assurance state) and all-or-none abort; §10.6 executed-table semantics;
-  §10.7 format impact. Failed refresh runs are terminal: replay returns the
+  §10.7 format impact. Failed ingests are terminal: replay returns the
   stored failure, never resumes (§6.0c).
   PLAN §12b is the authoritative vocabulary — never restate contracts from
   memory.
@@ -175,7 +177,7 @@ npm run lint && npm run typecheck && npx vitest run
   `satisfied-by`, `responsible-of`, or `accountable-to`. Q12
   scoping: the dev self-model/assurance store is pre-publication example
   content — migrate or recreate it freely when formats change (destructive
-  re-refresh fine; B0 dev default = repair); prove legacy-preservation and
+  re-ingest fine; B0 dev default = repair); prove legacy-preservation and
   confidentiality capabilities on synthetic fixtures, never by treating this
   store's content as genuinely sensitive or precious; do not reopen.
 
