@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml  # type: ignore[import-untyped]
 
+from src.domain.aibom_roles import DerivationRoleBindings, role_bindings_from_mapping
 from src.domain.profile_registry import ProfileRegistry, profile_registry_from_mapping
 from src.domain.specializations import SpecializationCatalog, specialization_catalog_from_mapping
 
@@ -28,3 +29,10 @@ def load_module_profiles(package_dir: Path) -> ProfileRegistry:
     if not path.exists():
         return ProfileRegistry.empty()
     return profile_registry_from_mapping(yaml.safe_load(path.read_text(encoding="utf-8")), label=str(path))
+
+
+def load_module_aibom_roles(package_dir: Path) -> DerivationRoleBindings:
+    path = package_dir / "aibom_roles.yaml"
+    if not path.exists():
+        return DerivationRoleBindings.empty()
+    return role_bindings_from_mapping(yaml.safe_load(path.read_text(encoding="utf-8")), label=str(path))

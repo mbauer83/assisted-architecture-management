@@ -119,14 +119,40 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
 - Gates: backend 6383 passed / 5 skipped (+ the one updated test); ruff + zuban clean.
 
 ### WU-A3 — Derivation-role vocabulary and bindings (needs A1)
-- [ ] Declare the closed role vocabulary (PLAN §5) and the default
+- [x] Declare the closed role vocabulary (PLAN §5) and the default
       role→(connection type, target specialization) bindings as a YAML file in
       the ArchiMate module.
-- [ ] Support a repository-level override in `.arch-repo/`, merged over the
+- [x] Support a repository-level override in `.arch-repo/`, merged over the
       shipped defaults.
-- [ ] Tests: defaults load; an override replaces exactly the bound role and
+- [x] Tests: defaults load; an override replaces exactly the bound role and
       leaves the rest; an unknown role name in an override is a typed error, not
       a silent ignore.
+
+#### WU-A3 PROGRESS (2026-07-22)
+- Domain: `src/domain/aibom_roles.py` — `AIBOM_DERIVATION_ROLES` (the closed nine),
+  `RoleBinding` / `DerivationRoleBindings`, `role_bindings_from_mapping` (typed
+  `DerivationRoleError` on an unknown role or a binding with no connection type),
+  `merge_role_bindings` (per-role override), and `unbound_roles()` for the coverage finding
+  (an unbound role is a finding, never a silently-empty BOM — PLAN §5).
+- Shipped defaults: `src/ontologies/archimate_4/aibom_roles.yaml`, loaded by
+  `load_module_aibom_roles`. Repo override `.arch-repo/aibom-roles.yaml` merged per-role by
+  `src/application/aibom_role_loading.resolve_aibom_role_bindings` (mirrors the profile-registry
+  repo-override loader; absent file = shipped unchanged).
+- The three dataset roles share a default connection binding (model→access→ai-dataset);
+  the Training/Evaluation/Fine-tuning distinction is the dataset's `Dataset Role` attribute,
+  not three connection types — a repo may still override each separately.
+- **STREAM-B NOTE (spec-vs-code tension, recorded not worked around):** PLAN §3 sources
+  `componentData.governance` from `accountable-for` / `responsible-for`, which are
+  CONFIDENTIAL assurance (GRC) relations the PUBLIC AIBOM derivation cannot read. The
+  `governed-by` default binds to the architecture-layer `archimate-assignment`. Whether
+  Stream B's governance derivation should additionally consult assurance-store accountability
+  edges (and how, given the confidentiality boundary) is a WU-B1 decision — flag for the
+  owner there if it materially changes governance coverage.
+- Not wired into the module protocol / RuntimeCatalogs: WU-B1 takes bindings as a parameter,
+  so the export use case (Stream E) resolves them via the loader and passes them in — no
+  speculative runtime plumbing.
+- Tests: `tests/domain/test_aibom_roles.py`.
+- Gates: backend 6393 passed / 5 skipped; ruff + zuban clean.
 
 ### WU-A4 — Upgrade path (needs A2)
 - [ ] Verify `DefaultSchemataEnsureStep` picks up the new entries with no code
