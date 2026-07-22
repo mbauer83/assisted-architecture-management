@@ -765,11 +765,29 @@ job (uv + node) runs both `--check`s.
   `tools/` scripts). Inventories feed the L4 THIRD-PARTY-NOTICES generation.
 
 ### WU-L4 — Obligations discharge + notices
-- [ ] Generate a top-level `THIRD-PARTY-NOTICES` from the inventories; ship it + the bundled
+- [x] Generate a top-level `THIRD-PARTY-NOTICES` from the inventories; ship it + the bundled
       runtime notices (PlantUML variant, Graphviz, OpenJDK, fonts) in BOTH the image and the
       source tree (and sdist/wheel if published); add the project LICENSE; create the licensing
       reference-page stub (full page authored in Stream E). Verify obligations ride in the
       artifacts adopters actually receive (I-L3).
+
+#### WU-L4 PROGRESS (2026-07-22)
+- `tools/generate_notices.py` renders top-level `THIRD-PARTY-NOTICES.md` from the three committed
+  inventories (`licenses/{python,npm,native}.json`). It leads with the corresponding-source
+  offers for every copyleft/weak-copyleft component (PlantUML GPLv3, OpenJDK GPLv2+CE, Graphviz
+  EPL-1.0, git GPLv2, ca-certificates MPL-2.0, cvss LGPLv3+) — each bundled unmodified or invoked
+  arm's-length, so none touches the MIT code — then the full permissive inventory tables. Added
+  `licenses/native.json` as the curated source of truth for system/native components (apt/OCI
+  layers the gate can't introspect).
+- I-L3 (obligations ride in the artifacts adopters receive) verified across all three:
+  (a) source tree — committed at root; (b) Docker image — `COPY LICENSE THIRD-PARTY-NOTICES.md
+  /app/` in the runtime stage; (c) wheel — `[project] license-files` builds them into
+  `dist-info/licenses/` (verified by inspecting a real `uv build --wheel`). `license = "MIT"`
+  (SPDX) added to pyproject.
+- Licensing reference stub: `docs/reference/licensing.md` (posture + where the authoritative files
+  live + how the gate stays honest; full page in the docs session).
+- CI: `generate-notices --check` added to the `licenses` job (fails if the notices file drifts
+  from the inventories). ruff clean on both tools.
 
 ### WU-L5 — Stream L boundary
 - [ ] Full backend + frontend gates; the CI license gates green; a from-clean Docker build

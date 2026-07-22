@@ -98,6 +98,8 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/plantuml.jar /app/plantuml.jar
 COPY --from=builder /app/pyproject.toml /app/pyproject.toml
+# License + third-party notices ride in the image adopters receive (I-L3).
+COPY LICENSE THIRD-PARTY-NOTICES.md /app/
 COPY src/ /app/src/
 COPY config/ /app/config/
 # Activate the server-oriented settings as the live config. It lives in the

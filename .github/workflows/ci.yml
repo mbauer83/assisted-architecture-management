@@ -100,6 +100,9 @@ jobs:
       - name: License gate (npm) — fail on denied/unknown/unacknowledged licenses
         run: uv run python tools/check_licenses.py --ecosystem npm --check
 
+      - name: THIRD-PARTY-NOTICES is regenerated from the inventories
+        run: uv run python tools/generate_notices.py --check
+
   frontend:
     name: Frontend · lint · types · tests
     runs-on: ubuntu-latest

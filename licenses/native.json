@@ -1,0 +1,106 @@
+{
+  "ecosystem": "native",
+  "description": "System / native runtime components bundled in or invoked by the Docker image (Debian bookworm apt packages + the PlantUML jar + the base image). Hand-curated from the §10b.2 setup determinations; the license gate does not introspect apt/OCI layers, so this file is the reviewed source of truth for their obligations. purl/source URLs are the corresponding-source pointers for the copyleft components.",
+  "count": 11,
+  "components": [
+    {
+      "name": "PlantUML",
+      "version": "1.2026.3",
+      "license": "GPL-3.0-or-later",
+      "bucket": "review",
+      "exposure": "redistributed in image (unmodified jar); invoked arm's-length (java -jar)",
+      "source_url": "https://github.com/plantuml/plantuml/releases/tag/v1.2026.3",
+      "obligation": "GPLv3 §6 corresponding-source offer: the bundled jar is the unmodified official binary; its complete corresponding source is the tagged release above (and the plantuml-1.2026.3 sources jar on Maven Central). Arm's-length invocation (separate process) keeps this project's own MIT-licensed code unaffected (GPLv3 §5 aggregation)."
+    },
+    {
+      "name": "OpenJDK (openjdk-17-jre-headless via default-jre-headless)",
+      "version": "17 (Debian bookworm)",
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0",
+      "bucket": "allow",
+      "exposure": "bundled + run (executes the PlantUML jar)",
+      "source_url": "https://openjdk.org/ + Debian: apt-get source openjdk-17",
+      "obligation": "The GPLv2 Classpath Exception is designed for running independent programs on the JRE; ship the license notice. Corresponding source available from Debian and openjdk.org."
+    },
+    {
+      "name": "Graphviz",
+      "version": "Debian bookworm",
+      "license": "EPL-1.0",
+      "bucket": "allow",
+      "exposure": "bundled + invoked (PlantUML shells out to dot); unmodified",
+      "source_url": "https://gitlab.com/graphviz/graphviz",
+      "obligation": "EPL-1.0 (weak copyleft, file-level): unmodified, so ship the notice + point at upstream source. No project source becomes EPL."
+    },
+    {
+      "name": "git",
+      "version": "Debian bookworm",
+      "license": "GPL-2.0-only",
+      "bucket": "review",
+      "exposure": "invoked arm's-length (separate process) for repository sync",
+      "source_url": "https://git-scm.com/ + Debian: apt-get source git",
+      "obligation": "Aggregation / arm's-length invocation — no linking into project code. Ship notice; corresponding source from Debian."
+    },
+    {
+      "name": "openssh-client",
+      "version": "Debian bookworm",
+      "license": "SSH-OpenSSH (BSD-style, permissive)",
+      "bucket": "allow",
+      "exposure": "invoked (ssh transport for git)",
+      "source_url": "https://www.openssh.com/",
+      "obligation": "Permissive; ship notice."
+    },
+    {
+      "name": "curl",
+      "version": "Debian bookworm",
+      "license": "curl (MIT/X-style, permissive)",
+      "bucket": "allow",
+      "exposure": "invoked (container healthcheck)",
+      "source_url": "https://curl.se/docs/copyright.html",
+      "obligation": "Permissive; ship notice."
+    },
+    {
+      "name": "ca-certificates",
+      "version": "Debian bookworm",
+      "license": "MPL-2.0 (Mozilla CA bundle) + public-domain certs",
+      "bucket": "allow",
+      "exposure": "bundled (TLS trust store)",
+      "source_url": "https://salsa.debian.org/debian/ca-certificates",
+      "obligation": "MPL-2.0 (file-level weak copyleft), unmodified; ship notice + upstream pointer."
+    },
+    {
+      "name": "fonts-dejavu-core",
+      "version": "Debian bookworm",
+      "license": "Bitstream-Vera + DejaVu (permissive, notice-required)",
+      "bucket": "allow",
+      "exposure": "bundled; rendered into diagrams by PlantUML/Graphviz",
+      "source_url": "https://dejavu-fonts.github.io/",
+      "obligation": "Permissive with attribution; ship the font license notice."
+    },
+    {
+      "name": "libfontconfig1",
+      "version": "Debian bookworm",
+      "license": "MIT (fontconfig)",
+      "bucket": "allow",
+      "exposure": "bundled runtime library (font matching)",
+      "source_url": "https://gitlab.freedesktop.org/fontconfig/fontconfig",
+      "obligation": "Permissive; ship notice."
+    },
+    {
+      "name": "libharfbuzz0b",
+      "version": "Debian bookworm",
+      "license": "MIT (Old MIT / HarfBuzz)",
+      "bucket": "allow",
+      "exposure": "bundled runtime library (text shaping)",
+      "source_url": "https://github.com/harfbuzz/harfbuzz",
+      "obligation": "Permissive; ship notice."
+    },
+    {
+      "name": "python:3.13-slim-bookworm (runtime base image)",
+      "version": "3.13-slim-bookworm",
+      "license": "PSF-2.0 (Python) + Debian bookworm main (DFSG-free)",
+      "bucket": "allow",
+      "exposure": "redistributed as the image base layer",
+      "source_url": "https://hub.docker.com/_/python + https://www.debian.org/distrib/packages",
+      "obligation": "Debian main is DFSG-free (no non-free packages pulled); ship the aggregate notice. Build-only images (node:20-alpine, ghcr.io/astral-sh/uv) are NOT shipped (multi-stage) and are out of redistribution scope."
+    }
+  ]
+}
