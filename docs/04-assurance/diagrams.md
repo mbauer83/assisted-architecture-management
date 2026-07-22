@@ -31,6 +31,10 @@ not in the generic architecture diagram viewer. This surface:
   architecture bindings, and a link to the full node-edit view.
 - Falls back to a selectable store-grounded entity list when PlantUML is unavailable.
 
+From the detail panel, every node continues into its deep-linkable page
+(`/assurance/node/<id>`) and the assurance graph explorer — see
+[Exploring assurance content](exploring-assurance.md).
+
 The three assurance-only types are **not listed in the generic diagram browser** — they cannot
 be opened through the architecture diagram catalogue, so there is no risk of encountering a
 broken, unfiltered, or non-selectable view of confidential content.

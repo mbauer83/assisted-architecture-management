@@ -173,9 +173,9 @@ arch-import-guidance --source guidance.yaml --strict             # abort on any 
 Writes `<alias>.guidance.yaml` (the filtered, matched document) plus a provenance sidecar
 `<alias>.guidance.meta.yaml` (source, SHA-256, format version, matched/unmatched counts) per
 imported module alias. `--allow-http` permits a plain-HTTP source (HTTPS is required by
-default). Restart the backend to pick up a newly imported cache. See [Ontology modules →
-Guidance externalization](../05-extensibility/ontology-modules.md#guidance-externalization-license-compliance)
-for the full precedence and empty-state behavior.
+default). Restart the backend to pick up a newly imported cache. See
+[Authoring guidance](../05-extensibility/guidance.md) for the hierarchy, document
+format, precedence, and empty-state behavior.
 
 &nbsp;
 

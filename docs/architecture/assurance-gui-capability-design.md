@@ -1,11 +1,18 @@
 # Assurance GUI capability and exposure design
 
-Status: accepted design input for the assurance GUI work units  
-Date: 2026-06-20
+Status: **historical design record** (accepted 2026-06-20, since implemented)
 
-This document records the code-backed capability inventory and the decisions that
-must precede HTTP and GUI implementation. The target architecture remains
-hexagonal: HTTP and MCP are adapters over shared application use cases and
+This document records the capability inventory and decisions that preceded the
+assurance HTTP and GUI implementation. The design has since been realized. The
+inventory's HTTP column is kept truthful by a live test
+(`tests/common/test_documentation_claims.py` verifies every named endpoint against
+the registered routes); the use-case framing and gap notes reflect the original
+design context. For task-oriented documentation of what exists today, see —
+[Exploring assurance](../04-assurance/exploring-assurance.md),
+[Methods](../04-assurance/methods.md),
+[Security signals](../04-assurance/security-signals.md), and
+[Assurance MCP tools](../04-assurance/mcp-tools.md). The target architecture
+remains hexagonal: HTTP and MCP are adapters over shared application use cases and
 policies, not peer implementations of assurance behavior.
 
 ## Capability inventory
@@ -70,7 +77,7 @@ described adapters that called connectors directly and did not consistently gate
 audit, or verify. They were replaced by the signal-snapshot model, in which every
 ingest runs through one application command under the signal-mutation capability
 gate and lands its audit record in the same transaction. The rows above reflect
-the current surfaces; see [Security signals](security-signals.md).
+the current surfaces; see [Security signals](../04-assurance/security-signals.md).
 
 Ingest IS a GUI capability, reached from the architecture entity it anchors (and
 from the supply-chain wizard), consistent with contract 1 above: the architecture
@@ -107,7 +114,7 @@ analysis-scoped, exposure-filtered graph view.
 ## Architecture-grounding contracts
 
 The architecture model is the entry point and navigation spine for assurance.
-These contracts apply to every later assurance HTTP and GUI work unit:
+These contracts applied to all of the assurance HTTP and GUI implementation work:
 
 1. Creating an analysis requires one visible architecture artifact as its
    anchor. The UI starts this flow from entity or diagram detail when possible;

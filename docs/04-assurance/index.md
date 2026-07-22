@@ -36,7 +36,8 @@ work traceable without building a dedicated assurance department.
 
 | Page | What it covers |
 |---|---|
-| [Methods](methods.md) | STPA, STPA-Sec, CAST, GRC, supply-chain signals; wizards; method-completion verification |
+| [Methods](methods.md) | STPA, STPA-Sec, CAST, GRC concepts; the analysis workflow — wizards, completeness review, baseline sealing |
+| [Exploring assurance](exploring-assurance.md) | Browsing the store, deep-linkable node pages, budgeted graph traversal, ontology-driven edge authoring |
 | [Diagrams](diagrams.md) | Bowtie, STAMP control structure, GSN assurance cases, UCA matrix; unified assurance viewer; GSN dual-home |
 | [Security signals](security-signals.md) | SBOM ingest, signal snapshots, vulnerability identity, directness, impact analysis, VEX |
 | [Storage & confidentiality](storage-and-confidentiality.md) | Store vs. archive, backends, credential storage, TLP ceiling, withheld content, WORM, WAL, CLI reference |

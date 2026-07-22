@@ -13,10 +13,14 @@ The axes are mutually independent — a diagram collection is never tied to a mo
 Grouping is a **soft partition**: it controls where files live and nothing else. Search,
 linking, and verification ignore group boundaries entirely.
 
-Groups are engagement-tier navigation aids. When grouped content is promoted, the
-enterprise side gets its own flat namespace: a new enterprise group defaults to
-`{engagement-label}-{slug}` so same-named groups from different engagements cannot
-collide, and the mapping can be overridden during promotion — see
+Groups exist at both tiers — each repository carries its own group registry. Promotion
+maps each engagement group to an enterprise group: a group promoted before is matched by
+its registry id and receives the new content in place; a same-slug enterprise group with
+a different identity is flagged as a conflict to resolve; and a group new to the
+enterprise tier is created with an engagement-qualified default slug
+(`{engagement-label}-{slug}`), so two engagements that independently named a group
+"assurance" cannot silently merge. The promoting user can override any mapping — for
+example to merge into an existing enterprise group deliberately. See
 [Git sync & promotion](../reference/git-sync-promotion.md#promotion).
 
 ![Group management view](../media/group-management.png)

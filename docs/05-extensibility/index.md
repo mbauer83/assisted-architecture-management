@@ -18,6 +18,7 @@ theory.
 | **Attribute profiles & frontmatter** | Required/optional fields per entity, connection, diagram | [Schemata & profiles](schemata-and-profiles.md) |
 | **Document types** | New structured doc kinds with required sections and links | [Document types](document-types.md) |
 | **Ontology modules** | New entity/connection vocabularies (ArchiMate, SysML, assurance, …) | [Ontology modules](ontology-modules.md) |
+| **Authoring guidance** | Imported, hierarchy-layered create-when guidance per concept | [Authoring guidance](guidance.md) |
 | **Diagram-type modules** | New view families and notations | [Diagram-type modules](diagram-type-modules.md) |
 | **Hexagonal core** | Swap infrastructure adapters behind stable ports | [Hexagonal architecture](hexagonal-architecture.md) |
 

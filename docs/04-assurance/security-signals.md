@@ -5,8 +5,9 @@ which software components an architecture element is actually built from, which
 vulnerabilities affect them, and which entities a given CVE reaches.
 
 The model is deliberately small. One **ingest** produces one **signal snapshot**.
-A snapshot belongs to one architecture entity — its *anchor* — and exactly one
-snapshot per anchor is `active` at a time. Every read answers from the active
+A snapshot belongs to one architecture entity — the **assessed entity**, passed as
+the `anchor` parameter on the ingest surfaces — and exactly one snapshot per
+assessed entity is `active` at a time. Every read answers from the active
 snapshot, so a figure on screen always has one identifiable basis rather than an
 accumulation of scans.
 
@@ -98,6 +99,19 @@ The same three views are available to agents as
 `assurance_security_metrics`, `assurance_list_vulnerabilities`, and
 `assurance_vulnerability_impact`, and over REST as `/api/assurance/security-metrics`,
 `/api/assurance/security-findings`, and `/api/assurance/vulnerability-impact`.
+`assurance_security_stats` lists every assessed entity with an active snapshot, so an
+agent discovers where signals exist without an out-of-band lookup.
+
+### The security-posture viewpoint
+
+The shipped `security-posture` viewpoint puts the same data on a diagram: application
+components colored by the maximum CVSS score of their open findings, read from each
+component's active snapshot through the signal-metrics path (exposure-filtered,
+snapshot-pinned), with the legend derived from the style bands. With the store locked
+or signals unconfigured, the diagram renders in default styling with an explicit
+"signals unavailable" note — never with stale or mixed values. The styled output is
+classification-bearing and ephemeral: persisting it into a git-tracked artifact is
+refused, and downloads go through the stamped export path only.
 
 ## Vulnerability identity
 
@@ -167,3 +181,8 @@ In the default co-located backend the signals share a database file with the
 STPA/CAST/GRC model. Repairs scoped to signals must therefore name the signal
 tables — deleting the database file would destroy authored assurance content that
 is not regenerable.
+
+The backend is selected by `storage.assurance.signals_backend` — value semantics in
+the [configuration reference](../reference/configuration.md#configsettingsyaml--backend),
+and migration of legacy configurations/databases in the
+[upgrade guide](../reference/upgrade-guide.md#quarantine-and-blocking-findings).

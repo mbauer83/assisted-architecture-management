@@ -60,31 +60,14 @@ you start from a working module.
 
 ## Guidance externalization (license compliance)
 
-`archimate_4` ships `create_when`/`never_create_when` **empty** in `entities.yaml` — the
-authored guidance text is licensed content and lives outside this repository, never
-committed (the same rule that keeps the ArchiMate 4 spec and other reference PDFs out of
-git). Full per-type creation guidance is still available via a two-tier overlay:
-
-- **Import**: `arch-import-guidance --source <url|path> [--module ALIAS] [--dry-run]
-  [--strict] [--allow-http]` fetches (HTTPS by default) or reads a guidance YAML, validates
-  it against the registered module and specialization catalog, and writes
-  `~/.config/arch-repo/guidance-cache/<alias>.guidance.yaml` plus a provenance sidecar
-  `<alias>.guidance.meta.yaml` (source, SHA-256, format version, matched/unmatched counts).
-  Guidance is a **deployment concern, not a per-repository-tier one**: one running instance
-  of this software imports one guidance source into one cache outside any repo, never split
-  per engagement/enterprise and never committed to either repo's git history. Restart the
-  backend to pick up a newly imported cache.
-- **Precedence**: module-inline (empty by default) < the imported deployment-level cache;
-  committed repo declarations are never overridden.
-- **Empty-state signalling**: until an import has run, `artifact_authoring_guidance` (MCP)
-  and `GET /api/authoring-guidance` (REST) return `guidance_status: "empty"` plus a
-  `guidance_hint` naming the import command — never a silent blank string that could be
-  misread as "no restrictions apply". The GUI modeling wizard surfaces the same hint.
-- **Hosting location — open, deferred**: where the published guidance YAML will be hosted
-  (a versioned location `arch-import-guidance --source`/`guidance_default_source` in
-  `config/settings.yaml` could point at by default) has not been decided yet. Until it is,
-  `guidance_default_source` stays empty and every import must pass `--source` explicitly —
-  this does not block importing, only the convenience default.
+A module's `create_when`/`never_create_when` slots may ship **empty** — `archimate_4`
+does, because its authored guidance text derives from licensed material that is never
+committed to this repository. Guidance is imported per deployment with
+`arch-import-guidance` and layered along the module's declared concept hierarchy
+(domain → entity type → specialization for `archimate_4`), with the empty state
+explicitly signalled rather than silently blank. The full story — hierarchy levels, the
+document format, importing, precedence — is on the
+[Authoring guidance](guidance.md) page.
 
 &nbsp;
 

@@ -101,8 +101,7 @@ These apply globally and are read at startup; they are not configurable via
 `arch-workspace.yaml`. `validation.viewpoint_enforcement` and the `viewpoints:` execution
 bounds are covered in full in [Viewpoints — schema
 reference](viewpoints-schema.md#execution-result--bounds); `guidance.default_source` in
-[Ontology modules → Guidance
-externalization](../05-extensibility/ontology-modules.md#guidance-externalization-license-compliance).
+[Authoring guidance](../05-extensibility/guidance.md#importing).
 The `storage.assurance` keys are written automatically by
 `arch-assurance init` and `arch-assurance use-backend` — see
 [Assurance: storage & confidentiality](../04-assurance/storage-and-confidentiality.md).

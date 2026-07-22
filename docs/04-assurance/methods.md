@@ -76,6 +76,31 @@ arch-assurance scan-ai-candidates   # heuristic scan of architecture entities fo
 
 &nbsp;
 
+## Working an analysis end to end
+
+Every method runs through the same workflow surfaces:
+
+1. **Create an analysis.** An *analysis* is the aggregate a method's content lives in.
+   Create one from the method's wizard in the GUI, or with `assurance_create_analysis`
+   (MCP). Each analysis names its method, so the completion checks know what "done"
+   means for it.
+2. **Work the guided wizard.** Each method has a guided flow — `/assurance/stpa`,
+   `/assurance/cast`, `/assurance/grc`, `/assurance/gsn`, and
+   `/assurance/supply-chain` — that walks the method's steps in order, creating the
+   typed nodes and edges as you go, with the per-type guidance inline. The wizards
+   author ordinary store content: anything they create is equally editable from the
+   browse/detail views or via the MCP write tools.
+3. **Review completeness.** The method-completion verifier (below) reports what the
+   analysis still needs; the wizards surface the same checks as you work, and agents
+   read them via `assurance_stpa_complete`, `assurance_cast_complete`,
+   `assurance_grc_complete`, and `assurance_case_completeness` (GSN), plus
+   `assurance_coverage` for how much of the architecture the analysis touches.
+4. **Seal a baseline.** `/assurance/baselines` (GUI) or `assurance_seal_baseline`
+   (MCP) seals the analysis state into the tamper-evident archive — the reference
+   point a CAST reconstruction or a later review compares against.
+
+&nbsp;
+
 ## Method-completion verification
 
 Beyond per-write validation, the assurance verifier reports whether a method is *complete* —

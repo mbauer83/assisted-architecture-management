@@ -191,7 +191,7 @@ def test_documented_mcp_tool_names_are_registered() -> None:
 
 # ── The assurance capability inventory ────────────────────────────────────────
 
-_CAPABILITY_DOC = DOCS / "04-assurance" / "gui-capability-design.md"
+_CAPABILITY_DOC = DOCS / "architecture" / "assurance-gui-capability-design.md"
 
 
 def _inventory_http_tokens() -> list[tuple[str, str]]:
@@ -237,7 +237,7 @@ def test_capability_inventory_names_real_endpoints() -> None:
     assert offenders == [], (
         "The assurance capability inventory names HTTP surfaces that no longer exist:\n  "
         + "\n  ".join(offenders)
-        + "\nUpdate docs/04-assurance/gui-capability-design.md when a surface changes."
+        + "\nUpdate docs/architecture/assurance-gui-capability-design.md when a surface changes."
     )
 
 
