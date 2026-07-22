@@ -57,13 +57,13 @@ def test_malformed_yaml_is_rejected(tmp_path: Path) -> None:
         load_repo_profile_registry(tmp_path)
 
 
-def test_shipped_module_registry_is_reachable_and_empty() -> None:
-    # Every ontology module exposes a profile registry; the shipped archimate-4 one parses
-    # to the valid empty default (no named profiles bound yet). This is the regression guard
-    # that turning the mechanism on changes nothing for existing content.
+def test_shipped_module_registry_is_reachable_and_carries_the_aibom_profiles() -> None:
+    # Every ontology module exposes a profile registry; the shipped archimate-4 one now
+    # carries the AIBOM shared profiles (WU-A2). The mechanism resolves them by name.
     from src.infrastructure.app_bootstrap import build_module_registry, build_runtime_catalogs
 
     catalogs = build_runtime_catalogs(build_module_registry())
-    assert dict(catalogs.profiles.profiles) == {}
+    assert catalogs.profiles.get("ai-supplier") is not None
+    assert catalogs.profiles.get("ai-licensing") is not None
     for module in catalogs.module_catalog.all_ontologies().values():
         assert module.profile_registry is not None

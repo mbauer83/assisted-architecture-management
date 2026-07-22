@@ -57,6 +57,21 @@ ARCHIMATE_ATTRIBUTE_SCHEMATA: dict[str, dict] = {
         },
         "additionalProperties": True,
     },
+    "attributes.data-object.schema.json": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "attributes.data-object.schema.json",
+        "title": "Data Object Attribute Schema",
+        "description": "Attribute schema for Properties table in Data Object entities.",
+        "type": "object",
+        "required": [],
+        "properties": {
+            "Provenance": {"type": "string", "description": "Where the data originates."},
+            # Reused (not AI-specific): an AI dataset's classification / sensitiveData in the
+            # AIBOM derive from this, exactly as business-object Sensitivity does (AIBOM D3a).
+            "Sensitivity": {"type": "string", "enum": SENSITIVITY_ENUM, "description": _SENSITIVITY_DESCRIPTION},
+        },
+        "additionalProperties": True,
+    },
     "attributes.application-component.service.schema.json": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "attributes.application-component.service.schema.json",

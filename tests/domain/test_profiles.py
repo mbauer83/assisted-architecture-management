@@ -40,6 +40,22 @@ class TestCompileProfileSchema:
         assert schema["properties"]["criticality"]["type"] == "string"
         assert schema["required"] == ["criticality"]
 
+    def test_array_attribute_carries_its_item_schema(self) -> None:
+        # An array attribute must declare its element type, not be a bare untyped list —
+        # this is what a typed list editor and a complete JSON Schema need.
+        inline = profile_from_inline_attributes(
+            "ai-model", {"Licenses": {"type": "array", "level": "recommended", "items": {"type": "string"}}}
+        )
+        schema = compile_profile_schema(inline)
+        assert schema["properties"]["Licenses"] == {"type": "array", "items": {"type": "string"}}
+
+    def test_items_is_ignored_for_non_array_types(self) -> None:
+        inline = profile_from_inline_attributes(
+            "x", {"name": {"type": "string", "items": {"type": "string"}}}
+        )
+        schema = compile_profile_schema(inline)
+        assert "items" not in schema["properties"]["name"]
+
 
 class TestMergePropertySchemas:
     def test_merges_properties_across_fragments(self) -> None:

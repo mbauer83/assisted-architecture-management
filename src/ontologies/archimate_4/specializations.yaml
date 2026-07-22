@@ -32,6 +32,7 @@ specializations:
         never_create_when: >-
           The element is the trained model artefact itself (use `ai-model`) or the serving
           engine/framework (use `ai-runtime`).
+        profiles: [ai-supplier, ai-licensing]
     process:
       - slug: business-process
         name: Business Process
@@ -82,6 +83,22 @@ specializations:
         never_create_when: >-
           The element is the served endpoint (use `ai-inference-service`), the serving engine
           (use `ai-runtime`), or an agentic application built on a model (use `ai-agent`).
+        profiles: [ai-supplier, ai-licensing]
+        attributes:
+          # The CycloneDX modelCard: authored model characteristics (AIBOM D3/D4 — flat
+          # scalars + string arrays; the exporter lifts these into the nested modelCard).
+          Approach: { type: string, level: recommended, enum: [Supervised, Unsupervised, Semi-supervised, Self-supervised, Reinforcement Learning] }
+          Task: { type: string, level: recommended }
+          Architecture Family: { type: string, level: recommended }
+          Model Architecture: { type: string, level: optional }
+          Inputs: { type: string, level: optional }
+          Outputs: { type: string, level: optional }
+          Performance Metrics: { type: array, level: recommended, items: { type: string } }
+          Technical Limitations: { type: array, level: recommended, items: { type: string } }
+          Performance Tradeoffs: { type: array, level: optional, items: { type: string } }
+          Ethical Considerations: { type: array, level: recommended, items: { type: string } }
+          Environmental Considerations: { type: array, level: optional, items: { type: string } }
+          Fairness Assessments: { type: array, level: optional, items: { type: string } }
       - slug: ai-agent
         name: AI Agent
         description: >-
@@ -95,6 +112,9 @@ specializations:
           A component orchestrates model calls with tools, retrieval, or a decision loop to
           deliver an application capability.
         never_create_when: The element is the bare model artefact (`ai-model`) or a served endpoint.
+        profiles: [ai-supplier, ai-licensing]
+        attributes:
+          Control Flow: { type: string, level: recommended, enum: [Autonomous Loop, Deterministic Pipeline] }
     data-object:
       - slug: ai-dataset
         name: AI Dataset
@@ -104,6 +124,9 @@ specializations:
           considerations. A data-object because it is passive data, not a served capability.
         create_when: A dataset is used to train, evaluate, or fine-tune a model in the system.
         never_create_when: The data is a prompt asset (`ai-prompt-asset`) or an embedding index (`ai-vector-store`).
+        profiles: [ai-supplier, ai-licensing]
+        attributes:
+          Dataset Role: { type: string, level: recommended, enum: [Training, Evaluation, Fine-tuning] }
       - slug: ai-prompt-asset
         name: AI Prompt Asset
         description: >-
@@ -129,6 +152,7 @@ specializations:
           endpoint (`ai-inference-service`).
         create_when: A dedicated engine or framework executes model inference.
         never_create_when: The element is the model (`ai-model`) or the served endpoint (`ai-inference-service`).
+        profiles: [ai-supplier, ai-licensing]
     application-interface:
       - slug: ai-tool-interface
         name: AI Tool Interface

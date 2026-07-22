@@ -30,6 +30,10 @@ class ProfileAttribute:
     level: AttributeLevel = "optional"
     default: Any = None
     enum: tuple[str, ...] = ()
+    items: Mapping[str, Any] | None = None
+    """For ``type: array`` — the element schema (``{type, enum, ...}``), so an array attribute
+    declares what it contains rather than being an untyped list. Feeds the GUI's typed list
+    editor and makes the JSON Schema complete. Ignored for non-array types."""
 
 
 @dataclass(frozen=True)
@@ -57,6 +61,8 @@ def compile_profile_schema(profile: ProfileDefinition) -> dict[str, Any]:
         prop_schema: dict[str, Any] = {"type": attr.type}
         if attr.enum:
             prop_schema["enum"] = list(attr.enum)
+        if attr.type == "array" and attr.items is not None:
+            prop_schema["items"] = dict(attr.items)
         if attr.default is not None:
             prop_schema["default"] = attr.default
         properties[attr.name] = prop_schema
@@ -88,6 +94,7 @@ def attributes_from_mapping(attributes: Mapping[str, Any]) -> tuple[ProfileAttri
                 level=level if level in ("required", "recommended", "optional") else "optional",
                 default=raw.get("default"),
                 enum=tuple(str(v) for v in raw["enum"]) if isinstance(raw.get("enum"), (list, tuple)) else (),
+                items=dict(raw["items"]) if isinstance(raw.get("items"), Mapping) else None,
             )
         )
     return tuple(attrs)

@@ -82,22 +82,41 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
 - Gates: backend 6378 passed / 5 skipped; ruff + zuban clean.
 
 ### WU-A2 — Shared and specific profiles (needs A1, and the profile registry's WU-P2)
-- [ ] Declare shared named profiles (provenance, licensing, supplier) once and
-      bind them to the AI specializations (PLAN §4 D3).
-- [ ] Per-specialization profiles for what genuinely differs only.
-- [ ] **Declare no attribute the base type already provides** (D3a) — base-type
-      inheritance already works. `componentData.classification` /
-      `sensitiveData` derive from the existing base `Sensitivity` attribute and
-      its specified TLP mapping; do not add a parallel AI sensitivity field.
-- [ ] Attribute set per PLAN §3, Title Case (D8), flat scalars + string arrays
-      only (D4). Required/recommended levels set deliberately — required means
-      *the AIBOM is invalid without it*, not merely *nice to have*.
-- [ ] Register shipped defaults in `DEFAULT_SCHEMATA`, keeping that module
-      within the source-length policy — split as
-      `repo_default_assurance_schemata.py` already does if needed.
-- [ ] Tests: every payload is valid JSON Schema; no orphan attachment schemata
-      (verifier rule W044); a specialization's effective schema contains its
-      base-type attributes without redeclaring them.
+- [x] Declare shared named profiles and bind them to the AI specializations (D3).
+- [x] Per-specialization profiles for what genuinely differs only.
+- [x] **Declare no attribute the base type already provides** (D3a).
+- [x] Attribute set per PLAN §3, Title Case (D8), flat scalars + typed arrays (D4).
+- [~] Register shipped defaults in `DEFAULT_SCHEMATA` — DEVIATION: the AIBOM attributes ship
+      in the MODULE (profiles.yaml + inline on specializations.yaml), not as per-repo
+      attachment files, so they need no `DEFAULT_SCHEMATA` entry and no per-repo migration
+      (the named-profile registry supersedes the attachment-file approach the box assumed).
+      The one `DEFAULT_SCHEMATA` addition is the `data-object` BASE schema (Sensitivity +
+      Provenance) — a latent ontology gap, not AI-specific — so `ai-dataset` inherits
+      Sensitivity per D3a (data-object had no base schema; business-object was the precedent).
+- [x] Tests: profiles are valid JSON Schema; no orphan AI attachment schemata; ai-model's
+      effective schema = base ⊕ shared profiles ⊕ model card with no redeclaration; ai-dataset
+      inherits the base data-object attributes.
+
+#### WU-A2 PROGRESS (2026-07-22)
+- Shared profiles in `src/ontologies/archimate_4/profiles.yaml`: `ai-supplier`
+  (Supplier, Publisher) and `ai-licensing` (Licenses, Hashes) — bound via `profiles:
+  [ai-supplier, ai-licensing]` from ai-model, ai-agent, ai-inference-service, ai-runtime,
+  ai-dataset.
+- Model card inline on `ai-model` (Approach enum, Task, Architecture Family, Model
+  Architecture, Inputs, Outputs, and the six list attributes); small inline attributes on
+  ai-agent (Control Flow enum) and ai-dataset (Dataset Role enum). Prompt-asset / vector-store
+  / tool-interface carry no authored profile (base + relations suffice).
+- **Profile-format fix (owner-flagged 2026-07-22): array attributes now declare `items`.**
+  `ProfileAttribute` gained `items`; `attributes_from_mapping` parses it and
+  `compile_profile_schema` emits `items` for `type: array` — so every list attribute
+  declares its element type (verified end-to-end: profile → effective schema → GUI
+  descriptor, which the WU-Y1 list editor already consumes). A bare untyped array is no
+  longer produced. All six model-card lists + Licenses/Hashes carry `items: {type: string}`.
+- The `data-object` base schema (Sensitivity + Provenance) added to
+  `repo_default_attribute_schemata.py`; source-length policy still green.
+- Tests: `tests/domain/test_aibom_profiles.py`, `test_profiles.py` (array items +
+  non-array ignore), and the updated shipped-registry test.
+- Gates: backend 6383 passed / 5 skipped (+ the one updated test); ruff + zuban clean.
 
 ### WU-A3 — Derivation-role vocabulary and bindings (needs A1)
 - [ ] Declare the closed role vocabulary (PLAN §5) and the default

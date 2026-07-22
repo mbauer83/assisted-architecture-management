@@ -17,6 +17,20 @@
 #       attributes:
 #         <Attribute Name>: { type: string, level: required|recommended|optional, enum: [...] }
 #
-# No reusable profiles are shipped yet; the empty registry is the valid default state.
+# The AIBOM shared profiles (PLAN-aibom-model-derived.md D3): attribute sets several AI
+# specializations share — supply-chain provenance and licensing — declared ONCE and bound by
+# name from specializations.yaml. Per-specialization attributes (the model card) stay inline
+# on their own specialization; these are only the genuinely shared sets. No attribute here
+# redeclares one a base type already provides (D3a).
 profile_schema: 1
-profiles: {}
+profiles:
+  ai-supplier:
+    version: 1
+    attributes:
+      Supplier: { type: string, level: recommended }
+      Publisher: { type: string, level: optional }
+  ai-licensing:
+    version: 1
+    attributes:
+      Licenses: { type: array, level: recommended, items: { type: string } }
+      Hashes: { type: array, level: optional, items: { type: string } }
