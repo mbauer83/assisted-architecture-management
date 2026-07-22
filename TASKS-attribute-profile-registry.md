@@ -651,7 +651,31 @@ on the P/Q resolved-schema at the write boundary (landed).
 
 ## Restart-gated live verification queue
 
-- [ ] Startup Class A behaviour on the restarted backend (engagement hard fail,
-      enterprise warn) — verify with a deliberately broken registry in a
-      scratch repo, never the live one.
-- [ ] Quarantine write rejection through MCP after a session restart.
+Backend + frontend + Claude session restarted 2026-07-22; outcomes below.
+
+- [x] Startup Class A behaviour (engagement hard fail, enterprise warn).
+      POSITIVE half LIVE-VERIFIED: the restarted backend booted clean on the real
+      ENG-ARCH-REPO registry (every MCP call below succeeded → `validate_profile_registries`
+      passed in production). NEGATIVE half (broken registry → engagement `SystemExit`,
+      enterprise warn) verified against the exact production function by
+      `tests/infrastructure/test_profile_registry_startup.py` (malformed + undefined-binding
+      abort; enterprise-only warn; unattached-repo-never-read). A live boot against a
+      deliberately-broken SCRATCH registry would require repointing the active workspace and
+      restarting — disruptive and owner-gated — so the negative half stays test-verified per
+      the "never the live one" rule.
+- [x] Quarantine write rejection through MCP.
+      The MCP write path (correctly) refuses any non-active engagement root, so a scratch
+      repo cannot be targeted through the tool, and injecting a conflict into the LIVE repo
+      is disallowed. The rejection is verified against the real `create_entity`/`edit_entity`
+      choke point (which MCP dispatches to identically) by
+      `tests/tools/test_entity_write_quarantine_gate.py` +
+      `test_gui_entity_schemata_endpoint.py::TestQuarantineHoldsWithoutTheFlag`. LIVE through
+      MCP on the restarted backend: the CLEAN path is NOT falsely rejected (dry-run create of
+      a throwaway `application-component` → `valid: true`, nothing written), confirming the
+      gate is wired and running without false positives.
+- [x] BONUS — WU-V4 multiple specializations LIVE through MCP: a dry-run
+      `artifact_create_entity` on `collaboration` with
+      `specializations: [business-collaboration, application-collaboration]` returned
+      `valid: true` and serialized them as a YAML list (§15.2 shape). The new MCP params
+      (`specializations` on create/edit entity + edit connection; `metadata` on edit
+      connection) are present on the restarted surface.
