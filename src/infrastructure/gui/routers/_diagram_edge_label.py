@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._openapi import TAG_DIAGRAMS, WRITE_RESPONSES, OpenMapResponse
 
 router = APIRouter()
 
@@ -19,7 +20,8 @@ class SetEdgeLabelBody(BaseModel):
     dry_run: bool = True
 
 
-@router.put("/api/diagram/edge-label")
+@router.put("/api/diagram/edge-label", tags=[TAG_DIAGRAMS], summary="Set a per-diagram edge label override",
+    response_model=OpenMapResponse, responses=WRITE_RESPONSES)
 def set_edge_label_gui(body: SetEdgeLabelBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write._diagram_edge_labels import set_diagram_edge_label
 

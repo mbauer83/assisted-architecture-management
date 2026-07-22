@@ -17,6 +17,7 @@ from src.application.repo_path_helpers import rendered_dir_for_diagram
 from src.config.repo_paths import DIAGRAM_CATALOG, DIAGRAMS, RENDERED
 from src.domain.artifact_types import DiagramRecord
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._openapi import READ_RESPONSES, TAG_DIAGRAMS
 
 router = APIRouter()
 
@@ -57,7 +58,8 @@ def _rendered_path(d: DiagramRecord, suffix: str) -> Path | None:
     return None
 
 
-@router.get("/api/diagram-image/{filename}")
+@router.get("/api/diagram-image/{filename}", tags=[TAG_DIAGRAMS], summary="Serve a rendered diagram image",
+    responses=READ_RESPONSES)
 def get_diagram_image(filename: str) -> FileResponse:
     repo_root = s.maybe_engagement_root()
     if repo_root is None:
@@ -76,7 +78,7 @@ def get_diagram_image(filename: str) -> FileResponse:
     return FileResponse(path, media_type="image/png")
 
 
-@router.get("/api/diagram-svg")
+@router.get("/api/diagram-svg", tags=[TAG_DIAGRAMS], summary="Serve a diagram as SVG", responses=READ_RESPONSES)
 def get_diagram_svg(id: str) -> Response:
     repo_root = s.maybe_engagement_root()
     if repo_root is None:
@@ -118,7 +120,8 @@ def get_diagram_svg(id: str) -> Response:
     return Response(content=svg, media_type="image/svg+xml")
 
 
-@router.get("/api/diagram-download")
+@router.get("/api/diagram-download", tags=[TAG_DIAGRAMS], summary="Download a diagram source file",
+    responses=READ_RESPONSES)
 def download_diagram(id: str, format: Literal["png", "svg"] = "png") -> FileResponse:
     repo_root = s.maybe_engagement_root()
     if repo_root is None:

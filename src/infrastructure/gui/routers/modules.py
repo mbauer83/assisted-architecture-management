@@ -6,11 +6,13 @@ from fastapi import APIRouter, Depends
 
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
+from src.infrastructure.gui.routers._openapi import TAG_TAXONOMY, OpenMapResponse
 
 router = APIRouter()
 
 
-@router.get("/api/modules")
+@router.get("/api/modules", tags=[TAG_TAXONOMY], summary="Loaded ontology / diagram-type modules",
+    response_model=list[OpenMapResponse])
 def list_modules(catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency)) -> list[dict[str, object]]:
     """Return metadata for every registered (enabled + satisfied) ontology module."""
     return [

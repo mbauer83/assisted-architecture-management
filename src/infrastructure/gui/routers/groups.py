@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from src.application.assurance_diagrams import ASSURANCE_SURFACE_DIAGRAM_TYPES
 from src.domain.groups import GroupAxis, GroupEntry, GroupRegistry
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._openapi import TAG_GROUPS, WRITE_RESPONSES, OpenMapResponse
 
 router = APIRouter()
 
@@ -93,7 +94,8 @@ def _axis_entries(registry: GroupRegistry, kind: GroupAxis) -> list[dict[str, An
     return [_entry_dict(e, counts.get(e.slug, 0)) for e in registry.list_axis(kind)]
 
 
-@router.get("/api/groups")
+@router.get("/api/groups", tags=[TAG_GROUPS], summary="List model-project groups with member counts",
+    response_model=OpenMapResponse)
 def list_groups(kind: str | None = None) -> dict[str, Any]:
     """Return groups from the registry, optionally filtered by axis."""
     repo_root = s.maybe_engagement_root()
@@ -131,7 +133,8 @@ async def _exec_op(route: tuple[str, str], **kwargs: Any) -> dict[str, Any]:
     return dict(result)
 
 
-@router.post("/api/group")
+@router.post("/api/group", tags=[TAG_GROUPS], summary="Create a group", response_model=OpenMapResponse,
+    responses=WRITE_RESPONSES)
 async def create_group(body: CreateGroupBody) -> dict[str, Any]:
     return await _exec_op(
         ("POST", "/api/group"),
@@ -146,7 +149,8 @@ async def create_group(body: CreateGroupBody) -> dict[str, Any]:
     )
 
 
-@router.put("/api/group")
+@router.put("/api/group", tags=[TAG_GROUPS], summary="Rename a group", response_model=OpenMapResponse,
+    responses=WRITE_RESPONSES)
 async def rename_group(body: RenameGroupBody) -> dict[str, Any]:
     return await _exec_op(
         ("PUT", "/api/group"),
@@ -158,19 +162,22 @@ async def rename_group(body: RenameGroupBody) -> dict[str, Any]:
     )
 
 
-@router.post("/api/group/archive")
+@router.post("/api/group/archive", tags=[TAG_GROUPS], summary="Archive a group", response_model=OpenMapResponse,
+    responses=WRITE_RESPONSES)
 async def archive_group(body: ArchiveGroupBody) -> dict[str, Any]:
     return await _exec_op(
         ("POST", "/api/group/archive"), axis=body.kind, action="archive", target=body.target, confirm=body.confirm
     )
 
 
-@router.post("/api/group/unarchive")
+@router.post("/api/group/unarchive", tags=[TAG_GROUPS], summary="Unarchive a group", response_model=OpenMapResponse,
+    responses=WRITE_RESPONSES)
 async def unarchive_group(body: UnarchiveGroupBody) -> dict[str, Any]:
     return await _exec_op(("POST", "/api/group/unarchive"), axis=body.kind, action="unarchive", target=body.target)
 
 
-@router.patch("/api/group")
+@router.patch("/api/group", tags=[TAG_GROUPS], summary="Update a group (partial)", response_model=OpenMapResponse,
+    responses=WRITE_RESPONSES)
 async def update_group(body: UpdateGroupBody) -> dict[str, Any]:
     return await _exec_op(
         ("PATCH", "/api/group"),
@@ -184,7 +191,8 @@ async def update_group(body: UpdateGroupBody) -> dict[str, Any]:
     )
 
 
-@router.delete("/api/group")
+@router.delete("/api/group", tags=[TAG_GROUPS], summary="Delete a group", response_model=OpenMapResponse,
+    responses=WRITE_RESPONSES)
 async def delete_group(
     kind: str = Query(...),
     target: str = Query(...),

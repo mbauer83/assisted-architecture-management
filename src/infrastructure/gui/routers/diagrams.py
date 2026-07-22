@@ -27,6 +27,7 @@ from src.infrastructure.gui.routers._diagram_serving import _rendered_path
 from src.infrastructure.gui.routers._diagram_serving import router as _serving_router
 from src.infrastructure.gui.routers._diagram_write import router as _write_router
 from src.infrastructure.gui.routers._entity_display_search import entity_display_search_impl
+from src.infrastructure.gui.routers._openapi import READ_RESPONSES, TAG_DIAGRAMS, OpenMapResponse
 
 router = APIRouter()
 router.include_router(_write_router)
@@ -71,7 +72,7 @@ def _read_diagram_impl(id: str, catalogs: RuntimeCatalogs) -> dict[str, Any]:
     return result
 
 
-@router.get("/api/diagrams")
+@router.get("/api/diagrams", tags=[TAG_DIAGRAMS], summary="List diagrams", response_model=OpenMapResponse)
 def list_diagrams(
     diagram_type: str | None = None,
     status: str | None = None,
@@ -90,7 +91,13 @@ def list_diagrams(
     return {"total": len(diagrams), "items": [s.diagram_to_summary(d) for d in diagrams]}
 
 
-@router.get("/api/diagram")
+@router.get(
+    "/api/diagram",
+    tags=[TAG_DIAGRAMS],
+    summary="Read a diagram by id",
+    response_model=OpenMapResponse,
+    responses=READ_RESPONSES,
+)
 def read_diagram(
     id: str,
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
@@ -98,7 +105,12 @@ def read_diagram(
     return _read_diagram_impl(id, catalogs)
 
 
-@router.get("/api/matrix-config")
+@router.get(
+    "/api/matrix-config",
+    tags=[TAG_DIAGRAMS],
+    summary="Matrix diagram configuration",
+    response_model=OpenMapResponse,
+)
 def get_matrix_config(id: str) -> dict[str, Any]:
     """Return entity-ids, conn-type-configs, combined flag, and body for a matrix diagram."""
     repo = s.get_repo()
@@ -144,7 +156,12 @@ def get_matrix_config(id: str) -> dict[str, Any]:
     }
 
 
-@router.get("/api/diagram-refs")
+@router.get(
+    "/api/diagram-refs",
+    tags=[TAG_DIAGRAMS],
+    summary="Diagram references for a source/target pair",
+    response_model=list[OpenMapResponse],
+)
 def get_diagram_refs(source_id: str, target_id: str) -> list[dict[str, str]]:
     repo = s.get_repo()
     src = repo.get_entity(source_id)
@@ -158,7 +175,12 @@ def get_diagram_refs(source_id: str, target_id: str) -> list[dict[str, str]]:
     ]
 
 
-@router.get("/api/diagram-entities")
+@router.get(
+    "/api/diagram-entities",
+    tags=[TAG_DIAGRAMS],
+    summary="Entities placed on a diagram",
+    response_model=list[OpenMapResponse],
+)
 def get_diagram_entities(
     id: str,
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
@@ -171,7 +193,12 @@ def get_diagram_entities(
     return entities
 
 
-@router.get("/api/diagram-connections")
+@router.get(
+    "/api/diagram-connections",
+    tags=[TAG_DIAGRAMS],
+    summary="Connections drawn on a diagram",
+    response_model=list[OpenMapResponse],
+)
 def get_diagram_connections(
     id: str,
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
@@ -183,7 +210,13 @@ def get_diagram_connections(
     return diagram_context_payload(repo, diag_rec, catalogs)["connections"]
 
 
-@router.get("/api/diagram-context")
+@router.get(
+    "/api/diagram-context",
+    tags=[TAG_DIAGRAMS],
+    summary="Diagram with its resolved context",
+    response_model=OpenMapResponse,
+    responses=READ_RESPONSES,
+)
 def get_diagram_context(
     id: str,
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
@@ -195,7 +228,13 @@ def get_diagram_context(
     return diagram_context_payload(repo, diag_rec, catalogs)
 
 
-@router.get("/api/diagram-types/{name}/entity-types")
+@router.get(
+    "/api/diagram-types/{name}/entity-types",
+    tags=[TAG_DIAGRAMS],
+    summary="Entity types a diagram type accepts",
+    response_model=list[OpenMapResponse],
+    responses=READ_RESPONSES,
+)
 def get_diagram_kind_entity_types(
     name: str,
     viewpoint: str | None = None,
@@ -207,7 +246,13 @@ def get_diagram_kind_entity_types(
         raise HTTPException(404, f"Diagram type not found: {name!r}")
 
 
-@router.get("/api/diagram-types/{name}/connection-types")
+@router.get(
+    "/api/diagram-types/{name}/connection-types",
+    tags=[TAG_DIAGRAMS],
+    summary="Connection types a diagram type accepts",
+    response_model=list[OpenMapResponse],
+    responses=READ_RESPONSES,
+)
 def get_diagram_kind_connection_types(
     name: str,
     viewpoint: str | None = None,
@@ -219,7 +264,13 @@ def get_diagram_kind_connection_types(
         raise HTTPException(404, f"Diagram type not found: {name!r}")
 
 
-@router.get("/api/entity-display-item")
+@router.get(
+    "/api/entity-display-item",
+    tags=[TAG_DIAGRAMS],
+    summary="Display item for one entity",
+    response_model=OpenMapResponse,
+    responses=READ_RESPONSES,
+)
 def get_entity_display_item(
     id: str,
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
@@ -231,7 +282,12 @@ def get_entity_display_item(
     return entity_display_item(rec, catalogs)
 
 
-@router.get("/api/entity-display-search")
+@router.get(
+    "/api/entity-display-search",
+    tags=[TAG_DIAGRAMS],
+    summary="Search entities for diagram placement",
+    response_model=OpenMapResponse,
+)
 def entity_display_search(
     q: str,
     limit: int = Query(default=20, le=50),
@@ -250,7 +306,12 @@ def entity_display_search(
     return {"items": result.items, "next_cursor": result.next_cursor}
 
 
-@router.get("/api/diagram-entity-discovery")
+@router.get(
+    "/api/diagram-entity-discovery",
+    tags=[TAG_DIAGRAMS],
+    summary="Discover entities to add to a diagram",
+    response_model=OpenMapResponse,
+)
 def diagram_entity_discovery(
     q: str | None = None,
     included_entity_ids: str | None = None,

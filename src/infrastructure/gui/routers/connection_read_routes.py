@@ -11,6 +11,7 @@ from src.application.entity_type_predicates import is_internal_entity_type
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._openapi import TAG_CONNECTIONS, TAG_ENTITIES, TAG_TAXONOMY, OpenMapResponse
 from src.infrastructure.gui.routers.connection_neighbors import DerivationLimitError, derive_neighbor_response
 
 
@@ -24,7 +25,8 @@ def _catalogs():
 def register_connection_read_routes(router: APIRouter) -> None:
     """Attach read endpoints while keeping the write router within the file-size limit."""
 
-    @router.get("/api/connections")
+    @router.get("/api/connections", tags=[TAG_CONNECTIONS], summary="List connections (AND-filtered)",
+        response_model=list[OpenMapResponse])
     def get_connections(
         entity_id: str,
         direction: Literal["any", "outbound", "inbound"] = "any",
@@ -33,7 +35,8 @@ def register_connection_read_routes(router: APIRouter) -> None:
         conns = s.get_repo().find_connections_for(entity_id, direction=direction, conn_type=conn_type)
         return [s.connection_to_dict(c) for c in conns]
 
-    @router.get("/api/neighbors")
+    @router.get("/api/neighbors", tags=[TAG_CONNECTIONS], summary="Neighbouring entities of an entity",
+        response_model=OpenMapResponse)
     def get_neighbors(
         entity_id: str,
         max_hops: int = 1,
@@ -55,12 +58,14 @@ def register_connection_read_routes(router: APIRouter) -> None:
         except DerivationLimitError as exc:
             raise HTTPException(400, {"code": "derivation-limit", "path": "query", "message": str(exc)}) from exc
 
-    @router.get("/api/search")
+    @router.get("/api/search", tags=[TAG_ENTITIES], summary="Keyword search over artifacts",
+        response_model=OpenMapResponse)
     def search(q: str, limit: int = 20) -> dict[str, Any]:
         result = s.get_repo().search_artifacts(q, limit=limit, include_connections=False)
         return {"query": result.query, "hits": [s.search_hit_to_dict(hit) for hit in result.hits]}
 
-    @router.get("/api/ontology")
+    @router.get("/api/ontology", tags=[TAG_CONNECTIONS], summary="Ontology classification / permitted pairs",
+        response_model=OpenMapResponse)
     def get_ontology(
         source_type: str,
         target_type: str | None = None,
@@ -90,7 +95,8 @@ def register_connection_read_routes(router: APIRouter) -> None:
             }
         return {"source_type": source_type, **catalogs.connections.classify_connections(source)}
 
-    @router.get("/api/write-help")
+    @router.get("/api/write-help", tags=[TAG_TAXONOMY], summary="Catalog of writable types",
+        response_model=OpenMapResponse)
     def get_write_help() -> dict[str, Any]:
         from src.infrastructure.write.artifact_write.help import write_help
 

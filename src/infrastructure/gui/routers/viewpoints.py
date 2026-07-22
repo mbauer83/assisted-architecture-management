@@ -40,6 +40,7 @@ from src.infrastructure.assurance.signal_attribute_capability import (
 )
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._diagram_selection import resolve_diagram_selection
+from src.infrastructure.gui.routers._openapi import READ_RESPONSES, TAG_VIEWPOINTS, OpenMapResponse
 from src.infrastructure.gui.routers._viewpoint_freshness import fresh_viewpoints_runtime_catalogs_dependency
 from src.infrastructure.gui.routers.viewpoints_signal_render import (
     signal_banner_for,
@@ -84,7 +85,8 @@ def _definition_label_attribute(slug: str | None, catalogs: RuntimeCatalogs) -> 
     return value if isinstance(value, str) and value else None
 
 
-@router.post("/api/viewpoints/execute")
+@router.post("/api/viewpoints/execute", tags=[TAG_VIEWPOINTS], summary="Execute a viewpoint query",
+    response_model=OpenMapResponse)
 def execute_viewpoint(
     slug: Annotated[str | None, Body()] = None,
     query: Annotated[dict[str, object] | None, Body()] = None,
@@ -128,7 +130,8 @@ def execute_viewpoint(
     return asdict(result)
 
 
-@router.post("/api/viewpoints/export-csv")
+@router.post("/api/viewpoints/export-csv", tags=[TAG_VIEWPOINTS], summary="Execute a viewpoint and export CSV",
+    response_model=OpenMapResponse)
 def export_viewpoint_csv(
     slug: Annotated[str | None, Body()] = None,
     query: Annotated[dict[str, object] | None, Body()] = None,
@@ -179,7 +182,8 @@ def export_viewpoint_csv(
     )
 
 
-@router.post("/api/viewpoints/execute-projection")
+@router.post("/api/viewpoints/execute-projection", tags=[TAG_VIEWPOINTS], summary="Execute a viewpoint projection",
+    response_model=OpenMapResponse)
 def execute_viewpoint_projection(
     slug: Annotated[str | None, Body()] = None,
     query: Annotated[dict[str, object] | None, Body()] = None,
@@ -216,7 +220,8 @@ def execute_viewpoint_projection(
     return {"applied": True, "index_generation": index_generation, **asdict(projection)}
 
 
-@router.post("/api/viewpoints/execute-diagram")
+@router.post("/api/viewpoints/execute-diagram", tags=[TAG_VIEWPOINTS],
+    summary="Execute a viewpoint against a diagram", response_model=OpenMapResponse)
 def execute_viewpoint_diagram(
     response: Response,
     slug: Annotated[str | None, Body()] = None,
@@ -307,7 +312,8 @@ def execute_viewpoint_diagram(
     return payload
 
 
-@router.get("/api/diagrams/{artifact_id}/viewpoint-projection")
+@router.get("/api/diagrams/{artifact_id}/viewpoint-projection", tags=[TAG_VIEWPOINTS],
+    summary="Viewpoint projection for a diagram", response_model=OpenMapResponse, responses=READ_RESPONSES)
 def get_diagram_viewpoint_projection(
     artifact_id: str,
     catalogs: RuntimeCatalogs = Depends(fresh_viewpoints_runtime_catalogs_dependency),

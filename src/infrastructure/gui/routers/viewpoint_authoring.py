@@ -46,6 +46,7 @@ from src.domain.viewpoint_summary import render_query_summary
 from src.domain.viewpoints import ViewpointCatalog, ViewpointDefinition
 from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._openapi import READ_RESPONSES, TAG_VIEWPOINTS, WRITE_RESPONSES, OpenMapResponse
 from src.infrastructure.viewpoint_declarations import (
     load_effective_viewpoint_catalog,
     load_viewpoint_catalog_file,
@@ -136,7 +137,8 @@ def _full_entry(
     }
 
 
-@router.get("/api/viewpoints")
+@router.get("/api/viewpoints", tags=[TAG_VIEWPOINTS], summary="List viewpoint definitions",
+    response_model=OpenMapResponse)
 def list_viewpoint_definitions() -> dict[str, Any]:
     """The effective merged catalog (module + enterprise + engagement), each entry
     carrying its full serialized mapping (to populate an edit form) and a ``tier`` so the
@@ -179,7 +181,8 @@ def _known_group_slugs() -> list[str]:
     return sorted(slugs)
 
 
-@router.get("/api/viewpoints/criteria-catalog")
+@router.get("/api/viewpoints/criteria-catalog", tags=[TAG_VIEWPOINTS],
+    summary="Criteria catalog for viewpoint authoring", response_model=OpenMapResponse)
 def get_criteria_catalog() -> dict[str, Any]:
     """Registries snapshot the criteria-tree builder's pickers are fed from — the same
     ``RegistrySnapshot`` save-mode validation itself resolves attribute paths against."""
@@ -253,7 +256,7 @@ def get_criteria_catalog() -> dict[str, Any]:
     }
 
 
-@router.get("/api/viewpoints/pins")
+@router.get("/api/viewpoints/pins", tags=[TAG_VIEWPOINTS], summary="Pinned viewpoints", response_model=OpenMapResponse)
 def get_viewpoint_pins() -> dict[str, Any]:
     """Pinned definition slugs (Home/management quick access) — an engagement-repo-local
     sidecar list, never definition content and never promoted. Slugs no longer in the
@@ -269,7 +272,8 @@ class ViewpointPinsBody(BaseModel):
     slugs: list[str]
 
 
-@router.put("/api/viewpoints/pins")
+@router.put("/api/viewpoints/pins", tags=[TAG_VIEWPOINTS], summary="Update pinned viewpoints",
+    response_model=OpenMapResponse, responses=WRITE_RESPONSES)
 def put_viewpoint_pins(body: ViewpointPinsBody) -> dict[str, Any]:
     engagement_root = _engagement_root()
     merged = load_effective_viewpoint_catalog(_both_roots())
@@ -281,7 +285,8 @@ def put_viewpoint_pins(body: ViewpointPinsBody) -> dict[str, Any]:
     return {"slugs": body.slugs}
 
 
-@router.get("/api/viewpoints/{slug}/referencers")
+@router.get("/api/viewpoints/{slug}/referencers", tags=[TAG_VIEWPOINTS], summary="Diagrams referencing a viewpoint",
+    response_model=OpenMapResponse, responses=READ_RESPONSES)
 def get_viewpoint_referencers(slug: str) -> dict[str, Any]:
     """Diagrams/matrices whose viewpoint application pins this slug — the management view
     uses this to warn, before a semantic edit, which views a version bump would leave
@@ -294,7 +299,8 @@ class SummarizeQueryBody(BaseModel):
     query: dict[str, Any]
 
 
-@router.post("/api/viewpoints/summarize")
+@router.post("/api/viewpoints/summarize", tags=[TAG_VIEWPOINTS], summary="Summarize a viewpoint definition",
+    response_model=OpenMapResponse)
 def summarize_query(body: SummarizeQueryBody) -> dict[str, str]:
     """Plain-language rendering of an in-progress (possibly ad-hoc, unsaved) query — the
     same ``render_query_summary`` MCP ``list``/``execute`` and REST execution use, so the
@@ -360,12 +366,14 @@ def _persist(action: PersistAction, body: ViewpointWriteBody, *, route: tuple[st
     return _result_to_dict(result, dry_run=body.dry_run)
 
 
-@router.post("/api/viewpoints")
+@router.post("/api/viewpoints", tags=[TAG_VIEWPOINTS], summary="Create a viewpoint", response_model=OpenMapResponse,
+    responses=WRITE_RESPONSES)
 def create_viewpoint_definition(body: ViewpointWriteBody) -> dict[str, Any]:
     return _persist("create", body, route=("POST", "/api/viewpoints"))
 
 
-@router.post("/api/viewpoints/edit")
+@router.post("/api/viewpoints/edit", tags=[TAG_VIEWPOINTS], summary="Edit a viewpoint",
+    response_model=OpenMapResponse, responses=WRITE_RESPONSES)
 def edit_viewpoint_definition(body: ViewpointWriteBody) -> dict[str, Any]:
     return _persist("edit", body, route=("POST", "/api/viewpoints/edit"))
 
@@ -375,7 +383,8 @@ class DeleteViewpointBody(BaseModel):
     dry_run: bool = True
 
 
-@router.post("/api/viewpoints/remove")
+@router.post("/api/viewpoints/remove", tags=[TAG_VIEWPOINTS], summary="Remove a viewpoint",
+    response_model=OpenMapResponse, responses=WRITE_RESPONSES)
 def delete_viewpoint_definition_route(body: DeleteViewpointBody) -> dict[str, Any]:
     engagement_root = _engagement_root()
     both_roots = _both_roots()

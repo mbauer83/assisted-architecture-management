@@ -22,8 +22,9 @@ from src.infrastructure.gui.routers._diagram_write_bodies import (
     MatrixPreviewBody,
     SyncDiagramToModelBody,
 )
+from src.infrastructure.gui.routers._openapi import TAG_DIAGRAMS, WRITE_RESPONSES, OpenMapResponse
 
-router = APIRouter()
+router = APIRouter(responses=WRITE_RESPONSES)
 
 
 def _split_diagram_entities(
@@ -64,7 +65,8 @@ def _extract_conn_bindings(
     return clean or None, bindings
 
 
-@router.post("/api/diagram/preview")
+@router.post("/api/diagram/preview", tags=[TAG_DIAGRAMS], summary="Preview a diagram write (dry-run)",
+    response_model=OpenMapResponse, responses=WRITE_RESPONSES)
 def preview_diagram(body: DiagramPreviewBody, catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency)) -> dict[str, Any]:  # noqa: E501
     repo_root = s.maybe_engagement_root()
     if repo_root is None:
@@ -93,7 +95,7 @@ def preview_diagram(body: DiagramPreviewBody, catalogs: RuntimeCatalogs = Depend
     return {"puml": puml, "image": image, "warnings": warnings, "derived_entities": derived_entities}
 
 
-@router.post("/api/diagram")
+@router.post("/api/diagram", tags=[TAG_DIAGRAMS], summary="Create a diagram", response_model=OpenMapResponse)
 def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
     from src.application.identifier_allocator import get_default_allocator
     from src.application.modeling.artifact_write import prefix_for_diagram_type
@@ -149,7 +151,7 @@ def create_diagram_gui(body: CreateDiagramGuiBody) -> dict[str, Any]:
     return s.write_result_to_dict(result)
 
 
-@router.post("/api/diagram/edit")
+@router.post("/api/diagram/edit", tags=[TAG_DIAGRAMS], summary="Edit a diagram", response_model=OpenMapResponse)
 def edit_diagram_gui(body: EditDiagramGuiBody) -> dict[str, Any]:
     from src.infrastructure.rendering.diagram_builder import generate_archimate_puml_body
     from src.infrastructure.write.artifact_write.diagram_edit import edit_diagram
@@ -234,7 +236,8 @@ def _build_matrix_markdown(
     )
 
 
-@router.post("/api/matrix/preview")
+@router.post("/api/matrix/preview", tags=[TAG_DIAGRAMS], summary="Preview a matrix write (dry-run)",
+    response_model=OpenMapResponse, responses=WRITE_RESPONSES)
 def preview_matrix(body: MatrixPreviewBody) -> dict[str, Any]:
     repo = s.get_repo()
     repo_root, registry, _ = s.get_write_deps()
@@ -258,7 +261,7 @@ def preview_matrix(body: MatrixPreviewBody) -> dict[str, Any]:
     return {"markdown": linked}
 
 
-@router.post("/api/matrix")
+@router.post("/api/matrix", tags=[TAG_DIAGRAMS], summary="Create a matrix diagram", response_model=OpenMapResponse)
 def create_matrix_gui(body: CreateMatrixBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.matrix import create_matrix
 
@@ -297,7 +300,7 @@ def create_matrix_gui(body: CreateMatrixBody) -> dict[str, Any]:
     return s.write_result_to_dict(result)
 
 
-@router.post("/api/matrix/edit")
+@router.post("/api/matrix/edit", tags=[TAG_DIAGRAMS], summary="Edit a matrix diagram", response_model=OpenMapResponse)
 def edit_matrix_gui(body: EditMatrixBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.matrix import create_matrix
 
@@ -337,7 +340,8 @@ def edit_matrix_gui(body: EditMatrixBody) -> dict[str, Any]:
     return s.write_result_to_dict(result)
 
 
-@router.post("/api/diagram/sync")
+@router.post("/api/diagram/sync", tags=[TAG_DIAGRAMS], summary="Sync a diagram to the model",
+    response_model=OpenMapResponse, responses=WRITE_RESPONSES)
 def sync_diagram_to_model_gui(body: SyncDiagramToModelBody) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.diagram_sync import refresh_diagram
 
@@ -360,7 +364,7 @@ def sync_diagram_to_model_gui(body: SyncDiagramToModelBody) -> dict[str, Any]:
     return d
 
 
-@router.post("/api/diagram/remove")
+@router.post("/api/diagram/remove", tags=[TAG_DIAGRAMS], summary="Remove a diagram", response_model=OpenMapResponse)
 def delete_diagram_gui(body: DeleteDiagramBody) -> dict[str, Any]:
     from src.application.candidate_repository import committed_repository  # noqa: PLC0415
     from src.infrastructure.write.artifact_write.diagram_delete import delete_diagram

@@ -15,12 +15,14 @@ from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
 from src.infrastructure.gui.routers._entity_filter import parse_csv_filter
+from src.infrastructure.gui.routers._openapi import TAG_TAXONOMY, OpenMapResponse
 from src.infrastructure.write import artifact_write_ops
 
 router = APIRouter()
 
 
-@router.get("/api/authoring-guidance")
+@router.get("/api/authoring-guidance", tags=[TAG_TAXONOMY], summary="Authoring guidance for types",
+    response_model=OpenMapResponse)
 def read_authoring_guidance(
     entity_type: str | None = None,
     domain: str | None = None,

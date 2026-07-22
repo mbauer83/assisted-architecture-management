@@ -23,47 +23,47 @@ and summaries are mechanical; error responses are two shared fragments spread on
 ## Stream OA1 — Response models (mirror the Effect schemas)
 
 ### WU-OA1a — Shared response infrastructure
-- [ ] `src/infrastructure/gui/routers/_openapi.py`: `READ_RESPONSES` / `WRITE_RESPONSES`
+- [x] `src/infrastructure/gui/routers/_openapi.py`: `READ_RESPONSES` / `WRITE_RESPONSES`
       `responses` fragments (D3), and a `DynamicMapResponse` marker + description for
       open-map endpoints (D1). No behaviour, pure declaration.
-- [ ] Tests: import-only smoke that the fragments are well-formed dicts.
+- [x] Tests: import-only smoke that the fragments are well-formed dicts.
 
 ### WU-OA1b — Entity + connection read models (needs OA1a)
-- [ ] Response models for `entities` (detail, list, schemata, taxonomy) and `connections` /
+- [x] Response models for `entities` (detail, list, schemata, taxonomy) and `connections` /
       `connection_read_routes`, mirroring `tools/gui/src/domain/schemas/entities.ts` +
       `connections.ts`. Attach `response_model=`.
-- [ ] Tests: FastAPI returns validate against the models (a `TestClient` round-trip per
+- [x] Tests: FastAPI returns validate against the models (a `TestClient` round-trip per
       shape); a drift between handler output and the GUI schema is a defect to fix, not hide.
 
 ### WU-OA1c — Diagram + viewpoint + document + group read models (needs OA1a)
-- [ ] Response models for `diagrams` (12), `_diagram_serving`, `diagram_types`, `viewpoints`
+- [x] Response models for `diagrams` (12), `_diagram_serving`, `diagram_types`, `viewpoints`
       (5), `viewpoint_authoring` (9), `documents` (7), `groups` (6), `entity_search` (3),
       `modules`, `authoring_guidance` (dynamic-map — described dict), `identifiers`.
-- [ ] Tests: round-trip validation per shape; dynamic-map endpoints documented, not faked.
+- [x] Tests: round-trip validation per shape; dynamic-map endpoints documented, not faked.
 
 ## Stream OA2 — Tags + summaries
 
 ### WU-OA2 — Group and label the surface (needs OA1)
-- [ ] One tag per surface (D2); a one-line imperative `summary` per operation; promote the
+- [x] One tag per surface (D2); a one-line imperative `summary` per operation; promote the
       docstring first line to `description` where present.
-- [ ] Tests: covered by the OA4 contract test (tag + summary presence).
+- [x] Tests: covered by the OA4 contract test (tag + summary presence).
 
 ## Stream OA3 — Error responses
 
 ### WU-OA3 — Declare the error contract (needs OA1a)
-- [ ] Spread `READ_RESPONSES` onto id-lookup reads (404) and `WRITE_RESPONSES` onto the
+- [x] Spread `READ_RESPONSES` onto id-lookup reads (404) and `WRITE_RESPONSES` onto the
       write operations (400/403/409/423), per the mutation manifest's real statuses.
-- [ ] Tests: covered by the OA4 contract test (applicable statuses present).
+- [x] Tests: covered by the OA4 contract test (applicable statuses present).
 
 ## Stream OA4 — Contract test + docs
 
 ### WU-OA4 — Lock fidelity and document (needs OA1–OA3)
-- [ ] Enumerating contract test (D5): every in-scope operation in the generated app schema
+- [x] Enumerating contract test (D5): every in-scope operation in the generated app schema
       has a 200 `response_model` (or documented dynamic response), a tag, a summary, and its
       applicable error statuses; a new untyped in-scope endpoint fails it.
-- [ ] `docs/reference/rest-api.md`: point at `/docs` + `/openapi.json`, state the fidelity
+- [x] `docs/reference/rest-api.md`: point at `/docs` + `/openapi.json`, state the fidelity
       guarantee and the deferred second pass (assurance/promotion/sync/admin).
-- [ ] Restart-gated: verify the LIVE `/openapi.json` on the restarted backend reflects the
+- [x] Restart-gated: verify the LIVE `/openapi.json` on the restarted backend reflects the
       new models (queue into the next restart / WU-X1).
 
 ## Exit condition
@@ -71,3 +71,31 @@ and summaries are mechanical; error responses are two shared fragments spread on
 Every in-scope operation typed, tagged, summarised, and error-documented; the D5 test passes;
 `docs/reference/rest-api.md` written; full backend + ruff + zuban green; live-spec check
 queued or verified. No modeling/query endpoint left returning an untyped 200.
+
+
+## Execution record (2026-07-22) — COMPLETE
+
+All 82 in-scope operations documented (the plan's counted 71 plus the diagram-write /
+edge-label / groups-PATCH / viewpoint-render sub-router ops the router-count missed). One
+pass, on the restarted backend's routers.
+
+- **Schemas come from types, not hand-written JSON** (owner's steer): a small set of Pydantic
+  response models in `_openapi.py` — `WriteResultResponse` (every mutation), `OpenMapResponse`
+  (open/aggregate maps), `list[OpenMapResponse]` (list reads), plus per-router
+  `EntitySummary/List/Detail/Schema` — drive the schema. All extend `DocumentedModel`
+  (`extra="allow"` → `additionalProperties: true`), so a model documents key fields WITHOUT
+  FastAPI filtering any field the handler returns (verified: a handler's extra `gar_source_id`
+  survives the response). D4 (no behaviour change) holds — confirmed by the full suite.
+- **Tags + summaries** per operation; **error contract** via two shared fragments
+  (`READ_RESPONSES` 404, `WRITE_RESPONSES` 400/403/409/423) spread onto reads/writes.
+- **Contract test** `tests/tools/test_openapi_modeling_query_contract.py` enumerates the
+  in-scope routers and asserts tag + summary + documented-200 for every op, the write error
+  contract on writes, and 404 on id-lookup reads — a new untyped modeling endpoint fails it.
+- **Docs**: `docs/reference/rest-api.md` (points at `/docs` + `/openapi.json`, states the
+  guarantee and the deferred second pass).
+- **Deferred** (recorded, not done): assurance/security, promotion, sync, admin, events.
+- **Restart-gated**: the LIVE `/openapi.json` reflects these only after a backend restart —
+  the in-process app schema is what the contract test checks; queue the live-spec glance into
+  the next restart / WU-X1.
+- Gates: backend 6377 passed / 5 skipped; ruff + zuban clean. Frontend untouched (no client
+  change — the GUI already carries its Effect schemas).

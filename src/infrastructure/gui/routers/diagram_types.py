@@ -11,11 +11,13 @@ from src.application.assurance_diagrams import ASSURANCE_SURFACE_DIAGRAM_TYPES
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.infrastructure.app_bootstrap import runtime_catalogs_dependency
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._openapi import READ_RESPONSES, TAG_DIAGRAMS, OpenMapResponse
 
 router = APIRouter()
 
 
-@router.get("/api/diagram-types")
+@router.get("/api/diagram-types", tags=[TAG_DIAGRAMS], summary="List diagram types",
+    response_model=list[OpenMapResponse])
 def list_diagram_types(catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency)) -> list[dict[str, str]]:
     return [
         {
@@ -28,7 +30,8 @@ def list_diagram_types(catalogs: RuntimeCatalogs = Depends(runtime_catalogs_depe
     ]
 
 
-@router.get("/api/diagram-types/{diagram_type}/ui-config")
+@router.get("/api/diagram-types/{diagram_type}/ui-config", tags=[TAG_DIAGRAMS],
+    summary="UI config for one diagram type", response_model=OpenMapResponse, responses=READ_RESPONSES)
 def read_diagram_kind_ui_config(
     diagram_type: str,
     catalogs: RuntimeCatalogs = Depends(runtime_catalogs_dependency),
@@ -39,7 +42,8 @@ def read_diagram_kind_ui_config(
     return asdict(kind.ui_config)
 
 
-@router.get("/api/diagram-types/datatype/types")
+@router.get("/api/diagram-types/datatype/types", tags=[TAG_DIAGRAMS], summary="Datatype classifier types",
+    response_model=OpenMapResponse)
 def query_datatype_type_catalog(
     query: str | None = None,
     scope: str | None = None,
@@ -74,7 +78,8 @@ def query_datatype_type_catalog(
     }
 
 
-@router.get("/api/diagram-types/datatype/type-usages")
+@router.get("/api/diagram-types/datatype/type-usages", tags=[TAG_DIAGRAMS],
+    summary="Usages of a datatype classifier type", response_model=OpenMapResponse)
 def query_datatype_type_usages(type_id: str) -> dict[str, Any]:
     from src.diagram_types.datatype._type_catalog import query_type_usages  # noqa: PLC0415
 

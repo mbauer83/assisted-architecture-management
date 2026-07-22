@@ -17,6 +17,15 @@ from src.application.entity_type_predicates import is_assurance_entity_type, is_
 from src.application.read_models import EntityContextReadModel
 from src.domain.artifact_types import EntityRecord
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._openapi import (
+    READ_RESPONSES,
+    TAG_ENTITIES,
+    TAG_TAXONOMY,
+    WRITE_RESPONSES,
+    DocumentedModel,
+    OpenMapResponse,
+    WriteResultResponse,
+)
 from src.infrastructure.gui.routers.entity_listing import build_entity_list_rows
 
 
@@ -27,6 +36,49 @@ def _catalogs():
     return build_runtime_catalogs(get_module_registry())
 
 router = APIRouter()
+
+
+# ── Response models (key fields documented; extras kept via DocumentedModel) ────
+
+
+class EntitySummaryResponse(DocumentedModel):
+    artifact_id: str
+    artifact_type: str
+    name: str
+    version: str
+    status: str
+    domain: str
+    subdomain: str
+    path: str
+    is_global: bool
+
+
+class EntityListResponse(DocumentedModel):
+    total: int
+    items: list[EntitySummaryResponse]
+
+
+class EntityDetailResponse(DocumentedModel):
+    artifact_id: str
+    artifact_type: str
+    name: str
+    version: str
+    status: str
+    domain: str
+    subdomain: str
+    path: str
+
+
+class EntitySchemaResponse(DocumentedModel):
+    artifact_type: str
+    specialization: str
+    # ``schema`` (the JSON Schema itself) flows through via extra="allow"; declaring it would
+    # shadow BaseModel.schema. The documented fields are the ones a client branches on.
+    properties: list[str]
+    required: list[str]
+    descriptors: dict[str, Any]
+    conflicts: list[str]
+    quarantined: bool
 
 
 def engagement_model_catalog(records: list[EntityRecord]) -> list[EntityRecord]:
@@ -44,12 +96,14 @@ def engagement_model_catalog(records: list[EntityRecord]) -> list[EntityRecord]:
     ]
 
 
-@router.get("/api/stats")
+@router.get("/api/stats", tags=[TAG_TAXONOMY], summary="Repository-wide artifact counts",
+    response_model=OpenMapResponse)
 def get_stats() -> dict[str, Any]:
     return s.get_repo().stats()
 
 
-@router.get("/api/backend-identity")
+@router.get("/api/backend-identity", tags=[TAG_TAXONOMY], summary="Backend identity and workspace roots",
+    response_model=OpenMapResponse)
 def get_backend_identity() -> dict[str, Any]:
     """Realpath-normalized served repo roots + software version.
 
@@ -70,7 +124,8 @@ def get_backend_identity() -> dict[str, Any]:
     }
 
 
-@router.get("/api/entities")
+@router.get("/api/entities", tags=[TAG_ENTITIES], summary="List entities (AND-filtered by scope/type/domain)",
+    response_model=EntityListResponse)
 def list_entities(
     request: Request,
     domain: str | None = None,
@@ -116,7 +171,8 @@ def list_entities(
     return {"total": len(entities), "items": build_entity_list_rows(page, repo)}
 
 
-@router.get("/api/entity")
+@router.get("/api/entity", tags=[TAG_ENTITIES], summary="Read one entity by id", response_model=EntityDetailResponse,
+    responses=READ_RESPONSES)
 def read_entity(id: str) -> dict[str, Any]:
     repo = s.get_repo()
     result = repo.read_artifact(id, mode="full")
@@ -146,7 +202,8 @@ def read_entity(id: str) -> dict[str, Any]:
     return result
 
 
-@router.get("/api/entity-context")
+@router.get("/api/entity-context", tags=[TAG_ENTITIES], summary="Read an entity with its connection context",
+    responses=READ_RESPONSES)
 def read_entity_context(id: str) -> EntityContextReadModel:
     repo = s.get_repo()
     context = repo.read_entity_context(id)
@@ -176,7 +233,8 @@ def read_entity_context(id: str) -> EntityContextReadModel:
     return context
 
 
-@router.get("/api/entity-schemata")
+@router.get("/api/entity-schemata", tags=[TAG_ENTITIES],
+    summary="Effective attribute schema for a (type, specialization) pair", response_model=EntitySchemaResponse)
 def get_entity_schemata(artifact_type: str, specialization: str = "") -> dict[str, Any]:
     """Effective attribute schema for an entity type, merged with the selected
     specialization(s)' contributed attributes — the same schema the verifier validates
@@ -266,7 +324,8 @@ class DeleteEntityBody(BaseModel):
     dry_run: bool = True
 
 
-@router.post("/api/entity")
+@router.post("/api/entity", tags=[TAG_ENTITIES], summary="Create an entity (dry-run or committed)",
+    response_model=WriteResultResponse, responses=WRITE_RESPONSES)
 def create_entity(body: CreateEntityBody) -> dict[str, Any]:
     if is_internal_entity_type(body.artifact_type, _catalogs().ontology):
         raise HTTPException(400, "global-artifact-reference entities cannot be created directly")
@@ -299,7 +358,8 @@ def create_entity(body: CreateEntityBody) -> dict[str, Any]:
     return s.write_result_to_dict(result)
 
 
-@router.post("/api/entity/edit")
+@router.post("/api/entity/edit", tags=[TAG_ENTITIES], summary="Edit an entity (partial update)",
+    response_model=WriteResultResponse, responses=WRITE_RESPONSES)
 def edit_entity(body: EditEntityBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
     from src.infrastructure.write.artifact_write.entity_edit import _UNSET
@@ -331,7 +391,8 @@ def edit_entity(body: EditEntityBody) -> dict[str, Any]:
     return s.write_result_to_dict(result)
 
 
-@router.post("/api/entity/remove")
+@router.post("/api/entity/remove", tags=[TAG_ENTITIES], summary="Delete an entity",
+    response_model=WriteResultResponse, responses=WRITE_RESPONSES)
 def delete_entity(body: DeleteEntityBody) -> dict[str, Any]:
     repo_root, registry, _verifier = s.get_write_deps()
     from src.infrastructure.write.artifact_write.entity_delete import delete_entity as _delete

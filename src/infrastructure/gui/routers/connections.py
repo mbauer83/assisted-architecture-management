@@ -10,6 +10,7 @@ from pydantic import BaseModel, field_validator
 
 from src.application.entity_type_predicates import is_internal_entity_type
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._openapi import TAG_CONNECTIONS, WRITE_RESPONSES, WriteResultResponse
 from src.infrastructure.gui.routers.connection_read_routes import _catalogs, register_connection_read_routes
 
 # Accepted multiplicity formats: n  |  n..m  |  n..*  |  *
@@ -67,7 +68,8 @@ def _reject_if_non_entity_gar(artifact_id: str, role: str) -> None:
         raise HTTPException(400, f"Cannot use a document/diagram global-artifact-reference as a connection {role}")
 
 
-@router.post("/api/connection")
+@router.post("/api/connection", tags=[TAG_CONNECTIONS], summary="Add a connection between two entities",
+    response_model=WriteResultResponse, responses=WRITE_RESPONSES)
 def add_connection(body: AddConnectionBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
     from src.infrastructure.write.artifact_write.connection import add_connection as _add
@@ -183,7 +185,8 @@ class ConnectionAssociateBody(BaseModel):
     dry_run: bool = True
 
 
-@router.post("/api/connection/edit")
+@router.post("/api/connection/edit", tags=[TAG_CONNECTIONS], summary="Edit or re-point a connection",
+    response_model=WriteResultResponse, responses=WRITE_RESPONSES)
 def edit_connection(body: EditConnectionBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
     from src.infrastructure.write.artifact_write.connection_edit import _UNSET
@@ -213,7 +216,9 @@ def edit_connection(body: EditConnectionBody) -> dict[str, Any]:
     return s.write_result_to_dict(result)
 
 
-@router.post("/api/connection/associate")
+@router.post("/api/connection/associate", tags=[TAG_CONNECTIONS],
+    summary="Add/remove a connection's associated entities", response_model=WriteResultResponse,
+    responses=WRITE_RESPONSES)
 def manage_connection_associations(body: ConnectionAssociateBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
     from src.infrastructure.write.artifact_write.connection_edit import edit_connection_associations as _assoc
@@ -237,7 +242,8 @@ def manage_connection_associations(body: ConnectionAssociateBody) -> dict[str, A
     return s.write_result_to_dict(result)
 
 
-@router.post("/api/connection/remove")
+@router.post("/api/connection/remove", tags=[TAG_CONNECTIONS], summary="Remove a connection",
+    response_model=WriteResultResponse, responses=WRITE_RESPONSES)
 def remove_connection(body: RemoveConnectionBody) -> dict[str, Any]:
     repo_root, registry, verifier = s.get_write_deps()
     from src.infrastructure.write.artifact_write.connection_edit import remove_connection as _remove
@@ -266,7 +272,9 @@ class CleanupBrokenRefsBody(BaseModel):
     dry_run: bool = True
 
 
-@router.post("/api/cleanup-broken-refs")
+@router.post("/api/cleanup-broken-refs", tags=[TAG_CONNECTIONS],
+    summary="Remove connections whose target no longer exists", response_model=WriteResultResponse,
+    responses=WRITE_RESPONSES)
 def cleanup_broken_refs(body: CleanupBrokenRefsBody) -> dict[str, Any]:
     """Find and optionally remove broken global-entity-reference proxies.
 

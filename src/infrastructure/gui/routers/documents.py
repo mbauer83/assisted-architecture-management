@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from src.application.artifact_document_schema import get_document_subdirectory, load_document_schemata
 from src.infrastructure.gui.routers import state as s
+from src.infrastructure.gui.routers._openapi import READ_RESPONSES, TAG_DOCUMENTS, WRITE_RESPONSES, OpenMapResponse
 
 router = APIRouter()
 
@@ -64,7 +65,8 @@ def _extra_frontmatter_fields(schema: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-@router.get("/api/document-types")
+@router.get("/api/document-types", tags=[TAG_DOCUMENTS], summary="List document types",
+    response_model=list[OpenMapResponse])
 def list_document_types() -> list[dict[str, object]]:
     repo_root = _get_engagement_root()
     schemata = load_document_schemata(repo_root)
@@ -84,13 +86,14 @@ def list_document_types() -> list[dict[str, object]]:
     ]
 
 
-@router.get("/api/document-schemata")
+@router.get("/api/document-schemata", tags=[TAG_DOCUMENTS], summary="Document frontmatter schemata",
+    response_model=OpenMapResponse)
 def get_document_schemata() -> dict[str, Any]:
     repo_root = _get_engagement_root()
     return load_document_schemata(repo_root)
 
 
-@router.get("/api/documents")
+@router.get("/api/documents", tags=[TAG_DOCUMENTS], summary="List documents", response_model=OpenMapResponse)
 def list_documents(
     doc_type: str | None = None,
     status: str | None = None,
@@ -126,7 +129,8 @@ def list_documents(
     }
 
 
-@router.get("/api/document")
+@router.get("/api/document", tags=[TAG_DOCUMENTS], summary="Read a document by id", response_model=OpenMapResponse,
+    responses=READ_RESPONSES)
 def read_document(id: str) -> dict[str, Any]:
     repo = s.get_repo()
     result = repo.read_artifact(id, mode="full")
@@ -138,7 +142,8 @@ def read_document(id: str) -> dict[str, Any]:
     return result
 
 
-@router.post("/api/document")
+@router.post("/api/document", tags=[TAG_DOCUMENTS], summary="Create a document", response_model=OpenMapResponse,
+    responses=WRITE_RESPONSES)
 def create_document(req: CreateDocumentRequest) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.document import create_document as _create
 
@@ -170,7 +175,8 @@ def create_document(req: CreateDocumentRequest) -> dict[str, Any]:
     }
 
 
-@router.put("/api/document/{artifact_id}")
+@router.put("/api/document/{artifact_id}", tags=[TAG_DOCUMENTS], summary="Edit a document",
+    response_model=OpenMapResponse, responses=WRITE_RESPONSES)
 def edit_document(artifact_id: str, req: EditDocumentRequest) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.document import edit_document as _edit
 
@@ -201,7 +207,8 @@ def edit_document(artifact_id: str, req: EditDocumentRequest) -> dict[str, Any]:
     }
 
 
-@router.delete("/api/document/{artifact_id}")
+@router.delete("/api/document/{artifact_id}", tags=[TAG_DOCUMENTS], summary="Delete a document",
+    response_model=OpenMapResponse, responses=WRITE_RESPONSES)
 def delete_document(artifact_id: str, dry_run: bool = False) -> dict[str, Any]:
     from src.infrastructure.write.artifact_write.document import delete_document as _delete
 
