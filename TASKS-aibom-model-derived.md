@@ -254,24 +254,51 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
 ## Stream C — Exporter rewrite
 
 ### WU-C1 — Full ML-BOM emission (needs B1)
-- [ ] Rewrite `_aibom_exporter._cdx_component`: populated `modelCard`
-      (`modelParameters`, `quantitativeAnalysis`, `considerations`),
-      `componentData` with `classification` / `sensitiveData` / `governance`,
-      `supplier` / `licenses` / `hashes` where authored.
-- [ ] Emit a real `dependencies[]` graph.
-- [ ] Keep the CycloneDX envelope and `AI_BOM_ROLES` vocabulary surface intact
-      (the GUI consumes the roles endpoint).
+- [x] Full ML-BOM node builder: populated `modelCard` (`modelParameters`,
+      `quantitativeAnalysis`, `considerations`), `componentData` with
+      `classification` / `governance`, `supplier` / `licenses` where authored.
+- [x] Emit a real `dependencies[]` graph.
+- [x] Keep the CycloneDX envelope intact.
+
+#### WU-C1 PROGRESS (2026-07-22)
+- New focused module `src/infrastructure/assurance/mlbom_builder.py` — `build_mlbom(
+  components: Sequence[AibomComponent])`. Consumes the TYPED derived components (not the
+  legacy caller-confirmed dicts), so the exporter is fed by the derivation core. Rather than
+  rewrite the dict-based `_cdx_component` in place (its `build_cyclonedx_16` is the legacy
+  scan→confirm path Stream E will retire), the typed builder is the C1 deliverable and E
+  rewires the surfaces to it.
+- DEVIATIONS from the box, kept schema-valid and honest: `sensitiveData` is not emitted (our
+  model has no structured sensitive-data content; `classification` from `Sensitivity` covers
+  the tier). `hashes` and model-level `governance` (CycloneDX has no governance slot on a
+  model, only on `componentData`) are emitted as `arch:`/`ai:` PROPERTIES rather than forced
+  into ill-fitting fields. `notes` moved from the invalid `metadata.notes` (the legacy path's
+  latent bug) to a `metadata` property.
+- `AI_BOM_ROLES` (the component-TYPE vocabulary at `/api/assurance/aibom/roles`) is untouched
+  — the derivation-role vocabulary (A3) is a distinct concept and does not replace it.
 
 ### WU-C2 — Schema-validated tests (needs C1)
-- [ ] Validate emitted documents against the CycloneDX 1.6 JSON schema in tests
-      (vendored schema; no network in CI).
-- [ ] Tests: a model with datasets and governance emits a document that
-      validates and contains the derived relationships.
+- [x] Validate emitted documents against the CycloneDX 1.6 JSON schema in tests
+      (the vendored `cyclonedx` package's `bom-1.6` schema; no network).
+- [x] Tests: a model with datasets, governance, considerations, supplier, and licenses
+      emits a document that VALIDATES and contains the derived relationships.
+
+#### WU-C2 PROGRESS (2026-07-22)
+- `tests/assurance/test_mlbom_builder.py` validates every emitted shape against
+  `cyclonedx/schema/_res/bom-1.6.SNAPSHOT.schema.json` (bundled with the installed cyclonedx
+  lib; the test skips if absent). Minimal model, full model card, data component with
+  classification+governance, the dependencies graph, and model-governance-as-property all
+  validate with zero schema errors.
 
 ### WU-C3 — Reconcile on the new shape (needs C1)
-- [ ] Revisit `reconcile_aibom` against the richer component shape — identity
-      keying (purl-else-name) is thin for models without purls.
-- [ ] Tests: drift detection over model-derived components.
+- [x] `reconcile_aibom` verified against the richer ML-BOM node shape — its purl-else-name
+      keying works over derived AI components (which carry name, no purl).
+- [x] Tests: drift detection over `build_mlbom` component output.
+
+#### WU-C3 PROGRESS (2026-07-22)
+- `reconcile_aibom` needed no change: it keys by purl-else-name and the ML-BOM nodes carry
+  `name`, so a discovered extra AI component shows as `added`. Covered by
+  `test_aibom_exporter.py::TestReconcileAiBom::test_reconcile_over_the_new_mlbom_component_shape`.
+- Gates (C1–C3): backend 6423 passed / 5 skipped; ruff + zuban clean.
 
 ## Stream D — Coverage surface
 

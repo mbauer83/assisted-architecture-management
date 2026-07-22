@@ -95,3 +95,24 @@ class TestReconcileAiBom:
         assert result["added_count"] == 0
         assert result["removed_count"] == 0
         assert result["matched_count"] == 0
+
+    def test_reconcile_over_the_new_mlbom_component_shape(self) -> None:
+        # WU-C3: reconcile keys by name (no purl on derived AI components), so it works over
+        # the richer ML-BOM nodes build_mlbom emits — a discovered extra shows as added.
+        from src.application.aibom_derivation import AibomComponent
+        from src.infrastructure.assurance.mlbom_builder import build_mlbom
+
+        model = AibomComponent(
+            entity_id="APP@1.a.model", name="Fraud Model", specialization="ai-model",
+            component_type="machine-learning-model",
+        )
+        extra = AibomComponent(
+            entity_id="APP@1.b.agent", name="Agent", specialization="ai-agent",
+            component_type="application",
+        )
+        modeled = build_mlbom([model])["components"]
+        discovered = build_mlbom([model, extra])["components"]
+        result = reconcile_aibom(modeled, discovered)
+        assert result["matched_count"] == 1
+        assert result["added_count"] == 1
+        assert result["added"][0]["name"] == "Agent"
