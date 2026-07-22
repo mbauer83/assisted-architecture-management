@@ -18,12 +18,21 @@ All responses carry ``Cache-Control: no-store``.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
 from src.infrastructure.gui.routers._assurance_http import ok as _ok
 
 aibom_router = APIRouter()
+
+
+@lru_cache(maxsize=1)
+def _catalogs():
+    from src.infrastructure.app_bootstrap import build_runtime_catalogs, get_module_registry  # noqa: PLC0415
+
+    return build_runtime_catalogs(get_module_registry())
 
 
 @aibom_router.get("/api/assurance/aibom/scan")
@@ -41,6 +50,8 @@ def aibom_scan_candidates(domain: str | None = None, limit: int = 50) -> JSONRes
             "name": e.name,
             "entity_type": e.artifact_type,
             "description": e.content_text,
+            # Carried so the scan skips entities already marked with an AI specialization.
+            "specializations": list(e.specializations),
         }
         for e in repo.list_entities(domain=domain)
         if e.host_diagram_id is None  # model entities only; not diagram-only nodes
@@ -59,14 +70,31 @@ def aibom_roles() -> JSONResponse:
 
 @aibom_router.post("/api/assurance/aibom/export")
 def aibom_export(payload: dict[str, object] = Body(default={})) -> JSONResponse:
-    """Emit a CycloneDX 1.6 ML-BOM from caller-confirmed AI components."""
-    from src.infrastructure.assurance._aibom_exporter import build_cyclonedx_16  # noqa: PLC0415
+    """Emit a CycloneDX 1.6 ML-BOM DERIVED from the architecture model — every entity carrying
+    an AI specialization, with its model card, dataset/governance links, and dependency graph.
+    No caller-supplied component list: the model is the source of truth."""
+    from src.infrastructure.assurance.aibom_service import export_model_derived_aibom  # noqa: PLC0415
+    from src.infrastructure.gui.routers import state as s  # noqa: PLC0415
 
-    raw = payload.get("ai_components")
-    ai_components = [c for c in raw if isinstance(c, dict)] if isinstance(raw, list) else []
-    notes = str(payload.get("notes") or "")
-    bom = build_cyclonedx_16(ai_components, notes=notes)
-    return _ok({"bom": bom, "component_count": len(ai_components)})
+    repo = s.maybe_get_repo()
+    repo_root = s.maybe_engagement_root()
+    if repo is None or repo_root is None:
+        return _ok({"bom": None, "component_count": 0, "coverage": None, "note": "Repository not initialized"})
+    return _ok(export_model_derived_aibom(repo, repo_root, _catalogs(), notes=str(payload.get("notes") or "")))
+
+
+@aibom_router.get("/api/assurance/aibom/coverage")
+def aibom_coverage() -> JSONResponse:
+    """Per-AI-component coverage: blocking gaps (missing required attributes, dataset link,
+    governance) vs advisory (recommended), plus repo-wide unbound derivation roles."""
+    from src.infrastructure.assurance.aibom_service import aibom_coverage_report  # noqa: PLC0415
+    from src.infrastructure.gui.routers import state as s  # noqa: PLC0415
+
+    repo = s.maybe_get_repo()
+    repo_root = s.maybe_engagement_root()
+    if repo is None or repo_root is None:
+        return _ok({"components": [], "unbound_roles": [], "note": "Repository not initialized"})
+    return _ok(aibom_coverage_report(repo, repo_root, _catalogs()))
 
 
 _SCAN_NOTE = (

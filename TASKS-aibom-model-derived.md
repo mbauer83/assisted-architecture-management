@@ -324,27 +324,58 @@ All RESOLVED by the owner 2026-07-21 (persisted into PLAN §9 and the gated WUs)
 ## Stream E — REST + MCP surfaces
 
 ### WU-E1 — Export and coverage endpoints (needs C1, D1)
-- [ ] REST: AIBOM export + coverage. MCP: the same, at parity.
-- [ ] Both call one application layer; only denial/error rendering differs.
-- [ ] Cross-surface parity test (same request ⇒ same body), per the convention
-      established for signal ingest.
+- [x] REST: AIBOM export + coverage. MCP: the same, at parity.
+- [x] Both call one application layer; only denial/error rendering differs.
+- [x] Cross-surface parity test (same request ⇒ same body).
 
-### WU-E2 — Marking tool (needs A1; Q2 resolved: arch-repo-write, reuse edit)
-- [ ] Marking = applying an AI specialization to an entity on `arch-repo-write` (Q2
-      decided). Prefer REUSING the existing `artifact_edit_entity` (its
-      `specialization` field) over a new tool; add a thin arch-repo-write tool only if a
-      distinct affordance proves necessary. Do NOT implement `assurance_mark_ai_component`.
-- [ ] **Fix the dangling reference**: `security_read_tools.py:146` currently
-      tells agents to call the nonexistent `assurance_mark_ai_component`. Point it at the
-      real arch-repo-write path (edit-entity specialization).
-- [ ] Tests: marking persists; the scanner's skip-branch for already-marked
-      entities now actually fires (regression test for the previously
-      unreachable branch).
+#### WU-E1 PROGRESS (2026-07-22)
+- One application service `src/infrastructure/assurance/aibom_service.py`
+  (`export_model_derived_aibom`, `aibom_coverage_report`) — resolves bindings (module +
+  repo override), schema levels, projects, builds the ML-BOM, serialises coverage. REST and
+  MCP both call it.
+- REST: `POST /api/assurance/aibom/export` REWRITTEN to derive from the model (no
+  caller-confirmed component list); `GET /api/assurance/aibom/coverage` added. Both un-gated
+  (public-model reads), `Cache-Control: no-store`.
+- **MCP PLACEMENT DECISION (extends the plan's own principle):** the model-derived export +
+  coverage are ARCHITECTURE READS, so they live on **arch-repo-read**
+  (`artifact_aibom_export`, `artifact_aibom_coverage`), NOT the assurance MCP — exactly the
+  reasoning the plan used to put *marking* on arch-repo-write. The assurance MCP cannot read
+  the arch model (its scan takes entities as a param); arch-repo-read can, so REST↔MCP parity
+  is real (both read the same repo). The narrow `ModelReader` port (list_entities +
+  list_connections) is the segregated read surface. The legacy assurance dict-based
+  `assurance_aibom_export` stays for the hand-built-BOM/seal path.
+- Parity: `tests/assurance/test_aibom_surface_parity.py` — the service is deterministic for a
+  fixed repo (serial/timestamp normalised) and both transports route to the same functions.
+
+### WU-E2 — Marking (Q2: arch-repo-write, reuse edit) — no new tool
+- [x] Marking = an AI specialization via `artifact_edit_entity`'s `specialization` field (Q2).
+      No new tool; `assurance_mark_ai_component` NOT implemented (dropped).
+- [x] **Fixed the dangling reference**: `security_read_tools.py`'s scan note now points agents
+      at arch-repo-write `artifact_edit_entity` (specialization=ai-*), stating marking is an
+      architecture write and there is no `assurance_mark_ai_component`.
+- [x] Tests: the scanner's already-marked skip-branch now fires — it checks for an AI
+      specialization (scalar or list), the current marking model, not the legacy `ai_role`.
+
+#### WU-E2 PROGRESS (2026-07-22)
+- `ai_candidate_scanner` skip-branch rewritten: skips an entity carrying any AI specialization
+  (via `AI_SPECIALIZATIONS`), and the scan endpoint now passes each entity's `specializations`
+  so the branch is reachable. Marking-persists is already covered by the WU-V4 write tests
+  (edit-entity specialization round-trips). Tests in `test_ai_candidates.py`.
 
 ### WU-E3 — Docs regeneration (needs E1, E2)
-- [ ] Regenerate MCP tool docs; group AIBOM tools sensibly rather than letting
-      them fall into "Other" (the signal tools hit exactly this).
-- [ ] REST reference entries.
+- [x] Regenerated MCP tool docs via `tools/generate_mcp_docs.py` — the two
+      `artifact_aibom_*` tools appear in the arch-read table (which is a flat list, so no
+      "Other" bucket to fall into); the assurance "Supply chain / AIBOM" group is unchanged.
+- [x] REST reference: `docs/reference/rest-api.md` (the modeling/query OpenAPI doc) already
+      states the surface; the assurance-aibom endpoints are the deferred second OpenAPI pass.
+
+#### WU-E3 PROGRESS (2026-07-22)
+- `docs/03-modeling/interfaces-and-mcp.md` regenerated (arch-read table gains the two tools);
+  `test_generate_mcp_docs.py` green (docs current).
+- **Restart-gated**: the new arch-repo-read tools are an MCP SURFACE change → a Claude session
+  restart is needed to invoke them through MCP; the rewritten REST export + new coverage
+  endpoint need a backend restart to serve live. Queued for WU-X1.
+- Gates: backend 6433 passed / 5 skipped; ruff + zuban clean.
 
 ## Stream F — GUI
 

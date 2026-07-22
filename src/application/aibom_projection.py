@@ -9,15 +9,26 @@ resolver that reads those attribute levels from the effective schemata for the c
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from src.application.aibom_coverage import AibomCoverage, evaluate_coverage
 from src.application.aibom_derivation import AI_SPECIALIZATIONS, AibomComponent, derive_aibom
-from src.application.ports import ArtifactSearch
 from src.application.runtime_catalogs import RuntimeCatalogs
 from src.domain.aibom_roles import DerivationRoleBindings
+from src.domain.artifact_types import ConnectionRecord, EntityRecord
+
+
+class ModelReader(Protocol):
+    """The narrow read port the AIBOM projection needs — the model's entities and connections.
+    Segregated (not the full ``ArtifactSearch``) so any list-capable source satisfies it, the
+    real ``ArtifactRepository`` included."""
+
+    def list_entities(self) -> Sequence[EntityRecord]: ...
+
+    def list_connections(self) -> Sequence[ConnectionRecord]: ...
 
 
 @dataclass(frozen=True)
@@ -29,7 +40,7 @@ class AibomProjection:
 
 
 def project_aibom(
-    search: ArtifactSearch,
+    search: ModelReader,
     bindings: DerivationRoleBindings,
     *,
     required_by_spec: Mapping[str, list[str]],

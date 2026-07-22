@@ -1,5 +1,6 @@
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
 
+from .aibom_read_tools import register_aibom_read_tools
 from .query_datatype_tools import register_query_datatype_tools
 from .query_graph_tools import register_query_graph_tools
 from .query_list_read_tools import register_query_list_read_tools
@@ -19,3 +20,4 @@ def register_query_tools(mcp: FastMCP) -> None:
     register_query_scaffold_tools(mcp)
     register_query_datatype_tools(mcp)
     register_query_viewpoint_tools(mcp)
+    register_aibom_read_tools(mcp)

@@ -176,8 +176,12 @@ def register_security_read_tools(server: FastMCP) -> None:
             "candidates": candidates,
             "count": len(candidates),
             "note": (
-                "These are heuristic suggestions only. "
-                "Confirm each candidate before calling assurance_mark_ai_component."
+                "These are heuristic suggestions only. Confirm each candidate, then MARK it "
+                "by setting an AI specialization on the entity via arch-repo-write's "
+                "artifact_edit_entity (specialization=ai-model | ai-agent | "
+                "ai-inference-service | ai-dataset | ai-prompt-asset | ai-vector-store | "
+                "ai-runtime | ai-tool-interface). Marking is an architecture write, not an "
+                "assurance one; there is no assurance_mark_ai_component tool."
             ),
         }
 

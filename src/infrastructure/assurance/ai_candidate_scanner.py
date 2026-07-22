@@ -38,6 +38,21 @@ _TYPE_BONUSES: dict[str, int] = {
 }
 
 
+def _already_ai_marked(ent: dict[str, object]) -> bool:
+    """True when the entity already carries an AI specialization — a scalar ``specialization``
+    or any of a ``specializations`` list. Such an entity is already an AIBOM component, so the
+    heuristic scan skips it rather than re-suggesting it."""
+    from src.application.aibom_derivation import AI_SPECIALIZATIONS  # noqa: PLC0415
+
+    scalar = ent.get("specialization")
+    if isinstance(scalar, str) and scalar in AI_SPECIALIZATIONS:
+        return True
+    listed = ent.get("specializations")
+    if isinstance(listed, (list, tuple)):
+        return any(isinstance(s, str) and s in AI_SPECIALIZATIONS for s in listed)
+    return False
+
+
 def scan_candidates(entities: list[dict[str, object]]) -> list[dict[str, object]]:
     """Score architecture entity dicts for AI-BOM relevance.
 
@@ -56,8 +71,9 @@ def scan_candidates(entities: list[dict[str, object]]) -> list[dict[str, object]
         score = 0
         reasons: list[str] = []
 
-        # Already marked — skip
-        if ent.get("ai_role"):
+        # Already marked — skip. Marking = an AI specialization on the entity (the current
+        # model; `ai_role` is the legacy dict field kept for back-compat).
+        if ent.get("ai_role") or _already_ai_marked(ent):
             continue
 
         combined_text = f"{name} {desc}"

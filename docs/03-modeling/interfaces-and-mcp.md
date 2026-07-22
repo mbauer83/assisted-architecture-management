@@ -22,6 +22,8 @@ Configure them in `.mcp.json` — see [Installation §5](../02-installation.md#5
 <!-- mcp-tools:begin arch-read -->
 | Tool | Access | Purpose |
 |---|---|---|
+| `artifact_aibom_coverage` | Read-only | Per-AI-component AIBOM coverage over the architecture model: blocking gaps (missing required attributes, missing dataset linkage, missing governance edge) vs advisory gaps (missing recommended attributes), plus repo-wide derivation roles that no connection type is bound to. |
+| `artifact_aibom_export` | Read-only | Emit a CycloneDX 1.6 ML-BOM DERIVED from the architecture model: every entity carrying an AI specialization (ai-model, ai-agent, ai-inference-service, ai-dataset, ai-prompt-asset, ai-vector-store, ai-runtime, ai-tool-interface) becomes a component, with its authored model card, dataset/governance links resolved from connections, and a dependency graph between AI components. |
 | `artifact_diagram_scaffold` | Read-only | Generate a ready-to-edit @startuml…@enduml scaffold from a list of entity IDs. |
 | `artifact_query_datatype_types` | Read-only | List available attribute types for datatype diagrams. |
 | `artifact_query_find_connections_for` | Read-only | Find connection records that touch a given entity_id. |

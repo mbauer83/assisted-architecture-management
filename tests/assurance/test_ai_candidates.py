@@ -51,6 +51,24 @@ class TestScanCandidates:
         results = scan_candidates([_ent("claude-service", ai_role="inference-service")])
         assert results == []
 
+    def test_entity_with_ai_specialization_is_skipped(self) -> None:
+        # WU-E2: marking now sets an AI specialization (not the legacy ai_role). An entity
+        # already carrying one must be skipped — this branch was unreachable before.
+        marked = {"name": "claude-service", "entity_type": "application-component",
+                  "specializations": ["ai-model"]}
+        assert scan_candidates([marked]) == []
+
+    def test_entity_with_scalar_ai_specialization_is_skipped(self) -> None:
+        marked = {"name": "gpt-service", "entity_type": "application-component",
+                  "specialization": "ai-inference-service"}
+        assert scan_candidates([marked]) == []
+
+    def test_non_ai_specialization_does_not_skip(self) -> None:
+        # A plain (non-AI) specialization must NOT suppress a name-matched candidate.
+        cand = {"name": "llm-gateway", "entity_type": "application-component",
+                "specializations": ["module"]}
+        assert scan_candidates([cand]) != []
+
     def test_technology_service_bonus(self) -> None:
         svc = _ent("llm-gateway", entity_type="technology-service")
         app = _ent("llm-gateway", entity_type="application-component")
