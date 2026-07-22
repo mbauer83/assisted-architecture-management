@@ -90,7 +90,7 @@ New here? Start with the [Quickstart in the README](../README.md#quickstart), th
 
 ## The model documents itself
 
-The system's own architecture is modelled inside
+The system's own architecture is modeled inside
 [`engagements/ENG-ARCH-REPO/`](../engagements/ENG-ARCH-REPO/). Browse it through the GUI or
 the `arch-repo-read` MCP tools — the screenshots in these docs are the tool describing its
 own design, and the [showcase](06-showcase.md) walks the model end to end.

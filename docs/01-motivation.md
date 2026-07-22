@@ -48,7 +48,7 @@ security, and compliance analysis is expensive.
 ## Where current practice breaks down
 
 Architecture knowledge usually lives in slide decks, wiki pages, loose spec files used to
-steer coding agents, or siloed modelling tools. Against the forces above, each of these
+steer coding agents, or siloed modeling tools. Against the forces above, each of these
 arrangements runs into hard limits:
 
 **AI code generation outpaces sequential architectural review.** Review capacity that
@@ -64,7 +64,7 @@ scattered across document collections, or held in non-AI-native tooling, gives a
 no reliable way to query, navigate, or verify intent and constraints.
 
 **Architecture tools without first-class agent access put avoidable manual upkeep on people.**
-Structured modelling tools capture relationships well, but where agent access is bolted on
+Structured modeling tools capture relationships well, but where agent access is bolted on
 after the fact — an export here, a read-only API there — an agent cannot discover, author,
 and verify model content through typed, validated operations. Routine updates an agent could
 make safely then fall to people too, on top of the design and review that genuinely needs
@@ -129,14 +129,14 @@ setup and configuration) — and primarily through MCP for agents.
 **Extensibility and configurability at multiple levels.** Frontmatter schemata, attribute
 schemata, valid entity and connection types, and directory conventions are all configurable
 through git-based config, at both enterprise and engagement scope. The ontology extends
-beyond the base ArchiMate 4.0 vocabulary. The system adapts to an organisation without
+beyond the base ArchiMate 4.0 vocabulary. The system adapts to an organization without
 forking the core.
 
 **Safety is never treated as subordinate to risk.** Safety constraints stay absolute — cost, schedule,
 and risk-acceptance decisions cannot override them. A hard safety-disposition safeguard runs
 on every assurance write to enforce this in the tooling, not just on paper.
 
-**Assurance content is confidential by default.** Assurance artefacts, signals (SBOMs), and
+**Assurance content is confidential by default.** Assurance artifacts, signals (SBOMs), and
 references are encrypted at rest, TLP-tagged ([Traffic-Light Protocol](https://en.wikipedia.org/wiki/Traffic_Light_Protocol)), reachable only through gated interfaces, and
 carry one-way references to architecture that are never reverse-persisted.
 
@@ -154,7 +154,7 @@ The strategy follows directly from those goals and principles.
 - **Treat architecture as code.** Artifacts are structured, version-controlled markdown with
   typed frontmatter, committed to git with authorship and history — queryable, diffable, and
   reviewable like any other code.
-- **Run a two-tiered repository.** An *enterprise* repo holds the organisation-wide baseline;
+- **Run a two-tiered repository.** An *enterprise* repo holds the organization-wide baseline;
   per-project *engagement* repos hold local detail and draft work. An explicit, traced
   *promotion* step moves proven content up to the shared baseline.
 - **Make access AI-native.** An MCP server exposes the model to agents as typed tools, so an
@@ -202,7 +202,7 @@ them — and the agents working alongside them — can reach the same model.
 ## Scope and non-goals
 
 **In scope**
-- Modelling architecture toward the ArchiMate 4.0 vocabulary, plus extension
+- Modeling architecture toward the ArchiMate 4.0 vocabulary, plus extension
   ontologies and diagram families (UML activity, sequence, C4, matrices, and assurance views).
 - A git-versioned, two-tier artifact store with a verifier, exposed through MCP, REST, CLI,
   and a browser GUI.

@@ -1,6 +1,6 @@
 # Assurance Diagrams
 
-Four diagram families visualise an assurance analysis, each a diagram type module under
+Four diagram families visualize an assurance analysis, each a diagram type module under
 `src/diagram_types/`.
 
 | Diagram | Module | Reads from | Viewer |
@@ -36,7 +36,7 @@ From the detail panel, every node continues into its deep-linkable page
 [Exploring assurance content](exploring-assurance.md).
 
 The three assurance-only types are **not listed in the generic diagram browser** — they cannot
-be opened through the architecture diagram catalogue, so there is no risk of encountering a
+be opened through the architecture diagram catalog, so there is no risk of encountering a
 broken, unfiltered, or non-selectable view of confidential content.
 
 &nbsp;
@@ -45,7 +45,7 @@ broken, unfiltered, or non-selectable view of confidential content.
 
 The backbone of an STPA/STAMP analysis: controllers, controlled processes, and the control
 actions and feedback between them. Binding a node to an architecture entity ties the analysis
-to the real system; an unbound node renders as a visible modelling gap. Here the **Architecture
+to the real system; an unbound node renders as a visible modeling gap. Here the **Architecture
 Backend** controls *Open store / release key* over the **SQLCipher store** and the **OS
 credential backend**.
 

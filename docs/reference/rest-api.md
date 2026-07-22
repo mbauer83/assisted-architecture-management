@@ -30,9 +30,8 @@ without its payload ever being filtered.
 ## Deferred (second pass)
 
 The assurance/security, promotion, sync, admin, and events endpoints are documented to
-FastAPI's defaults today; giving them the same fidelity is a planned follow-up
-(`PLAN-openapi-modeling-query.md` §5). Generating a typed client SDK from the now-faithful
-spec is possible once that lands.
+FastAPI's defaults today; giving them the same fidelity is a planned follow-up.
+Generating a typed client SDK from the now-faithful spec is possible once that lands.
 
 ---
 

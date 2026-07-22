@@ -17,7 +17,7 @@ A top-down safety analysis built on the STAMP model. The flow follows the entity
 3. **Control structure** — model controllers and controlled processes as
    `control-structure-node`s, and the `control-action`s that flow between them. Binding a
    node to an architecture entity ties the analysis to the real system; an unbound node
-   flags a modelling gap.
+   flags a modeling gap.
 4. **Unsafe control actions (UCAs)** — for each control action, work the four STPA
    guidewords: *not provided*, *provided when it should not be*, *wrong timing*, *stopped too
    soon*. Each UCA references one control action and its controller.

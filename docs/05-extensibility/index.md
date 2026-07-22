@@ -1,11 +1,11 @@
 # Extensibility — Modularity Everywhere
 
-> Adapt the system to your organisation without forking the core. The ArchiMate 4
+> Adapt the system to your organization without forking the core. The ArchiMate 4
 > vocabulary is the shipped default, and every layer below it is a plug-in point.
 
-Extensibility and configurability is a *Must* principle of the project. Repository behaviour —
+Extensibility and configurability is a *Must* principle of the project. Repository behavior —
 schemata, vocabularies, document structure, diagram notation — is configurable through
-git-based files at both enterprise and engagement scope, and the modelling ontology extends
+git-based files at both enterprise and engagement scope, and the modeling ontology extends
 beyond the base ArchiMate 4 element and connection types.
 
 The system already ships three ontology modules and nine diagram types, with the default

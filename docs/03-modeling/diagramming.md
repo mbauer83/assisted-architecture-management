@@ -4,7 +4,7 @@ Diagrams are views over the model. A **diagram type module** declares which enti
 connection types a view accepts and how it renders. Most ArchiMate views are config-only and
 share the `GenericPumlRenderer`; families with their own notation (activity, sequence,
 matrix, C4) bring a custom renderer. The full extension contract lives in
-[`src/diagram_types/README.md`](../../src/diagram_types/README.md) and is summarised for
+[`src/diagram_types/README.md`](../../src/diagram_types/README.md) and is summarized for
 authors in [Diagram-type modules](../05-extensibility/diagram-type-modules.md).
 
 Two kinds of content can appear in a view:
@@ -82,7 +82,7 @@ participants and messages without hand-editing frontmatter.
 
 ## Datatype (UML class)
 
-A restricted UML class diagram for modelling data structures and their relationships. The
+A restricted UML class diagram for modeling data structures and their relationships. The
 diagram owns five **diagram-only connection types** (`dt-association`, `dt-aggregation`,
 `dt-composition`, `dt-generalization`, `dt-dependency`) and five **classifier kinds**
 (`class`, `datatype`, `enumeration`, `variant`, `primitive`).

@@ -35,7 +35,7 @@ Only `name` is required; every other field falls back to a built-in default.
 ## Rendering: config first, custom only when needed
 
 The `GenericPumlRenderer` handles baseline config-backed PlantUML, and the shared
-`ArchimatePumlRenderer` layers ArchiMate behaviour on top. You do **not** write a renderer for
+`ArchimatePumlRenderer` layers ArchiMate behavior on top. You do **not** write a renderer for
 a new domain view, a different filter, or different grouping/layout.
 
 A custom renderer (implementing the `DiagramRenderer` protocol) is needed when the format is

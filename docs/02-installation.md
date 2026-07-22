@@ -7,7 +7,7 @@
 - [Per-environment prerequisites](#per-environment-prerequisites) — macOS · Debian/Ubuntu · WSL2 · Docker
 - [1. Install Python dependencies](#1-install-python-dependencies)
 - [2. Diagram runtime](#2-diagram-runtime)
-- [3. Initialise the workspace](#3-initialise-the-workspace)
+- [3. Initialize the workspace](#3-initialize-the-workspace)
 - [4. Start the backend](#4-start-the-backend)
 - [5. Configure MCP access for AI agents](#5-configure-mcp-access-for-ai-agents)
 - [6. Build and serve the GUI](#6-build-and-serve-the-gui)
@@ -157,7 +157,7 @@ context for the bundled jar and the JRE is in
 
 &nbsp;
 
-## 3. Initialise the workspace
+## 3. Initialize the workspace
 
 An `arch-workspace.yaml` at the workspace root declares the two repositories. The simplest
 form keeps a single explicit engagement:

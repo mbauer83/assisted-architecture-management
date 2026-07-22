@@ -43,6 +43,9 @@ jobs:
       - name: Verify generated MCP documentation is in sync with registered tools
         run: uv run tools/generate_mcp_docs.py --check
 
+      - name: Documentation links, anchors, and media references
+        run: uv run python tools/check_doc_links.py
+
       - name: Fetch the PlantUML runtime
         run: uv run get-plantuml
 

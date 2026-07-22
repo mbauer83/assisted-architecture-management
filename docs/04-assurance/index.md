@@ -66,7 +66,7 @@ obligation ──cites──► framework code (e.g. ISO26262:6-8)              
 
 Every type carries a `concern_class` (safety vs. security) where relevant, and constraints
 carry a disposition and integrity level. A `control-structure-node` that is not yet bound to
-an architecture entity is an explicit signal of a modelling gap — assurance analysis surfaces
+an architecture entity is an explicit signal of a modeling gap — assurance analysis surfaces
 holes in the architecture itself.
 
 ---

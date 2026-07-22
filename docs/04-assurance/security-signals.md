@@ -20,7 +20,7 @@ ingest  ─┬─ CLI script      ┐
 
 ## Producing a snapshot
 
-Ingest is a serialised, audited, idempotent act with one command behind every
+Ingest is a serialized, audited, idempotent act with one command behind every
 surface, so no route can bypass the capability gate or the audit record.
 
 | Route | Use it for |
@@ -121,7 +121,7 @@ merging previously separate identities when a feed reveals they are the same.
 
 This is why impact lookup accepts any identifier: asking about `GHSA-47FR-3FFG-HGMW`
 and asking about `CVE-2026-7246` reach the same answer, because both resolve to
-the same canonical id. Views display the identifier a reader recognises and
+the same canonical id. Views display the identifier a reader recognizes and
 navigate by the canonical one.
 
 A merge repoints every reference to the losing identity, including VEX

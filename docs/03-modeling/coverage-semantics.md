@@ -103,7 +103,7 @@ requirement is perfectly well modeled, and flagging it as a business-layer failu
 systematic false gaps. So the diagnostics tell you *where* realization was found, while the
 verdict rests solely on the authoritative columns.
 
-This is why the table shows text, not just colour: `none_observed` and `gap` mean entirely
+This is why the table shows text, not just color: `none_observed` and `gap` mean entirely
 different things and must never be distinguishable only by a shade.
 
 &nbsp;
@@ -113,7 +113,7 @@ different things and must never be distinguishable only by a shade.
 Two different traversals, deliberately:
 
 - **Branch enumeration walks direct, stored connections only.** Derived relationships compose
-  and collapse paths — exactly the wrong behaviour when the question is "is *this modeled
+  and collapse paths — exactly the wrong behavior when the question is "is *this modeled
   branch* complete?" A derived edge could bypass the very outcome whose absence you are trying
   to detect.
 - **Leaf coverage is existential over direct *and* derived realization chains**, up to a bounded

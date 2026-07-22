@@ -1,6 +1,6 @@
 # Architecture Modeling
 
-> Modelling aims for conformance with the
+> Modeling aims for conformance with the
 > [ArchiMate 4.0](../reference/archimate-4-conformance.md) standard; conformance has not
 > been independently verified, so no conformance claim is made.
 
@@ -43,11 +43,11 @@ Four kinds of artifact share one consistent metadata model (name, version,
 
 ## The two-tiered repository
 
-Modelling happens against two repositories:
+Modeling happens against two repositories:
 
 - **Engagement repo** — project-specific work. New entities, connections, diagrams, and
   documents are created here.
-- **Enterprise repo** — the curated, organisation-wide baseline. Engagement tools read it
+- **Enterprise repo** — the curated, organization-wide baseline. Engagement tools read it
   but do not write to it directly.
 
 Content moves up through an explicit, traced **promotion** step. Enterprise entities may

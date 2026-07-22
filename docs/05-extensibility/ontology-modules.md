@@ -48,7 +48,7 @@ whole element class.
   reference it without redeclaring.
 - **Protocol compliance** — every module must satisfy the `OntologyModule` protocol, checked
   by `tests/domain/test_protocol_compliance.py` on every run.
-- **Domain registration** — each new `hierarchy[0]` domain needs a colour/label entry in
+- **Domain registration** — each new `hierarchy[0]` domain needs a color/label entry in
   `tools/gui/src/ui/lib/domains.ts` so its chip renders correctly.
 
 Adding a module is five steps: create the package, define `entities.yaml`, optionally define
@@ -65,7 +65,7 @@ does, because its authored guidance text derives from licensed material that is 
 committed to this repository. Guidance is imported per deployment with
 `arch-import-guidance` and layered along the module's declared concept hierarchy
 (domain → entity type → specialization for `archimate_4`), with the empty state
-explicitly signalled rather than silently blank. The full story — hierarchy levels, the
+explicitly signaled rather than silently blank. The full story — hierarchy levels, the
 document format, importing, precedence — is on the
 [Authoring guidance](guidance.md) page.
 
@@ -113,9 +113,9 @@ The verifier checks every assignment:
 | W128 | warning | Connection specialization's `restrict_endpoints` doesn't cover the connection's actual (source-type, target-type) pair. |
 | W129 | warning | An endpoint entity's own specialization's `restrict_relationships` doesn't cover the connection's actual (type, source-type, target-type) triple for that entity's role. |
 
-Attribute constraints attach to a specialization inline or via a dedicated attachment file,
-never redefine it — see
-[Profiles are one-to-one with their specialization](schemata-and-profiles.md#profiles-are-one-to-one-with-their-specialization).
+Attribute constraints attach to a specialization inline, via a dedicated attachment file,
+or through named-profile bindings — they never redefine the specialization itself. See
+[How a specialization contributes attributes](schemata-and-profiles.md#how-a-specialization-contributes-attributes).
 
 ### Discovery
 

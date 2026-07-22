@@ -31,7 +31,7 @@ assurance built in.
 
 AI agents now write code faster than architecture can be reviewed by hand. Slide decks, wiki
 pages, and loose spec files give an agent nothing reliable to query or verify; structured
-modelling tools hold the relationships but treat agent access as an afterthought, so agents
+modeling tools hold the relationships but treat agent access as an afterthought, so agents
 can read the model yet cannot safely author and verify against it. This project makes
 architecture a typed graph of entities and connections — version-controlled markdown with
 structured frontmatter — that both people and agents read, author, and verify through the

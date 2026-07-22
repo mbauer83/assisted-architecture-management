@@ -27,7 +27,7 @@ like any other specialization (GUI entity page, or `artifact_edit_entity` with a
 
 | Specialization | Base type | Is |
 |---|---|---|
-| `ai-model` | application-component | the trained model artefact (the model card lives here) |
+| `ai-model` | application-component | the trained model artifact (the model card lives here) |
 | `ai-agent` | application-component | an agent or pipeline built on models + tools |
 | `ai-inference-service` | service | the served inference endpoint |
 | `ai-dataset` | data-object | training / evaluation / fine-tuning data |

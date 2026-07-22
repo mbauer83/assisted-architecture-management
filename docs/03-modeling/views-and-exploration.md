@@ -7,7 +7,7 @@ people and as structured data through the MCP and REST surfaces for agents.
 
 ## Overview
 
-The home view summarises the workspace: engagement versus enterprise counts, and breakdowns
+The home view summarizes the workspace: engagement versus enterprise counts, and breakdowns
 by domain and connection type. It is the fastest way to confirm what a repository contains
 and which tier you are looking at.
 

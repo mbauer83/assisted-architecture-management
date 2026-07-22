@@ -6,7 +6,7 @@ measure of a first model is not that files were created, but that **it answers a
 you actually had**.
 
 Prerequisites: the [Quickstart](../README.md#quickstart) is done (backend running, GUI
-reachable), and ideally [authoring guidance is imported](02-installation.md#3-initialise-the-workspace)
+reachable), and ideally [authoring guidance is imported](02-installation.md#3-initialize-the-workspace)
 so the forms can advise you as you go.
 
 The worked question: *"Which parts of my system actually realize the requirement that

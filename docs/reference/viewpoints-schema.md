@@ -369,7 +369,7 @@ underneath it. Criteria reference entity/connection **types** and **specializati
 (parameter defaults and supplied anchors). When the model changes — a type retired, an
 entity deleted, a definition promoted engagement→enterprise — those references can break.
 
-The catalogue computes a **reference report** for every definition: the same breakage
+The catalog computes a **reference report** for every definition: the same breakage
 contract as `rule_outcomes`, generalized to every reference class. It is a pure function of
 `(definition, current model)`, **never persisted** (it recomputes per model generation, so a
 reference that comes back self-heals), and rendered three ways — a `broken_references` array
