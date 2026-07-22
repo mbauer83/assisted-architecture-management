@@ -703,7 +703,7 @@ WU-L4. This is exactly the plan's sanctioned fallback. (Owner-confirmed 2026-07-
 | Component | Version | Fetched/installed from | License (as used) | Exposure | Disposition |
 |---|---|---|---|---|---|
 | PlantUML | 1.2026.3 | Maven Central `net/sourceforge/plantuml/plantuml/1.2026.3/plantuml-1.2026.3.jar` (SHA-256 sidecar verified by `get-plantuml`); GitHub Releases fallback | **GPLv3** | Redistributed in image (unmodified); invoked arm's-length | KEEP + discharge: GPLv3 text + written source offer in THIRD-PARTY-NOTICES |
-| JRE | openjdk-17-jre-headless (via `default-jre-headless` 2:1.17-74) | Debian bookworm apt | **GPLv2 + Classpath Exception** | Bundled + run | Keep (CE designed for this); user-settable JRE escape hatch added; notice |
+| JRE | openjdk-21-jre-headless (via `default-jre-headless`, Debian trixie) | Debian trixie apt | **GPLv2 + Classpath Exception** | Bundled + run | Keep (CE designed for this); user-settable JRE escape hatch added; notice. (Was openjdk-17 on bookworm; bumped with the trixie base — see hardening note.) |
 | Graphviz | Debian bookworm `graphviz` | Debian bookworm apt | **EPL-1.0** (weak copyleft) | Bundled + invoked (`dot`), unmodified | Compatible; ship EPL-1.0 notice + attribution |
 | git | Debian bookworm `git` | Debian bookworm apt | **GPLv2** | Invoked arm's-length for repo sync | Aggregation; notice in inventory |
 | openssh-client | Debian bookworm | Debian bookworm apt | **BSD-style / SSH** (permissive) | Invoked (ssh transport) | Notice |
@@ -711,7 +711,7 @@ WU-L4. This is exactly the plan's sanctioned fallback. (Owner-confirmed 2026-07-
 | ca-certificates | Debian bookworm | Debian bookworm apt | **MPL-2.0** (bundle) + public-domain certs | Bundled | Notice |
 | fonts-dejavu-core | Debian bookworm | Debian bookworm apt | **Bitstream Vera + DejaVu** (permissive, notice-required) | Bundled, rendered by PlantUML | Ship font license notice |
 | libfontconfig1 / libharfbuzz0b | Debian bookworm | Debian bookworm apt | fontconfig (MIT-style) / HarfBuzz "Old MIT" | Bundled runtime libs | Notice |
-| Runtime base image | `python:3.13-slim-bookworm` | Docker Hub official | PSF (Python) + Debian bookworm **main = DFSG-free** | Redistributed | Confirmed no non-free apt packages pulled; notice via inventory |
+| Runtime base image | `python:3.13-slim-trixie` (Debian 13.6) | Docker Hub official | PSF (Python) + Debian trixie **main = DFSG-free** | Redistributed | Confirmed no non-free apt packages pulled; notice via inventory. (Bumped from slim-bookworm — see hardening note.) |
 | Build-only images | `node:20-alpine`, `ghcr.io/astral-sh/uv:python3.13-bookworm-slim` | — | — | **NOT shipped** (multi-stage; only `dist/` + `.venv` + jar copied to runtime) | Out of redistribution scope |
 
 **Pre-sweep dependency-vulnerability remediation (owner-directed 2026-07-22, precedes L2/L3).**
@@ -810,15 +810,22 @@ for this image now** (recorded, not silently skipped).
   and the **OpenJDK JRE** (libcups/libasound/avahi, pulled even headless). (41 PyPI findings in that
   scan are a STALE-image artifact: `architectonic:local` predates the 2026-07-22 dep remediation; a
   rebuild on the current lock → 0, as verified in the L5 build.)
-- **Effective reductions are all behavior/rendering-affecting** — drop Graphviz via PlantUML's
-  Smetana (pure-Java) layout engine after a diagram-parity check; shrink/replace the JRE; bump to a
-  newer Debian base (graphviz version drift). Each is the same class of change the owner required we
-  not make blindly for PlantUML → surfaced as **owner-gated follow-ups**, not applied unilaterally.
-- Cheap, non-fidelity-risk hygiene already in place: runtime `apt-get install --no-install-
-  recommends`; non-root runtime user; multi-stage (build-only node/uv images not shipped).
-- RECOMMENDATION (owner decision): a dedicated base-image-hardening effort — most impact from a
-  Smetana parity check (removing Graphviz's entire Debian closure) paired with a rendering sidecar
-  or a slimmer JRE; optionally a Debian-trixie base bump. Not this session.
+- **Effective reductions are behavior/rendering-affecting.** Two were ruled out (owner): dropping
+  Graphviz via PlantUML's Smetana (pure-Java) engine — Smetana was previously deemed insufficient
+  for our diagram set; and removing the JRE — it exists solely to run PlantUML, so it must stay.
+- **DONE (owner-directed 2026-07-22): Debian base bump `slim-bookworm` → `slim-trixie` (Debian
+  13.6).** Builder + runtime both bumped (ABI consistency for the sqlcipher3 C-extension). Rebuilt
+  and verified in-container: LICENSE + THIRD-PARTY-NOTICES present; the render toolchain works
+  (JRE **21** + Graphviz 2.42.4 + plantuml.jar — sequence *and* dot-driven class diagrams render);
+  Python venv + C-extensions (sqlcipher3/cryptography/lxml/pydantic) import. **OS-CVE result:
+  osv-scanner image scan 311 → 214 distinct Debian findings (541 → 455 total)** — a ~31% cut from a
+  low-risk bump. (Severity shows unrated on Debian:13 because OSV lacks CVSS data for trixie
+  advisories yet — not a claim the bookworm HIGHs are all fixed.) native.json + THIRD-PARTY-NOTICES
+  + §10b.2 JRE/base rows updated to trixie/openjdk-21; license gates green.
+- Cheap hygiene already in place: runtime `apt-get install --no-install-recommends`; non-root user;
+  multi-stage (build-only node/uv images not shipped).
+- REMAINING (future, owner-gated): a slimmer/custom JRE (jlink) to shed the JRE's cups/alsa closure;
+  a rendering sidecar. Minimus distroless still not a fit for this multi-tool image.
 
 #### WU-L5 PROGRESS (2026-07-22) — Stream L COMPLETE
 - Backend gates: `pytest` 6457 passed / 4 skipped / 0 failures; `ruff check src/ tests/` clean;

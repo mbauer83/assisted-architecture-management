@@ -25,7 +25,7 @@ RUN npm run build
 
 
 # ── Stage 2: Resolve Python dependencies with uv ─────────────────────────────
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
+FROM ghcr.io/astral-sh/uv:python3.13-trixie-slim AS builder
 
 # uv tuning for reproducible, cache-friendly container builds.
 ENV UV_COMPILE_BYTECODE=1 \
@@ -63,7 +63,7 @@ RUN .venv/bin/get-plantuml
 
 
 # ── Stage 3: Runtime ─────────────────────────────────────────────────────────
-FROM python:3.13-slim-bookworm AS runtime
+FROM python:3.13-slim-trixie AS runtime
 
 # Diagram runtime (Java + Graphviz + fonts), git/ssh for repo sync, curl for health.
 RUN apt-get update \

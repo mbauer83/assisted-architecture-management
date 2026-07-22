@@ -118,8 +118,12 @@ cross-document consistency, current live MCP stats, all gates over the integrate
 - **Live assurance signals re-ingested**: python→Architecture Backend (`APP@1777293133.OYEmP1`),
   npm→GUI Authoring Tool (`APP@1776149382.lmO0mp`); both active snapshots now 0 findings. The store
   is runtime-confidential (never committed).
-- **Deferred, owner decision:** evaluate **Minimus** (hardened/minimal) Docker base images — not a
-  drop-in (runtime needs apt-installed JRE + graphviz + git); its own focused effort.
+- **Base-image hardening (done):** bumped the Docker base `slim-bookworm` → `slim-trixie`
+  (Debian 13, OpenJDK 21) — verified rendering + venv in-container; OS CVEs 311 → 214 distinct.
+  **Minimus** distroless evaluated and ruled out (multi-tool image needs apt-installed
+  JRE+graphviz+git); Smetana (drop graphviz) deemed insufficient; JRE must stay. REMAINING future
+  hardening (owner-gated): slimmer/custom JRE (jlink) to shed the JRE's cups/alsa closure; a
+  rendering sidecar.
 - **MCP ergonomics fix queued (restart-gated):** the assurance read surface forces out-of-band
   discovery of which architecture entities have security signals. Fix, using **role-functional
   naming** (the entity a snapshot attaches to = the *assessed entity*, NOT an "anchor" — that term

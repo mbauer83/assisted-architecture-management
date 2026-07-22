@@ -12,26 +12,26 @@ The following components are under copyleft or weak-copyleft licenses. Each is b
 - Source: https://github.com/plantuml/plantuml/releases/tag/v1.2026.3
 - Obligation: GPLv3 §6 corresponding-source offer: the bundled jar is the unmodified official binary; its complete corresponding source is the tagged release above (and the plantuml-1.2026.3 sources jar on Maven Central). Arm's-length invocation (separate process) keeps this project's own MIT-licensed code unaffected (GPLv3 §5 aggregation).
 
-### OpenJDK (openjdk-17-jre-headless via default-jre-headless) — GPL-2.0-only WITH Classpath-exception-2.0
-- Version: 17 (Debian bookworm)
+### OpenJDK (openjdk-21-jre-headless via default-jre-headless) — GPL-2.0-only WITH Classpath-exception-2.0
+- Version: 21 (Debian trixie)
 - Exposure: bundled + run (executes the PlantUML jar)
-- Source: https://openjdk.org/ + Debian: apt-get source openjdk-17
+- Source: https://openjdk.org/ + Debian: apt-get source openjdk-21
 - Obligation: The GPLv2 Classpath Exception is designed for running independent programs on the JRE; ship the license notice. Corresponding source available from Debian and openjdk.org.
 
 ### Graphviz — EPL-1.0
-- Version: Debian bookworm
+- Version: Debian trixie
 - Exposure: bundled + invoked (PlantUML shells out to dot); unmodified
 - Source: https://gitlab.com/graphviz/graphviz
 - Obligation: EPL-1.0 (weak copyleft, file-level): unmodified, so ship the notice + point at upstream source. No project source becomes EPL.
 
 ### git — GPL-2.0-only
-- Version: Debian bookworm
+- Version: Debian trixie
 - Exposure: invoked arm's-length (separate process) for repository sync
 - Source: https://git-scm.com/ + Debian: apt-get source git
 - Obligation: Aggregation / arm's-length invocation — no linking into project code. Ship notice; corresponding source from Debian.
 
 ### ca-certificates — MPL-2.0 (Mozilla CA bundle) + public-domain certs
-- Version: Debian bookworm
+- Version: Debian trixie
 - Exposure: bundled (TLS trust store)
 - Source: https://salsa.debian.org/debian/ca-certificates
 - Obligation: MPL-2.0 (file-level weak copyleft), unmodified; ship notice + upstream pointer.
@@ -187,14 +187,14 @@ The following components are under copyleft or weak-copyleft licenses. Each is b
 | Component | Version | License |
 |---|---|---|
 | PlantUML | 1.2026.3 | GPL-3.0-or-later |
-| OpenJDK (openjdk-17-jre-headless via default-jre-headless) | 17 (Debian bookworm) | GPL-2.0-only WITH Classpath-exception-2.0 |
-| Graphviz | Debian bookworm | EPL-1.0 |
-| git | Debian bookworm | GPL-2.0-only |
-| openssh-client | Debian bookworm | SSH-OpenSSH (BSD-style, permissive) |
-| curl | Debian bookworm | curl (MIT/X-style, permissive) |
-| ca-certificates | Debian bookworm | MPL-2.0 (Mozilla CA bundle) + public-domain certs |
-| fonts-dejavu-core | Debian bookworm | Bitstream-Vera + DejaVu (permissive, notice-required) |
-| libfontconfig1 | Debian bookworm | MIT (fontconfig) |
-| libharfbuzz0b | Debian bookworm | MIT (Old MIT / HarfBuzz) |
-| python:3.13-slim-bookworm (runtime base image) | 3.13-slim-bookworm | PSF-2.0 (Python) + Debian bookworm main (DFSG-free) |
+| OpenJDK (openjdk-21-jre-headless via default-jre-headless) | 21 (Debian trixie) | GPL-2.0-only WITH Classpath-exception-2.0 |
+| Graphviz | Debian trixie | EPL-1.0 |
+| git | Debian trixie | GPL-2.0-only |
+| openssh-client | Debian trixie | SSH-OpenSSH (BSD-style, permissive) |
+| curl | Debian trixie | curl (MIT/X-style, permissive) |
+| ca-certificates | Debian trixie | MPL-2.0 (Mozilla CA bundle) + public-domain certs |
+| fonts-dejavu-core | Debian trixie | Bitstream-Vera + DejaVu (permissive, notice-required) |
+| libfontconfig1 | Debian trixie | MIT (fontconfig) |
+| libharfbuzz0b | Debian trixie | MIT (Old MIT / HarfBuzz) |
+| python:3.13-slim-trixie (runtime base image) | 3.13-slim-trixie | PSF-2.0 (Python) + Debian trixie main (DFSG-free) |
 

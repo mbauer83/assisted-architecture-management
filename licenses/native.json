@@ -1,6 +1,6 @@
 {
   "ecosystem": "native",
-  "description": "System / native runtime components bundled in or invoked by the Docker image (Debian bookworm apt packages + the PlantUML jar + the base image). Hand-curated from the §10b.2 setup determinations; the license gate does not introspect apt/OCI layers, so this file is the reviewed source of truth for their obligations. purl/source URLs are the corresponding-source pointers for the copyleft components.",
+  "description": "System / native runtime components bundled in or invoked by the Docker image (Debian trixie apt packages + the PlantUML jar + the base image). Hand-curated from the §10b.2 setup determinations; the license gate does not introspect apt/OCI layers, so this file is the reviewed source of truth for their obligations. purl/source URLs are the corresponding-source pointers for the copyleft components.",
   "count": 11,
   "components": [
     {
@@ -13,17 +13,17 @@
       "obligation": "GPLv3 §6 corresponding-source offer: the bundled jar is the unmodified official binary; its complete corresponding source is the tagged release above (and the plantuml-1.2026.3 sources jar on Maven Central). Arm's-length invocation (separate process) keeps this project's own MIT-licensed code unaffected (GPLv3 §5 aggregation)."
     },
     {
-      "name": "OpenJDK (openjdk-17-jre-headless via default-jre-headless)",
-      "version": "17 (Debian bookworm)",
+      "name": "OpenJDK (openjdk-21-jre-headless via default-jre-headless)",
+      "version": "21 (Debian trixie)",
       "license": "GPL-2.0-only WITH Classpath-exception-2.0",
       "bucket": "allow",
       "exposure": "bundled + run (executes the PlantUML jar)",
-      "source_url": "https://openjdk.org/ + Debian: apt-get source openjdk-17",
+      "source_url": "https://openjdk.org/ + Debian: apt-get source openjdk-21",
       "obligation": "The GPLv2 Classpath Exception is designed for running independent programs on the JRE; ship the license notice. Corresponding source available from Debian and openjdk.org."
     },
     {
       "name": "Graphviz",
-      "version": "Debian bookworm",
+      "version": "Debian trixie",
       "license": "EPL-1.0",
       "bucket": "allow",
       "exposure": "bundled + invoked (PlantUML shells out to dot); unmodified",
@@ -32,7 +32,7 @@
     },
     {
       "name": "git",
-      "version": "Debian bookworm",
+      "version": "Debian trixie",
       "license": "GPL-2.0-only",
       "bucket": "review",
       "exposure": "invoked arm's-length (separate process) for repository sync",
@@ -41,7 +41,7 @@
     },
     {
       "name": "openssh-client",
-      "version": "Debian bookworm",
+      "version": "Debian trixie",
       "license": "SSH-OpenSSH (BSD-style, permissive)",
       "bucket": "allow",
       "exposure": "invoked (ssh transport for git)",
@@ -50,7 +50,7 @@
     },
     {
       "name": "curl",
-      "version": "Debian bookworm",
+      "version": "Debian trixie",
       "license": "curl (MIT/X-style, permissive)",
       "bucket": "allow",
       "exposure": "invoked (container healthcheck)",
@@ -59,7 +59,7 @@
     },
     {
       "name": "ca-certificates",
-      "version": "Debian bookworm",
+      "version": "Debian trixie",
       "license": "MPL-2.0 (Mozilla CA bundle) + public-domain certs",
       "bucket": "allow",
       "exposure": "bundled (TLS trust store)",
@@ -68,7 +68,7 @@
     },
     {
       "name": "fonts-dejavu-core",
-      "version": "Debian bookworm",
+      "version": "Debian trixie",
       "license": "Bitstream-Vera + DejaVu (permissive, notice-required)",
       "bucket": "allow",
       "exposure": "bundled; rendered into diagrams by PlantUML/Graphviz",
@@ -77,7 +77,7 @@
     },
     {
       "name": "libfontconfig1",
-      "version": "Debian bookworm",
+      "version": "Debian trixie",
       "license": "MIT (fontconfig)",
       "bucket": "allow",
       "exposure": "bundled runtime library (font matching)",
@@ -86,7 +86,7 @@
     },
     {
       "name": "libharfbuzz0b",
-      "version": "Debian bookworm",
+      "version": "Debian trixie",
       "license": "MIT (Old MIT / HarfBuzz)",
       "bucket": "allow",
       "exposure": "bundled runtime library (text shaping)",
@@ -94,13 +94,13 @@
       "obligation": "Permissive; ship notice."
     },
     {
-      "name": "python:3.13-slim-bookworm (runtime base image)",
-      "version": "3.13-slim-bookworm",
-      "license": "PSF-2.0 (Python) + Debian bookworm main (DFSG-free)",
+      "name": "python:3.13-slim-trixie (runtime base image)",
+      "version": "3.13-slim-trixie",
+      "license": "PSF-2.0 (Python) + Debian trixie main (DFSG-free)",
       "bucket": "allow",
       "exposure": "redistributed as the image base layer",
       "source_url": "https://hub.docker.com/_/python + https://www.debian.org/distrib/packages",
-      "obligation": "Debian main is DFSG-free (no non-free packages pulled); ship the aggregate notice. Build-only images (node:20-alpine, ghcr.io/astral-sh/uv) are NOT shipped (multi-stage) and are out of redistribution scope."
+      "obligation": "Debian main is DFSG-free (no non-free packages pulled); ship the aggregate notice. Build-only images (node:20-alpine, ghcr.io/astral-sh/uv:python3.13-trixie-slim) are NOT shipped (multi-stage) and are out of redistribution scope."
     }
   ]
 }
