@@ -31,7 +31,7 @@ incomplete. (A prior session missed Stream R entirely by capping a grep with
 | WU | Open boxes | Reconciled true state |
 |---|---|---|
 | D1 — Guidance format v2 | 7 | **GENUINELY OPEN.** Its guidance-cache upgrade *step* landed separately (`GuidanceCacheFormatStep`, registered); the format-v2 feature itself is not started. |
-| E1 — Documentation content | 2 | **GENUINELY OPEN.** May start anytime. |
+| E1 — Documentation content | 0 | **DONE 2026-07-22** (5 commits; see WU-E1). |
 | E2 — Deterministic screenshots | 3 | **GENUINELY OPEN.** Gated on the UI surfaces it captures. |
 | G1 — Trace evaluator etc. | 8 | **STALE — substantially complete.** Evidenced by G2's live validation: the shipped `motivation-coverage` viewpoint executed live returning 91 gap rows / 0 warnings, which exercises the grammar, result union, evaluator, and post-projection pipeline. Individual sub-items (enum-set parameter type, §10.7 format impact) were not separately re-verified. |
 | G2 — Shipped viewpoint, docs, self-model, boundary | 6 | **STALE except one item.** Live-validated 2026-07-21; self-model saved (engagement commit `4f5a22e1`); frontend boundary gate green. The deferred **full backend suite is now satisfied** — 6124 passed / 5 skipped, 2026-07-21. **REMAINING: the crit-21b e2e G-S3 GUI walk** (Playwright; needs the running GUI dev server). |
@@ -873,10 +873,29 @@ for this image now** (recorded, not silently skipped).
 ## Stream E — Documentation & deterministic media
 
 ### WU-E1 — Documentation content (may start anytime)
-- [ ] All PLAN §8.1 E1 items, incl. README claim amendment, both signal-backend
-      configurations, refresh-tooling prerequisites, MCP reference regeneration,
-      and the self-model showcase page.
-- [ ] Link check + generated-reference check green.
+- [x] All PLAN §8.1 E1 items DONE 2026-07-22 (commits 5699921, 22a09c3, cde1db3,
+      6019c56, 5b9602c), executed per the owner-approved PLAN-docs-rework.md (which
+      supersedes §8.1 detail where they differ — notably the media policy: the
+      self-model's assurance content is owner-declared public, so the README
+      self-describing claim STANDS with a synthetic-marker caveat instead of being
+      weakened). Landed: upgrade operator guide (real fixture-generated report
+      example) + CLI-page split; licensing page (JRE substitution, CI gates,
+      CVE posture); signal-backend value semantics in configuration; security-signals
+      expansion (posture viewpoint, assessed-entity terminology, stats discovery);
+      exploring-assurance page; methods end-to-end workflow section; guidance v2 page
+      + ontology-modules slim-down; showcase (verified motivation→strategy→C4→ADR
+      chain + real STPA-Sec walk); first-model tutorial; audience entry paths;
+      workflow/status-cluster docs; promotion group-mapping correction;
+      docs/architecture cleanup (burn-down restated, glossary reconciled,
+      gui-capability-design relocated as a design record w/ live claims test moved);
+      README (roadmap, upgrades row, optional extras); installation refresh;
+      American-English standardization. MCP reference tables verified in sync
+      (--check green; assessed_entity surface live).
+- [x] Link check + generated-reference check green 2026-07-22: NEW
+      tools/check_doc_links.py (relative links + GitHub anchors + orphan-media;
+      CI-gated in the python job) — found+fixed a stale anchor, an orphaned image,
+      and a plan-file reference; generate_mcp_docs --check + generate_notices
+      --check green; planning-vocab and internal-process-voice greps clean.
 - [x] Coverage-semantics page DONE 2026-07-20: docs/03-modeling/coverage-semantics.md —
       explains branch-complete vs existential with a concrete false-green example (the live
       two-outcome goal with no requirements under either), the obligation table incl. why a
