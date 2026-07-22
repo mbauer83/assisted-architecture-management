@@ -256,8 +256,16 @@ by:
 |---|---|---|
 | `ARCH_REPAIR_UPGRADE` | `true` | Set `false` to skip the check entirely (run `arch-repair upgrade` manually instead) |
 
-See `arch-repair upgrade --help` (or `PLAN-archimate-4-compliance.md` §3 D17)
-for the full CLI, including `--repo-root`/`--workspace` targeting and the
+The entrypoint exports `ARCH_SETTINGS_PATH` pointing at the container's live
+settings file, so the upgrade discovers the deployment's operational targets
+(guidance cache, signal stores, assurance store) — not just the repositories —
+and halts with the report on any non-zero exit rather than serving on stale
+formats. Note the distinction from `ARCH_SETTINGS_FILE` in `.env`: that is the
+**host-side** path Compose bind-mounts onto `/app/config/settings.yaml`; it is
+never meaningful inside the container. See the
+[upgrade guide](upgrade-guide.md#docker-upgrade-before-serving) for the exit
+mapping and worked report examples, and the
+[CLI reference](cli-and-backend.md#repository-maintenance) for flags and the
 `--json` report contract used for scripted checks.
 
 ---

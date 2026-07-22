@@ -59,18 +59,11 @@ composition   →  all packages
 ## Burn-down
 
 Known violations are recorded in `tests/architecture/architecture_baseline.json`.
-The test fails only on *new* violations. The baseline must be **empty** by the time
-all plan phases (WU-01 through WU-08) are complete.
+The test fails only on *new* violations, so the baseline can only shrink; the goal
+state is an empty baseline.
 
-Current violation categories and their planned remediation:
+The baseline currently records three entries, all one category:
 
-| Category | Files | Remediated by |
-|----------|-------|---------------|
-| `domain → infrastructure` | `ontology_catalog.py`, `connection_ontology.py`, `archimate_relation_rendering.py` (lazy `get_module_registry`); `ontology_protocol.py` (`GenericPumlRenderer`) | Phase B/C (WU-02–06) |
-| `domain → config` | `artifact_types.py` (`infer_repo_scope`) | Phase D (WU-07) |
-| `domain → ontologies` | `ontology_catalog.py` (`matrix_abbreviations`) | Phase D (WU-07) |
-| `domain → application` | `view_projection.py` (`derivation.types`) | Phase B/C (WU-02–06) |
-| `application → infrastructure` | `entity_type_predicates.py`, `_verifier_rules_bindings.py`, `_verifier_rules_semantic.py` (lazy `get_module_registry`) | Phase C (WU-05–06) |
-| `application → config` | `artifact_document_schema.py`, `group_registry.py`, `group_registry_validation.py`, `repo_path_helpers.py`, `artifact_verifier.py`, `artifact_verifier_incremental.py`, `artifact_verifier_rules.py` | Phase C/D (WU-05–07) |
-| `diagram_types → application` | `c4/_projection.py`, `c4/_type.py` (`derivation.*`) | Phase C/E (WU-05, WU-08) |
-| `ontologies → infrastructure` | `archimate_4/_loader.py` (lazy `_svg_sprite_convert`) | Phase D (WU-07) |
+| Category | Files | Status |
+|----------|-------|--------|
+| `diagram_types → application` | `datatype/_contributions.py`, `datatype/_contributions_keys.py` (import verifier types from `application.verification`) | Known exception, pending a contributed-verifier contract in `domain` |

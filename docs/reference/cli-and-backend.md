@@ -90,81 +90,29 @@ ids are reported per root plus one aggregate summary for `--workspace` runs.
 `--deployment-root`, or the `ARCH_SETTINGS_PATH` process selector, the command
 touches repositories only (a test workspace can never reach your real guidance
 cache or stores). With a deployment identity, the same run also discovers,
-preflights, and migrates operational targets — each as one atomic unit
-(databases in one migration transaction; text files by atomic replace), in a
-deterministic order, with no cross-target atomicity claimed: a failure after an
-earlier target committed exits `20` with an exact partial report, and a re-run
-resumes safely from actual content. Exit codes: dry-run is always `0` (findings,
-blockers, and credential-uninspectable targets are report states); `--commit`
-returns `0` success · `1` repository-internal step errors · `3` unresolved
-blocking migration (nothing written) · `20` partial apply · `21`
-infrastructure/credential failure before any commit. The JSON report is
-additive: `repos` is unchanged; `report_schema_version`, `operational_targets`,
-`deployment_preflight`, and `outcome` are new.
+preflights, and migrates the deployment's operational targets (settings,
+guidance cache, signal stores, the assurance store).
 
-**Backup & recovery per target kind** (before any `--commit` on a deployment):
+Exit codes: a dry run is always `0` — findings, blockers, and
+credential-uninspectable targets are report states, not errors. `--commit`
+returns:
 
-| Target kind | Backup | Recovery |
-|---|---|---|
-| Repository | Commit or branch the repo (recommended by the CLI) | Re-run `--commit`; steps are idempotent and self-healing |
-| Guidance cache (`~/.config/arch-repo/guidance-cache/` or deployment-scoped) | Copy the directory | Restore the copy, or re-import from the licensed source with `arch-import-guidance` |
-| Public signals SQLite | Copy the `.db` file | Restore the copy and re-run; quarantined legacy rows stay inspectable via the admin surface |
-| SQLCipher assurance store | `arch-assurance backup` (encrypted copy) | Restore the backup; the key stays in the OS keychain/vault — never in reports or logs |
-| Deployment settings document | Copy the YAML file | Restore the copy; rewrites are atomic and byte-preserving outside the changed key |
+| Exit | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | Repository-internal step errors |
+| `3` | Unresolved blocking migration (nothing written) |
+| `20` | Partial apply — re-run to resume |
+| `21` | Infrastructure/credential failure before any commit |
 
-A locked SQLCipher store whose version cannot be read is a **blocking unresolved
-migration** (exit `3`), never assumed current; provide the credential through
-the non-interactive secret path (OS keychain, or the
-`ARCH_ASSURANCE_MASTER_PASSWORD`-protected vault on headless hosts) and re-run.
+The `--json` report contract: `repos` per repository, plus
+`report_schema_version`, `operational_targets`, `deployment_preflight`, and
+`outcome`.
 
-`--commit`, in order:
-
-1. **Backend-not-serving — the only hard, non-overridable gate.** Probes
-   `GET /api/backend-identity` on the configured backend port. A backend that
-   responds but predates this endpoint fails closed — assume it might be
-   serving the target repo. A backend serving an *unrelated* repo never
-   blocks. This is the actual consistency invariant: two writers touching the
-   same files.
-2. **Stale temp-file sweep.** Removes orphaned atomic-write temp files a
-   previous, killed run may have left behind.
-3. **Transaction recovery.** Runs the same idempotent `recover_transactions`
-   the backend itself runs at startup, so upgrade steps always see a
-   consistent repo regardless of git-sync/promotion history.
-4. **Applies.** Git status is deliberately *not* a gate — an out-of-date,
-   actively-used repo routinely has uncommitted edits to the very files that
-   need migrating, and every step reads whatever is on disk right now and
-   carries it into the rewrite, so an uncommitted edit is never lost or
-   clobbered regardless of git state. When a touched file does have an
-   uncommitted local edit, `--commit` prints an informational note (which
-   files) so the operator knows to review the combined diff before
-   committing — it never refuses.
-
-Resumability: every step's `detect()` re-derives its finding from actual repo
-content, never from the `applied_upgrade_steps` stamp in `.arch-repo/config.yaml`
-— the stamp is reporting metadata only. Combined with atomic (temp-file +
-rename) writes and per-step/per-repo failure isolation, `--commit` may be
-interrupted at any point (killed process, crash, power loss) and safely
-re-run from scratch.
-
-On success, each repo's `.arch-repo/config.yaml` records `format_contract_version`
-and the applied step ids (`applied_upgrade_steps`) — metadata only; detection
-always stays probe-based against real content, so a hand-edited or stale stamp
-self-heals on the next run rather than causing incorrect skips.
-
-**Supported floor.** `arch-repair upgrade` covers format changes introduced by
-the ArchiMate-4-compliance effort (and its successors) forward — not this
-project's full history, most of which predates any migration tooling at all.
-Every report (human output and the `coverage_note` field in `--json`) states
-this explicitly: **a clean report means "no known issues," never "fully
-current."** The registered `unrecognized-structure-scan` step exists
-specifically to narrow that gap without overclaiming — it flags frontmatter
-that matches neither a current shape nor any other registered step's known
-legacy pattern (missing/unrecognized `artifact-type`, malformed frontmatter)
-as an always-manual, low-confidence finding, so an old or drifted repo's
-report is honestly incomplete-looking rather than falsely clean. It never
-attempts a rewrite. Closing a gap this step (or any other) can only flag,
-not fix, means either writing a new step once the shape is understood, or
-manual repair via the ordinary MCP write tools.
+For how to run an upgrade safely — target discovery, credentials, backups,
+quarantine and blocking findings, resuming a partial apply, the Docker startup
+behavior, and worked report examples — see the
+[upgrade guide](upgrade-guide.md).
 
 &nbsp;
 

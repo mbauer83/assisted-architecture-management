@@ -22,8 +22,9 @@ ArchiMate 4.0, …) and the ontology/connection-type data they contribute.
 - `src/application/runtime_catalogs.py` — `RuntimeCatalogs` bundles all four
   catalogs into one frozen dataclass injected at every composition root.
 
-**Distinguished from:** the self-model entity "Model Registry" (will be reconciled
-in WU-15/Phase J). In code, the canonical name is `ModuleCatalog`.
+**In the self-model:** the matching entity is "Module Catalog"
+(`APP@1712870400.yNhgdh.module-catalog`), aligned with the code's canonical name
+`ModuleCatalog`.
 
 ---
 

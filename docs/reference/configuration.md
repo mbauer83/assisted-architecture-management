@@ -106,6 +106,13 @@ externalization](../05-extensibility/ontology-modules.md#guidance-externalizatio
 The `storage.assurance` keys are written automatically by
 `arch-assurance init` and `arch-assurance use-backend` — see
 [Assurance: storage & confidentiality](../04-assurance/storage-and-confidentiality.md).
+For `signals_backend`: **`sqlcipher-colocated`** (recommended) stores security-signal
+snapshots inside the encrypted assurance store, behind the same unlock, classification,
+and audit path; **`sqlite`** is the unencrypted public database — deprecated for
+posture metrics, since findings then live outside the confidentiality boundary;
+**`encrypted`** is a legacy alias for `sqlcipher-colocated` — the runtime tolerates it,
+and `arch-repair upgrade` rewrites it to the explicit value (see the
+[upgrade guide](upgrade-guide.md#quarantine-and-blocking-findings)).
 The `assurance:` traversal budgets bound `GET /api/assurance/neighbors` (the assurance
 graph explorer): the size budgets produce deterministic partial results with frontier
 node ids, while the time budget aborts the whole request with a retryable error; every
